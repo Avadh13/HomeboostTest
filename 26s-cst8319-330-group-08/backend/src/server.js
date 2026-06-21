@@ -34,6 +34,7 @@ const allowedOrigins = [
   "http://127.0.0.1:5174",
   "http://127.0.0.1:5175",
   "http://127.0.0.1:8080",
+  "https://your-vercel-app.vercel.app",
 ];
 
 app.use(
