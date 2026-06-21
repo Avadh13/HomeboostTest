@@ -38,25 +38,33 @@ const allowedOrigins = [
   "https://homeboost-test.vercel.app",
   "https://homeboost-test-git-main-avadh13s-projects.vercel.app",
   "https://homeboost-test-3z0yyx449-avadh13s-projects.vercel.app",
+  "https://homeboost-test-dfx9x0438-avadh13s-projects.vercel.app",
 ];
+
 app.use(
   cors({
     origin(origin, callback) {
       if (!origin) return callback(null, true);
 
-      if (
+      const isAllowed =
         allowedOrigins.includes(origin) ||
         origin.endsWith(".vercel.app") ||
-        origin.endsWith(".railway.app")
-      ) {
+        origin.endsWith(".railway.app");
+
+      if (isAllowed) {
         return callback(null, true);
       }
 
+      console.log("CORS blocked origin:", origin);
       return callback(new Error(`CORS blocked origin: ${origin}`));
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+app.options("*", cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
