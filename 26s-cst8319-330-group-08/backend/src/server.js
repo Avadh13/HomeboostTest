@@ -23,6 +23,7 @@ const enrollmentRoutes = require("./routes/enrollmentRoutes");
 const adminPartnershipRoutes = require("./routes/adminPartnershipRoutes");
 const publicPartnershipRoutes = require("./routes/publicPartnershipRoutes");
 const messageRoutes = require("./routes/messageRoutes");
+
 const app = express();
 
 const allowedOrigins = [
@@ -64,8 +65,6 @@ app.use(
   })
 );
 
-app.options("*", cors());
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static("uploads"));
@@ -75,24 +74,45 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "success", message: "Backend API is working" });
+  res.json({
+    status: "success",
+    message: "Backend API is working",
+  });
 });
 
 app.get("/api/test-db", async (req, res) => {
   try {
     const [rows] = await pool.query("SELECT 1 + 1 AS result");
-    res.json({ status: "success", message: "Database connected successfully", result: rows[0].result });
+
+    res.json({
+      status: "success",
+      message: "Database connected successfully",
+      result: rows[0].result,
+    });
   } catch (error) {
-    res.status(500).json({ status: "error", message: "Database connection failed", error: error.message });
+    res.status(500).json({
+      status: "error",
+      message: "Database connection failed",
+      error: error.message,
+    });
   }
 });
 
 app.get("/api/test-tables", async (req, res) => {
   try {
     const [tables] = await pool.query("SHOW TABLES");
-    res.json({ status: "success", message: "Tables loaded successfully", tables });
+
+    res.json({
+      status: "success",
+      message: "Tables loaded successfully",
+      tables,
+    });
   } catch (error) {
-    res.status(500).json({ status: "error", message: "Could not load tables", error: error.message });
+    res.status(500).json({
+      status: "error",
+      message: "Could not load tables",
+      error: error.message,
+    });
   }
 });
 
@@ -116,13 +136,23 @@ app.use("/api/enrollment", enrollmentRoutes);
 app.use("/api/admin-partnerships", adminPartnershipRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/public-partnerships", publicPartnershipRoutes);
+
 app.use((req, res) => {
-  res.status(404).json({ status: "error", message: "API route not found", path: req.originalUrl });
+  res.status(404).json({
+    status: "error",
+    message: "API route not found",
+    path: req.originalUrl,
+  });
 });
 
 app.use((error, req, res, next) => {
   console.error("Server error:", error.message);
-  res.status(500).json({ status: "error", message: "Internal server error", error: error.message });
+
+  res.status(500).json({
+    status: "error",
+    message: "Internal server error",
+    error: error.message,
+  });
 });
 
 const PORT = process.env.PORT || 5000;
