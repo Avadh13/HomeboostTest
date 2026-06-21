@@ -34,9 +34,11 @@ const allowedOrigins = [
   "http://127.0.0.1:5174",
   "http://127.0.0.1:5175",
   "http://127.0.0.1:8080",
-  "https://your-vercel-app.vercel.app",
-];
 
+  "https://homeboost-test.vercel.app",
+  "https://homeboost-test-git-main-avadh13s-projects.vercel.app",
+  "https://homeboost-test-3z0yyx449-avadh13s-projects.vercel.app",
+];
 app.use(
   cors({
     origin(origin, callback) {
