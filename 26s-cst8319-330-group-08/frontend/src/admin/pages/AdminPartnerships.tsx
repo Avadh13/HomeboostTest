@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import API_BASE_URL from "../../api/api";
 import AdminLayout from "../components/AdminLayout";
 import ChatWidget from "../../components/ChatWidget";
+
 type HBTTeam = {
   id: number;
   name: string;
@@ -38,22 +39,26 @@ function AdminPartnerships() {
     {
       id: "hero",
       title: "Hero Banner",
-      description: "Employer name, benefit headline, and call-to-action buttons.",
+      description:
+        "Employer name, benefit headline, and call-to-action buttons.",
     },
     {
       id: "hbt-team",
       title: "Home Buying Team",
-      description: "Assigned HBT team contact details and support introduction.",
+      description:
+        "Assigned HBT team contact details and support introduction.",
     },
     {
       id: "resources",
       title: "Employee Resources",
-      description: "Guides, mortgage education, event links, and home buying materials.",
+      description:
+        "Guides, mortgage education, event links, and home buying materials.",
     },
     {
       id: "signup",
       title: "Employee Signup",
-      description: "Enrollment call-to-action connected to the company partnership slug.",
+      description:
+        "Enrollment call-to-action connected to the company partnership slug.",
     },
   ]);
 
@@ -69,6 +74,10 @@ function AdminPartnerships() {
   });
 
   const token = localStorage.getItem("token");
+
+  const getPublicPortalUrl = (slug: string) => {
+    return `${window.location.origin}/${encodeURIComponent(slug)}`;
+  };
 
   const loadPartnerships = async () => {
     const response = await fetch(`${API_BASE_URL}/admin-partnerships`, {
@@ -128,7 +137,10 @@ function AdminPartnerships() {
   };
 
   const selectedTeamName = useMemo(() => {
-    return teams.find((team) => String(team.id) === form.team_id)?.name || "No HBT assigned yet";
+    return (
+      teams.find((team) => String(team.id) === form.team_id)?.name ||
+      "No HBT assigned yet"
+    );
   }, [form.team_id, teams]);
 
   const handleCompanyNameChange = (value: string) => {
@@ -142,7 +154,9 @@ function AdminPartnerships() {
   const handleDrop = (targetId: string) => {
     if (!draggedBlockId || draggedBlockId === targetId) return;
 
-    const draggedIndex = blocks.findIndex((block) => block.id === draggedBlockId);
+    const draggedIndex = blocks.findIndex(
+      (block) => block.id === draggedBlockId
+    );
     const targetIndex = blocks.findIndex((block) => block.id === targetId);
 
     if (draggedIndex === -1 || targetIndex === -1) return;
@@ -184,7 +198,7 @@ function AdminPartnerships() {
         return;
       }
 
-      alert(`Partnership created successfully.\nPublic URL: ${data.public_url}`);
+      alert(`Partnership created successfully.\nPublic URL: /${form.slug}`);
 
       setForm({
         company_name: "",
@@ -243,18 +257,23 @@ function AdminPartnerships() {
           <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-700">
             Partnership Builder
           </p>
+
           <h2 className="mt-3 text-3xl font-black text-slate-950">
             Create company portals and assign the correct Home Buying Team
           </h2>
+
           <p className="mt-3 max-w-3xl text-slate-600">
-            This is the client-facing setup area. Admins can create employer companies,
-            connect them to an HBT team, and instantly generate a public branded URL.
+            This is the client-facing setup area. Admins can create employer
+            companies, connect them to an HBT team, and instantly generate a
+            public branded URL.
           </p>
         </section>
 
         <div className="grid gap-8 xl:grid-cols-[1fr_0.9fr]">
           <section className="rounded-3xl bg-white p-6 shadow-sm">
-            <h2 className="mb-5 text-xl font-black text-slate-950">Add Employer Company</h2>
+            <h2 className="mb-5 text-xl font-black text-slate-950">
+              Add Employer Company
+            </h2>
 
             <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
               <input
@@ -268,7 +287,9 @@ function AdminPartnerships() {
                 className="rounded-2xl border border-slate-200 p-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                 placeholder="URL Slug"
                 value={form.slug}
-                onChange={(e) => setForm({ ...form, slug: generateSlug(e.target.value) })}
+                onChange={(e) =>
+                  setForm({ ...form, slug: generateSlug(e.target.value) })
+                }
               />
 
               <select
@@ -288,14 +309,18 @@ function AdminPartnerships() {
                 className="rounded-2xl border border-slate-200 p-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 md:col-span-2"
                 placeholder="Logo URL"
                 value={form.logo_url}
-                onChange={(e) => setForm({ ...form, logo_url: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, logo_url: e.target.value })
+                }
               />
 
               <input
                 className="rounded-2xl border border-slate-200 p-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                 placeholder="Website URL"
                 value={form.website}
-                onChange={(e) => setForm({ ...form, website: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, website: e.target.value })
+                }
               />
 
               <input
@@ -309,7 +334,9 @@ function AdminPartnerships() {
                 className="rounded-2xl border border-slate-200 p-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                 placeholder="Contact Email"
                 value={form.contact_email}
-                onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, contact_email: e.target.value })
+                }
               />
 
               <select
@@ -331,19 +358,32 @@ function AdminPartnerships() {
           </section>
 
           <section className="rounded-3xl bg-slate-950 p-6 text-white shadow-sm">
-            <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-300">Live Preview</p>
+            <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-300">
+              Live Preview
+            </p>
+
             <h3 className="mt-3 text-3xl font-black">
               {form.company_name || "Company Name"}
             </h3>
+
             <p className="mt-2 text-blue-100">/{form.slug || "companyslug"}</p>
+
             <p className="mt-5 rounded-2xl bg-white/10 p-4 text-sm text-slate-200">
               Assigned HBT: <strong>{selectedTeamName}</strong>
             </p>
+
             <div className="mt-5 rounded-3xl bg-white p-5 text-slate-950">
-              <p className="text-sm font-bold text-blue-700">Employee Benefit Portal</p>
-              <h4 className="mt-2 text-2xl font-black">Home-buying guidance for employees</h4>
+              <p className="text-sm font-bold text-blue-700">
+                Employee Benefit Portal
+              </p>
+
+              <h4 className="mt-2 text-2xl font-black">
+                Home-buying guidance for employees
+              </h4>
+
               <p className="mt-2 text-sm text-slate-600">
-                Employees will access resources, quizzes, events, and booking support from this branded portal.
+                Employees will access resources, quizzes, events, and booking
+                support from this branded portal.
               </p>
             </div>
           </section>
@@ -352,11 +392,16 @@ function AdminPartnerships() {
         <section className="rounded-3xl bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-xl font-black text-slate-950">Drag-and-drop portal section plan</h2>
+              <h2 className="text-xl font-black text-slate-950">
+                Drag-and-drop portal section plan
+              </h2>
+
               <p className="mt-1 text-sm text-slate-600">
-                This builder plan helps the client decide the order of sections on employer portals.
+                This builder plan helps the client decide the order of sections
+                on employer portals.
               </p>
             </div>
+
             <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700">
               WordPress-style planning
             </span>
@@ -371,19 +416,31 @@ function AdminPartnerships() {
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={() => handleDrop(block.id)}
                 className={`cursor-grab rounded-2xl border p-5 transition hover:-translate-y-1 hover:shadow-lg ${
-                  draggedBlockId === block.id ? "border-blue-500 bg-blue-50" : "border-slate-100 bg-slate-50"
+                  draggedBlockId === block.id
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-slate-100 bg-slate-50"
                 }`}
               >
-                <p className="text-xs font-black uppercase tracking-wide text-slate-500">Block {index + 1}</p>
-                <h3 className="mt-2 text-lg font-black text-slate-950">{block.title}</h3>
-                <p className="mt-2 text-sm text-slate-600">{block.description}</p>
+                <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                  Block {index + 1}
+                </p>
+
+                <h3 className="mt-2 text-lg font-black text-slate-950">
+                  {block.title}
+                </h3>
+
+                <p className="mt-2 text-sm text-slate-600">
+                  {block.description}
+                </p>
               </div>
             ))}
           </div>
         </section>
 
         <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <h2 className="mb-5 text-xl font-black text-slate-950">Current Employer Partnerships</h2>
+          <h2 className="mb-5 text-xl font-black text-slate-950">
+            Current Employer Partnerships
+          </h2>
 
           {loading ? (
             <p>Loading partnerships...</p>
@@ -397,22 +454,45 @@ function AdminPartnerships() {
                   className="flex flex-col gap-4 rounded-2xl border border-slate-100 p-5 md:flex-row md:items-center md:justify-between"
                 >
                   <div>
-                    <h3 className="text-lg font-black text-slate-950">{partnership.employer_name}</h3>
-                    <p className="text-sm text-slate-600">URL: /{partnership.slug}</p>
-                    <p className="text-sm text-slate-600">HBT Team: {partnership.hbt_name}</p>
-                    <p className="text-sm text-slate-600">Status: {partnership.status}</p>
-                    {partnership.contact_email && <p className="text-sm text-slate-600">Email: {partnership.contact_email}</p>}
-                    {partnership.phone && <p className="text-sm text-slate-600">Phone: {partnership.phone}</p>}
+                    <h3 className="text-lg font-black text-slate-950">
+                      {partnership.employer_name}
+                    </h3>
+
+                    <p className="text-sm text-slate-600">
+                      URL: /{partnership.slug}
+                    </p>
+
+                    <p className="text-sm text-slate-600">
+                      HBT Team: {partnership.hbt_name}
+                    </p>
+
+                    <p className="text-sm text-slate-600">
+                      Status: {partnership.status}
+                    </p>
+
+                    {partnership.contact_email && (
+                      <p className="text-sm text-slate-600">
+                        Email: {partnership.contact_email}
+                      </p>
+                    )}
+
+                    {partnership.phone && (
+                      <p className="text-sm text-slate-600">
+                        Phone: {partnership.phone}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap gap-3">
                     <a
-                      href={`/${partnership.slug}`}
+                      href={getPublicPortalUrl(partnership.slug)}
                       target="_blank"
+                      rel="noopener noreferrer"
                       className="rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
                     >
                       View Page
                     </a>
+
                     <button
                       onClick={() => handleDelete(partnership.id)}
                       className="rounded-full bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700"
@@ -426,6 +506,7 @@ function AdminPartnerships() {
           )}
         </section>
       </div>
+
       <ChatWidget />
     </AdminLayout>
   );
