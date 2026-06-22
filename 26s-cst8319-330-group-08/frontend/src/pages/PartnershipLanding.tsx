@@ -103,7 +103,8 @@ function PartnershipLanding() {
     return [
       {
         id: 1,
-        full_name: partnership.team_name || partnership.hbt_name || "Home Buying Team",
+        full_name:
+          partnership.team_name || partnership.hbt_name || "Home Buying Team",
         title: "Home Buying Support Team",
         bio: "Your assigned Home Buying Team can help with guidance, resources, next steps, and appointment support.",
         photo_url: meetingImage,
@@ -154,8 +155,10 @@ function PartnershipLanding() {
 
   const primary = partnership.brand_primary_color || "#2563eb";
   const secondary = partnership.brand_secondary_color || "#eff6ff";
-  const partnershipSlug = partnership.partnership_slug || partnership.slug || slug || "";
-  const teamName = partnership.team_name || partnership.hbt_name || "Home Buying Team";
+  const partnershipSlug =
+    partnership.partnership_slug || partnership.slug || slug || "";
+  const teamName =
+    partnership.team_name || partnership.hbt_name || "Home Buying Team";
 
   return (
     <main
@@ -356,19 +359,19 @@ function PartnershipLanding() {
             </p>
           </div>
 
-          <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
             {fallbackMembers.map((member) => (
               <article
                 key={member.id}
-                className="overflow-hidden rounded-[2rem] bg-white/90 shadow-xl ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-2xl"
+                className="flex min-h-[720px] flex-col overflow-hidden rounded-[2rem] bg-white/90 shadow-xl ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-2xl"
               >
-                <div className="h-72 w-full overflow-hidden bg-slate-100">
+                <div className="h-[410px] w-full overflow-hidden bg-slate-100">
                   {member.photo_url ? (
                     <img
                       src={member.photo_url}
                       alt={member.full_name}
                       className="h-full w-full object-cover"
-                      style={{ objectPosition: "center 18%" }}
+                      style={{ objectPosition: "center 35%" }}
                     />
                   ) : (
                     <div
@@ -384,7 +387,7 @@ function PartnershipLanding() {
                   )}
                 </div>
 
-                <div className="p-7">
+                <div className="flex min-h-[310px] flex-1 flex-col p-7">
                   <h3 className="text-2xl font-black text-slate-950">
                     {member.full_name}
                   </h3>
@@ -404,7 +407,7 @@ function PartnershipLanding() {
                     </p>
                   )}
 
-                  <div className="mt-7 flex flex-wrap gap-3">
+                  <div className="mt-auto flex flex-wrap gap-3 pt-7">
                     <Link
                       to={`/signup?partnership=${partnershipSlug}`}
                       className="rounded-full px-6 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-1"
