@@ -3,6 +3,16 @@ const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const isValidName = (value) => /^[a-zA-Z\s'.-]+$/.test(value);
 const isValidSlug = (value) => /^[a-z0-9-]+$/i.test(value);
 
+const sendValidationErrors = (res, errors) => {
+  const details = errors.map((error) => `${error.field}: ${error.message}`).join("; ");
+
+  return res.status(400).json({
+    status: "error",
+    message: details || "Validation failed",
+    errors,
+  });
+};
+
 const validateRegister = (req, res, next) => {
   const errors = [];
   const fullName = normalizeString(req.body.full_name);
@@ -11,7 +21,7 @@ const validateRegister = (req, res, next) => {
   const partnershipSlug = normalizeString(req.body.partnership_slug);
 
   if (!fullName || fullName.length < 2 || fullName.length > 100 || !isValidName(fullName)) {
-    errors.push({ field: "full_name", message: "Full name must be 2-100 characters and contain only valid name characters" });
+    errors.push({ field: "full_name", message: "Full name must be 2-100 characters and use letters, spaces, apostrophes, periods, or hyphens only" });
   }
 
   if (!email || !isValidEmail(email)) {
@@ -27,7 +37,7 @@ const validateRegister = (req, res, next) => {
   }
 
   if (errors.length > 0) {
-    return res.status(400).json({ status: "error", message: "Validation failed", errors });
+    return sendValidationErrors(res, errors);
   }
 
   req.body.full_name = fullName;
@@ -50,7 +60,7 @@ const validateLogin = (req, res, next) => {
   }
 
   if (errors.length > 0) {
-    return res.status(400).json({ status: "error", message: "Validation failed", errors });
+    return sendValidationErrors(res, errors);
   }
 
   req.body.email = email;
