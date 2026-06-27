@@ -11,19 +11,17 @@ type AdminLayoutProps = {
 function AdminLayout({ title, children }: AdminLayoutProps) {
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const token = localStorage.getItem("token");
 
   useEffect(() => {
+    const headers = { Authorization: `Bearer ${token}` };
+
     const fetchUnreadMessages = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/contact`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
+        const response = await fetch(`${API_BASE_URL}/contact`, { headers });
         const data = await response.json();
 
         if (Array.isArray(data)) {
@@ -34,8 +32,19 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
       }
     };
 
+    const fetchUnreadNotifications = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/notifications/unread-count`, { headers });
+        const data = await response.json();
+        setUnreadNotifications(Number(data.unread_count || 0));
+      } catch {
+        setUnreadNotifications(0);
+      }
+    };
+
     if (token) {
       fetchUnreadMessages();
+      fetchUnreadNotifications();
     }
   }, [token]);
 
@@ -47,6 +56,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
 
   const navLinks = [
     { path: "/admin", label: "Dashboard" },
+    { path: "/notifications", label: "Notifications" },
     { path: "/admin/builder", label: "Builder Mode" },
     { path: "/admin/hbts", label: "Home Buying Teams" },
     { path: "/admin/partnerships", label: "Partnerships" },
@@ -111,6 +121,12 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
                 {link.label === "Messages" && unreadCount > 0 && (
                   <span className="rounded-full bg-red-500 px-2 py-1 text-xs text-white">
                     {unreadCount}
+                  </span>
+                )}
+
+                {link.label === "Notifications" && unreadNotifications > 0 && (
+                  <span className="rounded-full bg-red-500 px-2 py-1 text-xs text-white">
+                    {unreadNotifications}
                   </span>
                 )}
               </NavLink>
