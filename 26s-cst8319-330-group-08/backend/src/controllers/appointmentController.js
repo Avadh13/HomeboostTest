@@ -2,6 +2,11 @@ const pool = require("../config/db");
 
 const VALID_STATUSES = new Set(["pending", "approved", "rejected", "completed"]);
 
+const normalizeDateForMySQL = (value) => {
+  if (!value) return null;
+  return String(value).trim().replace("T", " ");
+};
+
 const canManageAppointment = (user, appointment) => {
   if (!user || !appointment) return false;
 
@@ -32,7 +37,7 @@ exports.createAppointment = async (req, res, next) => {
       return res.status(400).json({ status: "error", message: "Employee account is not linked to a partnership" });
     }
 
-    let teamMemberId = team_member_id || null;
+    const teamMemberId = team_member_id || null;
 
     if (teamMemberId) {
       const [members] = await pool.query(
@@ -60,7 +65,7 @@ exports.createAppointment = async (req, res, next) => {
         teamMemberId,
         partnershipId,
         String(topic).trim(),
-        preferred_date || null,
+        normalizeDateForMySQL(preferred_date),
         message ? String(message).trim() : null,
       ]
     );
