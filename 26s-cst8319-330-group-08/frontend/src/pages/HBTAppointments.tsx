@@ -41,6 +41,46 @@ const getTime = (value?: string | null) => {
   return Number.isNaN(time) ? 0 : time;
 };
 
+const getPreferredTimeStyle = (appointment: Appointment) => {
+  if (!appointment.preferred_date) {
+    return {
+      className: "bg-slate-100 text-slate-600 border-slate-200",
+      label: "No time selected",
+    };
+  }
+
+  const activeStatus = appointment.status === "pending" || appointment.status === "approved";
+  const preferredTime = getTime(appointment.preferred_date);
+  const now = Date.now();
+  const twentyFourHours = 24 * 60 * 60 * 1000;
+
+  if (activeStatus && preferredTime < now) {
+    return {
+      className: "bg-red-50 text-red-700 border-red-200",
+      label: "Past due",
+    };
+  }
+
+  if (activeStatus && preferredTime - now <= twentyFourHours) {
+    return {
+      className: "bg-amber-50 text-amber-800 border-amber-200",
+      label: "Soon",
+    };
+  }
+
+  if (appointment.status === "completed") {
+    return {
+      className: "bg-emerald-50 text-emerald-800 border-emerald-200",
+      label: "Resolved",
+    };
+  }
+
+  return {
+    className: "bg-slate-100 text-slate-700 border-slate-200",
+    label: "Scheduled",
+  };
+};
+
 function HBTAppointments() {
   const token = localStorage.getItem("token");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -322,6 +362,7 @@ function HBTAppointments() {
             <div className="space-y-5">
               {filteredAppointments.map((appointment) => {
                 const draft = drafts[appointment.id] || { advisor_note: "", meeting_link: "" };
+                const preferredTimeStyle = getPreferredTimeStyle(appointment);
 
                 return (
                   <article key={appointment.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-6">
@@ -336,7 +377,12 @@ function HBTAppointments() {
 
                     <div className="mt-4 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
                       <p><strong>Requested expert:</strong> {appointment.team_member_name || "Any available team member"}</p>
-                      <p><strong>Preferred time:</strong> {appointment.preferred_date ? new Date(appointment.preferred_date).toLocaleString() : "Not specified"}</p>
+                      <div className={`rounded-2xl border px-4 py-3 font-bold ${preferredTimeStyle.className}`}>
+                        <p>
+                          Preferred time: {appointment.preferred_date ? new Date(appointment.preferred_date).toLocaleString() : "Not specified"}
+                        </p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.16em]">{preferredTimeStyle.label}</p>
+                      </div>
                     </div>
 
                     {appointment.message && <p className="mt-4 rounded-2xl bg-white p-4 text-sm leading-relaxed text-slate-600">{appointment.message}</p>}
