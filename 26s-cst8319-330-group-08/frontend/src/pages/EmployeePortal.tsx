@@ -35,6 +35,7 @@ function EmployeePortal() {
   const navigate = useNavigate();
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -45,6 +46,13 @@ function EmployeePortal() {
       .then((payload) => setData(payload.status === "success" ? payload : null))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
+
+    fetch(`${API_BASE_URL}/notifications/unread-count`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((payload) => setUnreadCount(Number(payload.unread_count || 0)))
+      .catch(() => setUnreadCount(0));
   }, [token]);
 
   const logout = () => {
@@ -96,6 +104,10 @@ function EmployeePortal() {
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
+              <Link to="/notifications" className="relative rounded-full bg-blue-600 px-6 py-3 font-bold text-white transition hover:-translate-y-0.5 hover:bg-blue-700">
+                Notifications
+                {unreadCount > 0 && <span className="absolute -right-2 -top-2 rounded-full bg-red-600 px-2 py-0.5 text-xs font-black text-white">{unreadCount}</span>}
+              </Link>
               <Link to="/employee/appointments" className="rounded-full bg-slate-950 px-6 py-3 font-bold text-white transition hover:-translate-y-0.5 hover:bg-blue-700">
                 My Appointments
               </Link>
