@@ -7,6 +7,24 @@ const normalizeDateForMySQL = (value) => {
   return String(value).trim().replace("T", " ");
 };
 
+const normalizeOptionalText = (value, maxLength = 1000) => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, maxLength);
+};
+
+const normalizeMeetingLink = (value) => {
+  const link = normalizeOptionalText(value, 500);
+  if (!link) return null;
+
+  if (!/^https?:\/\//i.test(link)) {
+    return `https://${link}`;
+  }
+
+  return link;
+};
+
 const canManageAppointment = (user, appointment) => {
   if (!user || !appointment) return false;
 
@@ -92,6 +110,8 @@ exports.getMyAppointments = async (req, res, next) => {
         a.topic,
         a.preferred_date,
         a.message,
+        a.advisor_note,
+        a.meeting_link,
         a.status,
         a.created_at,
         a.updated_at,
@@ -128,6 +148,8 @@ exports.getHBTAppointments = async (req, res, next) => {
         a.topic,
         a.preferred_date,
         a.message,
+        a.advisor_note,
+        a.meeting_link,
         a.status,
         a.created_at,
         a.updated_at,
@@ -175,6 +197,8 @@ exports.getAdminAppointments = async (req, res, next) => {
         a.topic,
         a.preferred_date,
         a.message,
+        a.advisor_note,
+        a.meeting_link,
         a.status,
         a.created_at,
         a.updated_at,
@@ -227,9 +251,17 @@ exports.updateAppointmentStatus = async (req, res, next) => {
       return res.status(403).json({ status: "error", message: "You are not allowed to update this appointment" });
     }
 
-    await pool.query("UPDATE appointments SET status = ? WHERE id = ?", [status, id]);
+    const advisorNote = normalizeOptionalText(req.body.advisor_note);
+    const meetingLink = normalizeMeetingLink(req.body.meeting_link);
 
-    res.json({ status: "success", message: "Appointment status updated successfully" });
+    await pool.query(
+      `UPDATE appointments
+       SET status = ?, advisor_note = ?, meeting_link = ?
+       WHERE id = ?`,
+      [status, advisorNote, meetingLink, id]
+    );
+
+    res.json({ status: "success", message: "Appointment updated successfully" });
   } catch (error) {
     next(error);
   }
