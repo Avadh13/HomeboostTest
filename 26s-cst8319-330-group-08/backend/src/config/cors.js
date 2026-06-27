@@ -9,24 +9,24 @@ const getAllowedOrigins = () => {
     .map(normalizeOrigin)
     .filter(Boolean);
 
-  if (envOrigins.length > 0) {
-    return [...new Set(envOrigins)];
-  }
+  const defaultOrigins = process.env.NODE_ENV === "production"
+    ? ["https://homeboost-test.vercel.app"]
+    : [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://localhost:8080",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
+        "http://127.0.0.1:8080",
+      ];
 
-  if (process.env.NODE_ENV === "production") {
-    return ["https://homeboost-test.vercel.app"];
-  }
+  return [...new Set([...defaultOrigins, ...envOrigins])];
+};
 
-  return [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "http://localhost:8080",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:5174",
-    "http://127.0.0.1:5175",
-    "http://127.0.0.1:8080",
-  ];
+const isAllowedVercelPreview = (origin) => {
+  return /^https:\/\/homeboost-test-[a-z0-9-]+-avadh13s-projects\.vercel\.app$/i.test(origin);
 };
 
 const corsOptions = {
@@ -36,7 +36,7 @@ const corsOptions = {
     const allowedOrigins = getAllowedOrigins();
     const requestOrigin = normalizeOrigin(origin);
 
-    if (allowedOrigins.includes(requestOrigin)) {
+    if (allowedOrigins.includes(requestOrigin) || isAllowedVercelPreview(requestOrigin)) {
       return callback(null, true);
     }
 
