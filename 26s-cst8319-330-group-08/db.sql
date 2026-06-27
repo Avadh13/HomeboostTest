@@ -19,7 +19,7 @@
 -- node src/seed/createHBTUser.js
 -- node src/seed/createEmployeeUser.js
 -- =========================================================
-use project2;
+USE project2;
 SET FOREIGN_KEY_CHECKS = 0;
 
 DROP TABLE IF EXISTS quiz_answers;
@@ -39,6 +39,7 @@ DROP TABLE IF EXISTS pages;
 
 DROP TABLE IF EXISTS resources;
 DROP TABLE IF EXISTS team_members;
+DROP TABLE IF EXISTS enrollment_batches;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS partnerships;
 DROP TABLE IF EXISTS employers;
@@ -70,6 +71,7 @@ CREATE TABLE employers (
   logo_url VARCHAR(500),
   address VARCHAR(255),
   phone VARCHAR(50),
+  contact_email VARCHAR(255),
   website VARCHAR(255),
   brand_primary_color VARCHAR(50) DEFAULT '#000000',
   brand_secondary_color VARCHAR(50) DEFAULT '#ffffff',
@@ -100,7 +102,7 @@ CREATE TABLE users (
   full_name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   password VARCHAR(255) NOT NULL,
-  role ENUM('super_admin', 'admin', 'hbt_admin', 'employee') NOT NULL DEFAULT 'employee',
+  role ENUM('super_admin', 'admin', 'hbt_admin', 'hbt_member', 'employee') NOT NULL DEFAULT 'employee',
   team_id INT NULL,
   partnership_id INT NULL,
   enrollment_batch_id INT NULL,
@@ -143,6 +145,7 @@ ALTER TABLE users
 
 CREATE TABLE team_members (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NULL,
   team_id INT NOT NULL,
   full_name VARCHAR(255) NOT NULL,
   title VARCHAR(255),
@@ -153,6 +156,10 @@ CREATE TABLE team_members (
   booking_link VARCHAR(500),
   is_active TINYINT(1) DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_team_members_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE SET NULL,
 
   CONSTRAINT fk_team_members_team
     FOREIGN KEY (team_id) REFERENCES home_buying_teams(id)
@@ -386,6 +393,7 @@ CREATE INDEX idx_partnerships_slug ON partnerships(slug);
 
 CREATE INDEX idx_employers_slug ON employers(slug);
 CREATE INDEX idx_team_members_team_id ON team_members(team_id);
+CREATE INDEX idx_team_members_user_id ON team_members(user_id);
 
 CREATE INDEX idx_resources_team_id ON resources(team_id);
 CREATE INDEX idx_events_team_id ON events(team_id);
@@ -412,13 +420,14 @@ VALUES
 );
 
 INSERT INTO employers
-(name, logo_url, address, phone, website, brand_primary_color, brand_secondary_color, slug)
+(name, logo_url, address, phone, contact_email, website, brand_primary_color, brand_secondary_color, slug)
 VALUES
 (
   'Joe''s Smoke Shop',
   'https://images.unsplash.com/photo-1556740758-90de374c12ad?auto=format&fit=crop&w=900&q=80',
   '100 Partnership Street, Ottawa, ON',
   '613-555-0200',
+  'contact@example.com',
   'https://example.com',
   '#7C2D12',
   '#FFF7ED',
