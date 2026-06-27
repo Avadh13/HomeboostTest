@@ -50,6 +50,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
     { path: "/admin/builder", label: "Builder Mode" },
     { path: "/admin/hbts", label: "Home Buying Teams" },
     { path: "/admin/partnerships", label: "Partnerships" },
+    { path: "/admin/appointments", label: "Appointments" },
     { path: "/admin/users", label: "Users" },
     { path: "/admin/resources", label: "Resources" },
     { path: "/admin/pages", label: "Pages" },
