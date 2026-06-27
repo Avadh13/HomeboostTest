@@ -95,9 +95,14 @@ function EmployeePortal() {
                 <h1 className="text-2xl font-black">Welcome, {employee.full_name}</h1>
               </div>
             </div>
-            <button onClick={logout} className="rounded-full bg-red-600 px-6 py-3 font-bold text-white transition hover:-translate-y-0.5 hover:bg-red-700">
-              Logout
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <Link to="/employee/appointments" className="rounded-full bg-slate-950 px-6 py-3 font-bold text-white transition hover:-translate-y-0.5 hover:bg-blue-700">
+                My Appointments
+              </Link>
+              <button onClick={logout} className="rounded-full bg-red-600 px-6 py-3 font-bold text-white transition hover:-translate-y-0.5 hover:bg-red-700">
+                Logout
+              </button>
+            </div>
           </header>
 
           <section className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
@@ -105,7 +110,7 @@ function EmployeePortal() {
               <p className="text-sm font-black uppercase tracking-[0.25em]" style={{ color: primary }}>Your benefit hub</p>
               <h2 className="mt-3 text-4xl font-black tracking-tight md:text-5xl">Your home-buying roadmap starts here.</h2>
               <p className="mt-5 max-w-2xl text-lg leading-relaxed text-slate-600">
-                Your program is supported by <strong>{employee.team_name}</strong>. Start with resources, take the readiness quiz, then book time with a trusted expert when you are ready.
+                Your program is supported by <strong>{employee.team_name}</strong>. Start with resources, take the readiness quiz, then request time with a trusted expert when you are ready.
               </p>
               <div className="mt-8 flex flex-wrap gap-4">
                 <Link to="/resources" className="btn-primary" style={{ background: primary }}>
@@ -113,6 +118,9 @@ function EmployeePortal() {
                 </Link>
                 <Link to="/quiz" className="btn-secondary">
                   Take Readiness Quiz
+                </Link>
+                <Link to="/employee/appointments" className="rounded-full bg-slate-950 px-7 py-3 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-blue-700">
+                  Request Appointment
                 </Link>
               </div>
             </div>
@@ -184,7 +192,7 @@ function EmployeePortal() {
                 <p className="text-sm font-black uppercase tracking-[0.22em]" style={{ color: primary }}>Connect</p>
                 <h2 className="text-3xl font-black">Your Home Buying Team</h2>
               </div>
-              <p className="max-w-2xl text-slate-600">Book an appointment with a specialist when you are ready to talk through your next step.</p>
+              <p className="max-w-2xl text-slate-600">Request an appointment with a specialist when you are ready to talk through your next step.</p>
             </div>
             <div className="grid gap-5 md:grid-cols-3">
               {data.team_members.map((member) => (
@@ -194,11 +202,9 @@ function EmployeePortal() {
                     <h3 className="text-xl font-black">{member.full_name}</h3>
                     <p className="font-semibold" style={{ color: primary }}>{member.title}</p>
                     <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-600">{member.bio}</p>
-                    {member.booking_link && (
-                      <a href={member.booking_link} target="_blank" rel="noreferrer" className="mt-5 inline-flex rounded-full px-5 py-2.5 text-sm font-black text-white" style={{ backgroundColor: primary }}>
-                        Book appointment
-                      </a>
-                    )}
+                    <Link to="/employee/appointments" className="mt-5 inline-flex rounded-full px-5 py-2.5 text-sm font-black text-white" style={{ backgroundColor: primary }}>
+                      Request appointment
+                    </Link>
                   </div>
                 </div>
               ))}
