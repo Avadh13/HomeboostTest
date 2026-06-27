@@ -36,14 +36,14 @@ setInterval(() => {
 }, 15 * 60 * 1000).unref();
 
 const authLimiter = createLimiter({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-  message: "Too many authentication attempts. Please try again later.",
+  windowMs: 5 * 60 * 1000,
+  limit: 50,
+  message: "Too many login attempts. Please wait 5 minutes and try again.",
 });
 
 const apiLimiter = createLimiter({
   windowMs: 15 * 60 * 1000,
-  limit: 300,
+  limit: 600,
   message: "Too many requests. Please slow down and try again later.",
 });
 
