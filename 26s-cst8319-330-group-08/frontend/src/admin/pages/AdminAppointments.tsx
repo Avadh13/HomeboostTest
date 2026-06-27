@@ -7,6 +7,8 @@ type Appointment = {
   topic: string;
   preferred_date?: string | null;
   message?: string | null;
+  advisor_note?: string | null;
+  meeting_link?: string | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -60,17 +62,21 @@ function AdminAppointments() {
     loadAppointments();
   }, []);
 
-  const updateStatus = async (id: number, status: string) => {
+  const updateStatus = async (appointment: Appointment, status: string) => {
     setNotice(null);
     try {
-      setUpdatingId(id);
-      const response = await fetch(`${API_BASE_URL}/appointments/${id}/status`, {
+      setUpdatingId(appointment.id);
+      const response = await fetch(`${API_BASE_URL}/appointments/${appointment.id}/status`, {
         method: "PUT",
         headers: {
           ...headers,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          status,
+          advisor_note: appointment.advisor_note || "",
+          meeting_link: appointment.meeting_link || "",
+        }),
       });
 
       const data = await response.json().catch(() => ({}));
@@ -105,7 +111,7 @@ function AdminAppointments() {
         <section className="rounded-3xl bg-gradient-to-r from-slate-950 to-blue-950 p-8 text-white shadow-xl">
           <p className="text-sm font-bold uppercase tracking-[0.25em] text-blue-200">Platform Activity</p>
           <h1 className="mt-3 text-4xl font-black">Appointment Requests</h1>
-          <p className="mt-3 max-w-3xl text-blue-100">Monitor employee requests across employer partnerships and Home Buying Teams.</p>
+          <p className="mt-3 max-w-3xl text-blue-100">Monitor employee requests, advisor messages, and meeting links across employer partnerships.</p>
         </section>
 
         {notice && (
@@ -143,13 +149,14 @@ function AdminAppointments() {
             <div className="rounded-2xl bg-slate-50 p-8 text-center text-slate-600">No appointment requests yet.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1100px] text-left text-sm">
+              <table className="w-full min-w-[1250px] text-left text-sm">
                 <thead>
                   <tr className="border-b bg-slate-50 text-slate-600">
                     <th className="p-4">Employee</th>
                     <th className="p-4">Employer</th>
                     <th className="p-4">HBT</th>
                     <th className="p-4">Topic</th>
+                    <th className="p-4">Advisor Response</th>
                     <th className="p-4">Preferred</th>
                     <th className="p-4">Status</th>
                     <th className="p-4">Actions</th>
@@ -171,6 +178,14 @@ function AdminAppointments() {
                         <p className="font-semibold">{appointment.topic}</p>
                         {appointment.team_member_name && <p className="text-slate-500">For {appointment.team_member_name}</p>}
                       </td>
+                      <td className="p-4 max-w-xs">
+                        {appointment.meeting_link ? (
+                          <a href={appointment.meeting_link} target="_blank" rel="noreferrer" className="font-bold text-blue-700 hover:underline">Open meeting link</a>
+                        ) : (
+                          <p className="text-slate-400">No link</p>
+                        )}
+                        {appointment.advisor_note && <p className="mt-2 line-clamp-3 text-slate-600">{appointment.advisor_note}</p>}
+                      </td>
                       <td className="p-4">{appointment.preferred_date ? new Date(appointment.preferred_date).toLocaleString() : "Not specified"}</td>
                       <td className="p-4">
                         <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${statusClasses[appointment.status] || statusClasses.pending}`}>{appointment.status}</span>
@@ -180,7 +195,7 @@ function AdminAppointments() {
                           className="rounded-xl border border-slate-200 bg-white p-2"
                           value={appointment.status}
                           disabled={updatingId === appointment.id}
-                          onChange={(e) => updateStatus(appointment.id, e.target.value)}
+                          onChange={(e) => updateStatus(appointment, e.target.value)}
                         >
                           <option value="pending">Pending</option>
                           <option value="approved">Approved</option>
