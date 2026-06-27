@@ -6,7 +6,14 @@ const protect = async (req, res, next) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ status: "error", message: "Not authorized. No token provided." });
+      return res.status(401).json({
+        status: "error",
+        message: "Not authorized. No token provided.",
+      });
+    }
+
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT_SECRET is not configured");
     }
 
     const token = authHeader.split(" ")[1];
@@ -33,7 +40,10 @@ const protect = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    res.status(401).json({ status: "error", message: "Not authorized. Invalid token.", error: error.message });
+    return res.status(401).json({
+      status: "error",
+      message: "Not authorized. Invalid or expired token.",
+    });
   }
 };
 

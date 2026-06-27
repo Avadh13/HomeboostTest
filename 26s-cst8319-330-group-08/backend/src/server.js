@@ -1,8 +1,12 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 require("dotenv").config();
 
 const pool = require("./config/db");
+const { corsOptions } = require("./config/cors");
+const { apiLimiter } = require("./middleware/rateLimiter");
+const errorHandler = require("./middleware/errorHandler");
 const authRoutes = require("./routes/authRoutes");
 const resourceRoutes = require("./routes/resourceRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -26,47 +30,18 @@ const messageRoutes = require("./routes/messageRoutes");
 
 const app = express();
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "http://localhost:5175",
-  "http://localhost:8080",
-  "http://127.0.0.1:5173",
-  "http://127.0.0.1:5174",
-  "http://127.0.0.1:5175",
-  "http://127.0.0.1:8080",
-
-  "https://homeboost-test.vercel.app",
-  "https://homeboost-test-git-main-avadh13s-projects.vercel.app",
-  "https://homeboost-test-3z0yyx449-avadh13s-projects.vercel.app",
-  "https://homeboost-test-dfx9x0438-avadh13s-projects.vercel.app",
-];
+app.set("trust proxy", 1);
 
 app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin) return callback(null, true);
-
-      const isAllowed =
-        allowedOrigins.includes(origin) ||
-        origin.endsWith(".vercel.app") ||
-        origin.endsWith(".railway.app");
-
-      if (isAllowed) {
-        return callback(null, true);
-      }
-
-      console.log("CORS blocked origin:", origin);
-      return callback(new Error(`CORS blocked origin: ${origin}`));
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cors(corsOptions));
+app.use(apiLimiter);
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use("/uploads", express.static("uploads"));
 
 app.get("/", (req, res) => {
@@ -80,7 +55,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-app.get("/api/test-db", async (req, res) => {
+app.get("/api/test-db", async (req, res, next) => {
   try {
     const [rows] = await pool.query("SELECT 1 + 1 AS result");
 
@@ -90,15 +65,11 @@ app.get("/api/test-db", async (req, res) => {
       result: rows[0].result,
     });
   } catch (error) {
-    res.status(500).json({
-      status: "error",
-      message: "Database connection failed",
-      error: error.message,
-    });
+    next(error);
   }
 });
 
-app.get("/api/test-tables", async (req, res) => {
+app.get("/api/test-tables", async (req, res, next) => {
   try {
     const [tables] = await pool.query("SHOW TABLES");
 
@@ -108,11 +79,7 @@ app.get("/api/test-tables", async (req, res) => {
       tables,
     });
   } catch (error) {
-    res.status(500).json({
-      status: "error",
-      message: "Could not load tables",
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -145,18 +112,10 @@ app.use((req, res) => {
   });
 });
 
-app.use((error, req, res, next) => {
-  console.error("Server error:", error.message);
-
-  res.status(500).json({
-    status: "error",
-    message: "Internal server error",
-    error: error.message,
-  });
-});
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
+  console.log(`Backend running on port ${PORT}`);
 });
