@@ -7,36 +7,47 @@ function Contact() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<{ type: "error" | "success"; message: string } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setNotice(null);
 
-    const response = await fetch(`${API_BASE_URL}/contact`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        full_name: fullName,
-        email,
-        phone,
-        message,
-      }),
-    });
+    try {
+      setLoading(true);
 
-    const data = await response.json();
+      const response = await fetch(`${API_BASE_URL}/contact`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          full_name: fullName.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          message: message.trim(),
+        }),
+      });
 
-    if (!response.ok) {
-      alert(data.message);
-      return;
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setNotice({ type: "error", message: data.message || `Message failed with status ${response.status}` });
+        return;
+      }
+
+      setNotice({ type: "success", message: "Message sent successfully. We will get back to you soon." });
+      setFullName("");
+      setEmail("");
+      setPhone("");
+      setMessage("");
+    } catch (error) {
+      console.error("Contact submit error:", error);
+      setNotice({ type: "error", message: "Could not send message. Please try again later." });
+    } finally {
+      setLoading(false);
     }
-
-    alert("Message sent successfully");
-
-    setFullName("");
-    setEmail("");
-    setPhone("");
-    setMessage("");
   };
 
   return (
@@ -55,12 +66,25 @@ function Contact() {
             Send us a message and we will get back to you soon.
           </p>
 
+          {notice && (
+            <div
+              className={`mb-6 rounded-2xl border px-4 py-3 text-sm font-semibold ${
+                notice.type === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-red-200 bg-red-50 text-red-700"
+              }`}
+            >
+              {notice.message}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit}>
             <input
               className="w-full border p-3 rounded mb-4"
               placeholder="Full Name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
+              required
             />
 
             <input
@@ -69,6 +93,7 @@ function Contact() {
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
             />
 
             <input
@@ -83,10 +108,11 @@ function Contact() {
               placeholder="Message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
+              required
             />
 
-            <button className="bg-black text-white px-6 py-3 rounded-lg">
-              Send Message
+            <button disabled={loading} className="bg-black text-white px-6 py-3 rounded-lg disabled:opacity-60">
+              {loading ? "Sending..." : "Send Message"}
             </button>
           </form>
         </div>
