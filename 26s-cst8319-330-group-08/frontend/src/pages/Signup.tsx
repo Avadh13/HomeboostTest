@@ -6,6 +6,17 @@ import Navbar from "../components/Navbar";
 const signupImage =
   "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80";
 
+const readResponse = async (response: Response) => {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
+};
+
 function Signup() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -23,7 +34,7 @@ function Signup() {
   const handleEmployeeSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!partnershipSlug) {
+    if (!partnershipSlug.trim()) {
       alert("Partnership slug is missing. Please sign up from your employer page.");
       return;
     }
@@ -33,8 +44,8 @@ function Signup() {
       return;
     }
 
-    if (password.length < 6) {
-      alert("Password must be at least 6 characters");
+    if (password.length < 8) {
+      alert("Password must be at least 8 characters");
       return;
     }
 
@@ -43,20 +54,27 @@ function Signup() {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ full_name: fullName, email, password, partnership_slug: partnershipSlug }),
+        body: JSON.stringify({
+          full_name: fullName.trim(),
+          email: email.trim(),
+          password,
+          partnership_slug: partnershipSlug.trim(),
+        }),
       });
 
-      const data = await response.json();
+      const data = await readResponse(response) as { message?: string; errors?: { message: string }[] };
 
       if (!response.ok) {
-        alert(data.message || "Signup failed");
+        const validationMessage = data.errors?.map((error) => error.message).join("\n");
+        alert(validationMessage || data.message || `Signup failed with status ${response.status}`);
         return;
       }
 
       alert("Account created successfully. Please login.");
       navigate("/login");
-    } catch {
-      alert("Backend is not running or signup API failed.");
+    } catch (error) {
+      console.error("Signup error:", error);
+      alert(`Signup API failed. Check backend URL: ${API_BASE_URL}/auth/register`);
     } finally {
       setLoading(false);
     }
