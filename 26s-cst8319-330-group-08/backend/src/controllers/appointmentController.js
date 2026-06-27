@@ -29,6 +29,10 @@ const normalizeMeetingLink = (value) => {
 
 const pad = (value) => String(value).padStart(2, "0");
 const toDateTime = (date, minutes) => `${date} ${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}:00`;
+const toMinutes = (timeText) => {
+  const [hours, minutes] = String(timeText || "09:00:00").split(":").map(Number);
+  return (hours || 0) * 60 + (minutes || 0);
+};
 const toDisplayTime = (dateTime) =>
   new Date(dateTime.replace(" ", "T")).toLocaleTimeString([], {
     hour: "numeric",
@@ -37,13 +41,10 @@ const toDisplayTime = (dateTime) =>
 
 const canManageAppointment = (user, appointment) => {
   if (!user || !appointment) return false;
-
   if (user.role === "admin" || user.role === "super_admin") return true;
-
   if (user.role === "hbt_admin" || user.role === "hbt_member") {
     return Number(user.team_id) === Number(appointment.team_id);
   }
-
   return false;
 };
 
@@ -91,6 +92,56 @@ const findAppointmentConflict = async ({ teamMemberId, startDateTime, excludeApp
   );
 
   return rows[0] || null;
+};
+
+const getAdvisorWorkWindow = async ({ teamMemberId, date }) => {
+  const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT start_time, end_time, is_available
+       FROM advisor_availability
+       WHERE team_member_id = ? AND day_of_week = ?
+       LIMIT 1`,
+      [teamMemberId, dayOfWeek]
+    );
+
+    if (rows.length > 0) {
+      const row = rows[0];
+      return {
+        isAvailable: Boolean(row.is_available),
+        startMinutes: toMinutes(row.start_time),
+        endMinutes: toMinutes(row.end_time),
+        source: "custom",
+      };
+    }
+  } catch (error) {
+    console.warn("advisor_availability table unavailable, using fallback hours");
+  }
+
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    return { isAvailable: false, startMinutes: 9 * 60, endMinutes: 17 * 60, source: "fallback" };
+  }
+
+  return { isAvailable: true, startMinutes: 9 * 60, endMinutes: 17 * 60, source: "fallback" };
+};
+
+const isBlockedByTimeOff = async ({ teamMemberId, startDateTime }) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id
+       FROM advisor_time_off
+       WHERE team_member_id = ?
+         AND start_datetime < DATE_ADD(?, INTERVAL 60 MINUTE)
+         AND end_datetime > ?
+       LIMIT 1`,
+      [teamMemberId, startDateTime, startDateTime]
+    );
+
+    return rows.length > 0;
+  } catch (error) {
+    return false;
+  }
 };
 
 const notifyAppointmentCreated = async ({ employee, partnershipId, teamId, topic }) => {
@@ -171,24 +222,25 @@ exports.getAvailableTimes = async (req, res, next) => {
       return res.status(403).json({ status: "error", message: "Advisor is not available for this account" });
     }
 
-    const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
+    const workWindow = await getAdvisorWorkWindow({ teamMemberId, date });
 
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      return res.json({ duration_minutes: MEETING_MINUTES, available_times: [] });
+    if (!workWindow.isAvailable) {
+      return res.json({ duration_minutes: MEETING_MINUTES, available_times: [], work_window: workWindow });
     }
 
     const availableTimes = [];
 
-    for (let minutes = 9 * 60; minutes < 17 * 60; minutes += MEETING_MINUTES) {
+    for (let minutes = workWindow.startMinutes; minutes + MEETING_MINUTES <= workWindow.endMinutes; minutes += MEETING_MINUTES) {
       const value = toDateTime(date, minutes);
       const conflict = await findAppointmentConflict({ teamMemberId, startDateTime: value });
+      const blockedByTimeOff = await isBlockedByTimeOff({ teamMemberId, startDateTime: value });
 
-      if (!conflict) {
+      if (!conflict && !blockedByTimeOff) {
         availableTimes.push({ value, label: toDisplayTime(value) });
       }
     }
 
-    res.json({ duration_minutes: MEETING_MINUTES, available_times: availableTimes });
+    res.json({ duration_minutes: MEETING_MINUTES, available_times: availableTimes, work_window: workWindow });
   } catch (error) {
     next(error);
   }
@@ -222,10 +274,7 @@ exports.createAppointment = async (req, res, next) => {
       return res.status(400).json({ status: "error", message: "Employee account is not linked to a partnership" });
     }
 
-    const [partnershipRows] = await pool.query(
-      "SELECT team_id FROM partnerships WHERE id = ? LIMIT 1",
-      [partnershipId]
-    );
+    const [partnershipRows] = await pool.query("SELECT team_id FROM partnerships WHERE id = ? LIMIT 1", [partnershipId]);
 
     if (partnershipRows.length === 0) {
       return res.status(400).json({ status: "error", message: "Partnership not found" });
@@ -238,10 +287,7 @@ exports.createAppointment = async (req, res, next) => {
       return res.status(400).json({ status: "error", message: "Selected advisor is not available for this partnership" });
     }
 
-    const conflict = await findAppointmentConflict({
-      teamMemberId,
-      startDateTime: normalizedPreferredDate,
-    });
+    const conflict = await findAppointmentConflict({ teamMemberId, startDateTime: normalizedPreferredDate });
 
     if (conflict) {
       return res.status(409).json({
@@ -256,14 +302,7 @@ exports.createAppointment = async (req, res, next) => {
       `INSERT INTO appointments
        (employee_user_id, team_member_id, partnership_id, topic, preferred_date, message, status)
        VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
-      [
-        req.user.id,
-        teamMemberId,
-        partnershipId,
-        normalizedTopic,
-        normalizedPreferredDate,
-        message ? String(message).trim() : null,
-      ]
+      [req.user.id, teamMemberId, partnershipId, normalizedTopic, normalizedPreferredDate, message ? String(message).trim() : null]
     );
 
     await notifyAppointmentCreated({ employee: req.user, partnershipId, teamId, topic: normalizedTopic });
@@ -285,21 +324,9 @@ exports.getMyAppointments = async (req, res, next) => {
     }
 
     const [appointments] = await pool.query(
-      `SELECT
-        a.id,
-        a.topic,
-        a.preferred_date,
-        a.message,
-        a.advisor_note,
-        a.meeting_link,
-        a.status,
-        a.created_at,
-        a.updated_at,
-        tm.full_name AS team_member_name,
-        tm.title AS team_member_title,
-        tm.email AS team_member_email,
-        e.name AS employer_name,
-        h.name AS hbt_name
+      `SELECT a.id, a.topic, a.preferred_date, a.message, a.advisor_note, a.meeting_link, a.status,
+        a.created_at, a.updated_at, tm.full_name AS team_member_name, tm.title AS team_member_title,
+        tm.email AS team_member_email, e.name AS employer_name, h.name AS hbt_name
        FROM appointments a
        LEFT JOIN team_members tm ON a.team_member_id = tm.id
        LEFT JOIN partnerships p ON a.partnership_id = p.id
@@ -323,39 +350,17 @@ exports.getHBTAppointments = async (req, res, next) => {
     }
 
     const [appointments] = await pool.query(
-      `SELECT
-        a.id,
-        a.topic,
-        a.preferred_date,
-        a.message,
-        a.advisor_note,
-        a.meeting_link,
-        a.status,
-        a.created_at,
-        a.updated_at,
-        a.employee_user_id,
-        u.full_name AS employee_name,
-        u.email AS employee_email,
-        tm.full_name AS team_member_name,
-        tm.title AS team_member_title,
-        e.name AS employer_name,
-        p.slug AS partnership_slug,
-        p.team_id
+      `SELECT a.id, a.topic, a.preferred_date, a.message, a.advisor_note, a.meeting_link, a.status,
+        a.created_at, a.updated_at, a.employee_user_id, u.full_name AS employee_name, u.email AS employee_email,
+        tm.full_name AS team_member_name, tm.title AS team_member_title, e.name AS employer_name,
+        p.slug AS partnership_slug, p.team_id
        FROM appointments a
        JOIN users u ON a.employee_user_id = u.id
        LEFT JOIN team_members tm ON a.team_member_id = tm.id
        LEFT JOIN partnerships p ON a.partnership_id = p.id
        LEFT JOIN employers e ON p.employer_id = e.id
        WHERE p.team_id = ?
-       ORDER BY
-        CASE a.status
-          WHEN 'pending' THEN 1
-          WHEN 'approved' THEN 2
-          WHEN 'completed' THEN 3
-          WHEN 'rejected' THEN 4
-          ELSE 5
-        END,
-        a.created_at DESC`,
+       ORDER BY CASE a.status WHEN 'pending' THEN 1 WHEN 'approved' THEN 2 WHEN 'completed' THEN 3 WHEN 'rejected' THEN 4 ELSE 5 END, a.created_at DESC`,
       [req.user.team_id]
     );
 
@@ -372,24 +377,10 @@ exports.getAdminAppointments = async (req, res, next) => {
     }
 
     const [appointments] = await pool.query(
-      `SELECT
-        a.id,
-        a.topic,
-        a.preferred_date,
-        a.message,
-        a.advisor_note,
-        a.meeting_link,
-        a.status,
-        a.created_at,
-        a.updated_at,
-        u.full_name AS employee_name,
-        u.email AS employee_email,
-        tm.full_name AS team_member_name,
-        tm.title AS team_member_title,
-        e.name AS employer_name,
-        p.slug AS partnership_slug,
-        h.name AS hbt_name,
-        p.team_id
+      `SELECT a.id, a.topic, a.preferred_date, a.message, a.advisor_note, a.meeting_link, a.status,
+        a.created_at, a.updated_at, u.full_name AS employee_name, u.email AS employee_email,
+        tm.full_name AS team_member_name, tm.title AS team_member_title, e.name AS employer_name,
+        p.slug AS partnership_slug, h.name AS hbt_name, p.team_id
        FROM appointments a
        JOIN users u ON a.employee_user_id = u.id
        LEFT JOIN team_members tm ON a.team_member_id = tm.id
@@ -415,11 +406,7 @@ exports.updateAppointmentStatus = async (req, res, next) => {
     }
 
     const [appointments] = await pool.query(
-      `SELECT a.*, p.team_id
-       FROM appointments a
-       LEFT JOIN partnerships p ON a.partnership_id = p.id
-       WHERE a.id = ?
-       LIMIT 1`,
+      `SELECT a.*, p.team_id FROM appointments a LEFT JOIN partnerships p ON a.partnership_id = p.id WHERE a.id = ? LIMIT 1`,
       [id]
     );
 
@@ -441,22 +428,14 @@ exports.updateAppointmentStatus = async (req, res, next) => {
       });
 
       if (conflict) {
-        return res.status(409).json({
-          status: "error",
-          message: "This advisor already has another active meeting at that time.",
-        });
+        return res.status(409).json({ status: "error", message: "This advisor already has another active meeting at that time." });
       }
     }
 
     const advisorNote = normalizeOptionalText(req.body.advisor_note);
     const meetingLink = normalizeMeetingLink(req.body.meeting_link);
 
-    await pool.query(
-      `UPDATE appointments
-       SET status = ?, advisor_note = ?, meeting_link = ?
-       WHERE id = ?`,
-      [status, advisorNote, meetingLink, id]
-    );
+    await pool.query(`UPDATE appointments SET status = ?, advisor_note = ?, meeting_link = ? WHERE id = ?`, [status, advisorNote, meetingLink, id]);
 
     await notifyAppointmentUpdated({ appointment, status, meetingLink, advisorNote });
 
