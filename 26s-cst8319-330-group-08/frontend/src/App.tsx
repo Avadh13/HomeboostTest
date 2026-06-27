@@ -25,6 +25,7 @@ import HBTResources from "./pages/HBTResources";
 import HBTQuizSubmissions from "./pages/HBTQuizSubmissions";
 import HBTEvents from "./pages/HBTEvents";
 import HBTAppointments from "./pages/HBTAppointments";
+import HBTAvailability from "./pages/HBTAvailability";
 
 import AdminLogin from "./admin/pages/AdminLogin";
 import AdminDashboard from "./admin/pages/AdminDashboard";
@@ -51,7 +52,6 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Pages */}
         <Route path="/" element={<Home />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/contact" element={<Contact />} />
@@ -59,7 +59,6 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/partners" element={<Partners />} />
 
-        {/* Shared Protected Pages */}
         <Route
           path="/notifications"
           element={
@@ -69,167 +68,27 @@ function App() {
           }
         />
 
-        {/* Employee Protected Pages */}
-        <Route
-          path="/employee-portal"
-          element={
-            <RoleProtectedRoute allowedRoles={["employee"]}>
-              <EmployeePortal />
-            </RoleProtectedRoute>
-          }
-        />
+        <Route path="/employee-portal" element={<RoleProtectedRoute allowedRoles={["employee"]}><EmployeePortal /></RoleProtectedRoute>} />
+        <Route path="/employee/appointments" element={<RoleProtectedRoute allowedRoles={["employee"]}><EmployeeAppointments /></RoleProtectedRoute>} />
+        <Route path="/resources" element={<RoleProtectedRoute allowedRoles={["employee"]}><Resources /></RoleProtectedRoute>} />
+        <Route path="/resources/:id" element={<RoleProtectedRoute allowedRoles={["employee"]}><ResourceDetails /></RoleProtectedRoute>} />
+        <Route path="/quiz" element={<RoleProtectedRoute allowedRoles={["employee"]}><Quiz /></RoleProtectedRoute>} />
+        <Route path="/quiz/:quizId" element={<RoleProtectedRoute allowedRoles={["employee"]}><Quiz /></RoleProtectedRoute>} />
+        <Route path="/employee/messages" element={<RoleProtectedRoute allowedRoles={["employee"]}><MessageCenter /></RoleProtectedRoute>} />
 
-        <Route
-          path="/employee/appointments"
-          element={
-            <RoleProtectedRoute allowedRoles={["employee"]}>
-              <EmployeeAppointments />
-            </RoleProtectedRoute>
-          }
-        />
+        <Route path="/hbt/dashboard" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTDashboard /></RoleProtectedRoute>} />
+        <Route path="/hbt/companies" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTCompanies /></RoleProtectedRoute>} />
+        <Route path="/hbt/employees" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTEmployees /></RoleProtectedRoute>} />
+        <Route path="/hbt/team-members" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTTeamMembers /></RoleProtectedRoute>} />
+        <Route path="/hbt/resources" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTResources /></RoleProtectedRoute>} />
+        <Route path="/hbt/events" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTEvents /></RoleProtectedRoute>} />
+        <Route path="/hbt/appointments" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTAppointments /></RoleProtectedRoute>} />
+        <Route path="/hbt/availability" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTAvailability /></RoleProtectedRoute>} />
+        <Route path="/hbt/quiz-submissions" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTQuizSubmissions /></RoleProtectedRoute>} />
+        <Route path="/hbt/messages" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><MessageCenter /></RoleProtectedRoute>} />
+        <Route path="/hbt/member-dashboard" element={<RoleProtectedRoute allowedRoles={["hbt_member"]}><HBTMemberDashboard /></RoleProtectedRoute>} />
 
-        <Route
-          path="/resources"
-          element={
-            <RoleProtectedRoute allowedRoles={["employee"]}>
-              <Resources />
-            </RoleProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/resources/:id"
-          element={
-            <RoleProtectedRoute allowedRoles={["employee"]}>
-              <ResourceDetails />
-            </RoleProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/quiz"
-          element={
-            <RoleProtectedRoute allowedRoles={["employee"]}>
-              <Quiz />
-            </RoleProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/quiz/:quizId"
-          element={
-            <RoleProtectedRoute allowedRoles={["employee"]}>
-              <Quiz />
-            </RoleProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/employee/messages"
-          element={
-            <RoleProtectedRoute allowedRoles={["employee"]}>
-              <MessageCenter />
-            </RoleProtectedRoute>
-          }
-        />
-
-        {/* HBT Admin Pages */}
-        <Route
-          path="/hbt/dashboard"
-          element={
-            <RoleProtectedRoute allowedRoles={["hbt_admin"]}>
-              <HBTDashboard />
-            </RoleProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/hbt/companies"
-          element={
-            <RoleProtectedRoute allowedRoles={["hbt_admin"]}>
-              <HBTCompanies />
-            </RoleProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/hbt/employees"
-          element={
-            <RoleProtectedRoute allowedRoles={["hbt_admin"]}>
-              <HBTEmployees />
-            </RoleProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/hbt/team-members"
-          element={
-            <RoleProtectedRoute allowedRoles={["hbt_admin"]}>
-              <HBTTeamMembers />
-            </RoleProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/hbt/resources"
-          element={
-            <RoleProtectedRoute allowedRoles={["hbt_admin"]}>
-              <HBTResources />
-            </RoleProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/hbt/events"
-          element={
-            <RoleProtectedRoute allowedRoles={["hbt_admin"]}>
-              <HBTEvents />
-            </RoleProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/hbt/appointments"
-          element={
-            <RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}>
-              <HBTAppointments />
-            </RoleProtectedRoute>
-          }
-        />
-
-        {/* HBT Admin + HBT Member Shared Pages */}
-        <Route
-          path="/hbt/quiz-submissions"
-          element={
-            <RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}>
-              <HBTQuizSubmissions />
-            </RoleProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/hbt/messages"
-          element={
-            <RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}>
-              <MessageCenter />
-            </RoleProtectedRoute>
-          }
-        />
-
-        {/* HBT Member Limited Dashboard */}
-        <Route
-          path="/hbt/member-dashboard"
-          element={
-            <RoleProtectedRoute allowedRoles={["hbt_member"]}>
-              <HBTMemberDashboard />
-            </RoleProtectedRoute>
-          }
-        />
-
-        {/* Admin Login */}
         <Route path="/admin/login" element={<AdminLogin />} />
-
-        {/* Admin Protected Pages */}
         <Route path="/admin" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
         <Route path="/admin/builder" element={<AdminProtectedRoute><AdminBuilder /></AdminProtectedRoute>} />
         <Route path="/admin/hbts" element={<AdminProtectedRoute><ManageHBTs /></AdminProtectedRoute>} />
@@ -248,10 +107,7 @@ function App() {
         <Route path="/admin/quiz-submissions" element={<AdminProtectedRoute><QuizSubmissions /></AdminProtectedRoute>} />
         <Route path="/admin/messages" element={<AdminProtectedRoute><MessageCenter /></AdminProtectedRoute>} />
 
-        {/* Employer Branded Public Page - keep near bottom */}
         <Route path="/:slug" element={<PartnershipLanding />} />
-
-        {/* 404 */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
