@@ -28,6 +28,7 @@ const publicPartnershipRoutes = require("./routes/publicPartnershipRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const appointmentRoutes = require("./routes/appointmentRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const advisorAvailabilityRoutes = require("./routes/advisorAvailabilityRoutes");
 
 const app = express();
 
@@ -99,6 +100,7 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/public-partnerships", publicPartnershipRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/advisor-availability", advisorAvailabilityRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
