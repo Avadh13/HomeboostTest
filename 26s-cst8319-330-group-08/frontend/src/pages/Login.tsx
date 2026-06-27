@@ -5,6 +5,32 @@ import API_BASE_URL from "../api/api";
 const loginImage =
   "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80";
 
+type LoginResponse = {
+  status?: string;
+  message?: string;
+  token?: string;
+  redirect_to?: string;
+  user?: {
+    id: number;
+    full_name: string;
+    email: string;
+    role: string;
+    team_id?: number | null;
+    partnership_id?: number | null;
+  };
+};
+
+const readResponse = async (response: Response): Promise<LoginResponse> => {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
+};
+
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -59,10 +85,10 @@ function Login() {
         }),
       });
 
-      const data = await response.json();
+      const data = await readResponse(response);
 
       if (!response.ok) {
-        alert(data.message || "Login failed");
+        alert(data.message || `Login failed with status ${response.status}`);
         return;
       }
 
@@ -76,8 +102,8 @@ function Login() {
 
       redirectByRole(data.user.role, data.redirect_to);
     } catch (error) {
-      console.log("Login error:", error);
-      alert("Backend is not running or login API failed.");
+      console.error("Login error:", error);
+      alert(`Login API failed. Check backend URL: ${API_BASE_URL}/auth/login`);
     } finally {
       setLoading(false);
     }
