@@ -6,7 +6,6 @@ const appointmentController = require("../controllers/appointmentController");
 
 router.use(protect);
 
-router.get("/available-times", appointmentController.getAvailableTimes);
 router.post("/", appointmentController.createAppointment);
 router.get("/my", appointmentController.getMyAppointments);
 router.get("/hbt", appointmentController.getHBTAppointments);
