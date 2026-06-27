@@ -26,19 +26,11 @@ const enrollmentRoutes = require("./routes/enrollmentRoutes");
 const adminPartnershipRoutes = require("./routes/adminPartnershipRoutes");
 const publicPartnershipRoutes = require("./routes/publicPartnershipRoutes");
 const messageRoutes = require("./routes/messageRoutes");
+const appointmentRoutes = require("./routes/appointmentRoutes");
 
 const app = express();
 
 app.set("trust proxy", 1);
-
-app.use((req, res, next) => {
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("X-XSS-Protection", "0");
-  next();
-});
-
 app.use(cors(corsOptions));
 app.use(apiLimiter);
 app.use(express.json({ limit: "1mb" }));
@@ -104,6 +96,7 @@ app.use("/api/enrollment", enrollmentRoutes);
 app.use("/api/admin-partnerships", adminPartnershipRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/public-partnerships", publicPartnershipRoutes);
+app.use("/api/appointments", appointmentRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
