@@ -35,6 +35,7 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<{ type: "error" | "success"; message: string } | null>(null);
 
   const navigate = useNavigate();
 
@@ -64,12 +65,12 @@ function Login() {
       return;
     }
 
-    alert(`Unknown role: ${role}`);
-    navigate("/");
+    setNotice({ type: "error", message: `Unknown role: ${role}` });
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setNotice(null);
 
     try {
       setLoading(true);
@@ -88,22 +89,23 @@ function Login() {
       const data = await readResponse(response);
 
       if (!response.ok) {
-        alert(data.message || `Login failed with status ${response.status}`);
+        setNotice({ type: "error", message: data.message || `Login failed with status ${response.status}` });
         return;
       }
 
       if (!data.token || !data.user) {
-        alert("Login response is missing token or user data.");
+        setNotice({ type: "error", message: "Login response is missing token or user data." });
         return;
       }
 
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
+      setNotice({ type: "success", message: "Login successful. Redirecting..." });
       redirectByRole(data.user.role, data.redirect_to);
     } catch (error) {
       console.error("Login error:", error);
-      alert(`Login API failed. Check backend URL: ${API_BASE_URL}/auth/login`);
+      setNotice({ type: "error", message: `Login API failed. Check backend URL: ${API_BASE_URL}/auth/login` });
     } finally {
       setLoading(false);
     }
@@ -166,6 +168,18 @@ function Login() {
               Use your assigned account credentials to access your role-based
               dashboard.
             </p>
+
+            {notice && (
+              <div
+                className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${
+                  notice.type === "success"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : "border-red-200 bg-red-50 text-red-700"
+                }`}
+              >
+                {notice.message}
+              </div>
+            )}
 
             <div className="mt-7 space-y-4">
               <input
