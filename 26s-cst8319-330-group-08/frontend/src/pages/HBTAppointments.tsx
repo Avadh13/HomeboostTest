@@ -25,11 +25,20 @@ type AdvisorDraft = {
   meeting_link: string;
 };
 
+type StatusFilter = "active" | "all" | "pending" | "approved" | "completed" | "rejected";
+type SortBy = "newest" | "oldest" | "preferred_soonest" | "preferred_latest";
+
 const statusClasses: Record<string, string> = {
   pending: "bg-amber-50 text-amber-800 border-amber-200",
   approved: "bg-blue-50 text-blue-800 border-blue-200",
   rejected: "bg-red-50 text-red-700 border-red-200",
   completed: "bg-emerald-50 text-emerald-800 border-emerald-200",
+};
+
+const getTime = (value?: string | null) => {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
 };
 
 function HBTAppointments() {
@@ -39,6 +48,9 @@ function HBTAppointments() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState<SortBy>("newest");
 
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -126,8 +138,57 @@ function HBTAppointments() {
       pending: appointments.filter((item) => item.status === "pending").length,
       approved: appointments.filter((item) => item.status === "approved").length,
       completed: appointments.filter((item) => item.status === "completed").length,
+      rejected: appointments.filter((item) => item.status === "rejected").length,
     };
   }, [appointments]);
+
+  const filteredAppointments = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return appointments
+      .filter((appointment) => {
+        if (statusFilter === "active") {
+          return appointment.status === "pending" || appointment.status === "approved";
+        }
+
+        if (statusFilter === "all") return true;
+
+        return appointment.status === statusFilter;
+      })
+      .filter((appointment) => {
+        if (!normalizedSearch) return true;
+
+        const searchable = [
+          appointment.topic,
+          appointment.employee_name,
+          appointment.employee_email,
+          appointment.employer_name,
+          appointment.partnership_slug,
+          appointment.team_member_name,
+          appointment.message,
+          appointment.advisor_note,
+          appointment.meeting_link,
+          appointment.status,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        return searchable.includes(normalizedSearch);
+      })
+      .sort((a, b) => {
+        if (sortBy === "oldest") return getTime(a.created_at) - getTime(b.created_at);
+        if (sortBy === "preferred_soonest") return getTime(a.preferred_date) - getTime(b.preferred_date);
+        if (sortBy === "preferred_latest") return getTime(b.preferred_date) - getTime(a.preferred_date);
+        return getTime(b.created_at) - getTime(a.created_at);
+      });
+  }, [appointments, searchTerm, sortBy, statusFilter]);
+
+  const clearFilters = () => {
+    setStatusFilter("active");
+    setSearchTerm("");
+    setSortBy("newest");
+  };
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-8">
@@ -144,17 +205,22 @@ function HBTAppointments() {
           </div>
         )}
 
-        <section className="grid gap-5 md:grid-cols-4">
+        <section className="grid gap-5 md:grid-cols-5">
           {[
-            ["Total", stats.total],
-            ["Pending", stats.pending],
-            ["Approved", stats.approved],
-            ["Completed", stats.completed],
-          ].map(([label, value]) => (
-            <div key={label} className="rounded-3xl bg-white p-6 shadow">
+            ["Total", stats.total, "all"],
+            ["Pending", stats.pending, "pending"],
+            ["Approved", stats.approved, "approved"],
+            ["Completed", stats.completed, "completed"],
+            ["Rejected", stats.rejected, "rejected"],
+          ].map(([label, value, filter]) => (
+            <button
+              key={label}
+              onClick={() => setStatusFilter(filter as StatusFilter)}
+              className={`rounded-3xl bg-white p-6 text-left shadow transition hover:-translate-y-1 hover:shadow-lg ${statusFilter === filter ? "ring-4 ring-blue-100" : ""}`}
+            >
               <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">{label}</p>
               <h2 className="mt-2 text-4xl font-black text-slate-950">{value}</h2>
-            </div>
+            </button>
           ))}
         </section>
 
@@ -163,17 +229,98 @@ function HBTAppointments() {
             <div>
               <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">Operations</p>
               <h2 className="text-3xl font-black">Team appointment queue</h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Showing {filteredAppointments.length} of {appointments.length} appointment requests.
+              </p>
             </div>
             <button onClick={loadAppointments} className="rounded-full bg-slate-100 px-5 py-2.5 font-bold text-slate-700 hover:bg-slate-200">Refresh</button>
+          </div>
+
+          <div className="mb-6 rounded-3xl border border-slate-100 bg-slate-50 p-5">
+            <div className="grid gap-4 lg:grid-cols-[1.1fr_0.7fr_0.7fr_auto]">
+              <label className="block">
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">Search</span>
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-white p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                  placeholder="Search employee, email, company, topic, meeting link..."
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">Status</span>
+                <select
+                  className="w-full rounded-2xl border border-slate-200 bg-white p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+                >
+                  <option value="active">Active only</option>
+                  <option value="all">All meetings</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="completed">Completed</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">Sort</span>
+                <select
+                  className="w-full rounded-2xl border border-slate-200 bg-white p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                  value={sortBy}
+                  onChange={(event) => setSortBy(event.target.value as SortBy)}
+                >
+                  <option value="newest">Newest created</option>
+                  <option value="oldest">Oldest created</option>
+                  <option value="preferred_soonest">Preferred soonest</option>
+                  <option value="preferred_latest">Preferred latest</option>
+                </select>
+              </label>
+
+              <div className="flex items-end">
+                <button
+                  onClick={clearFilters}
+                  className="w-full rounded-2xl bg-slate-950 px-5 py-3 font-bold text-white hover:bg-blue-700 lg:w-auto"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[
+                ["active", "Active"],
+                ["pending", "Pending"],
+                ["approved", "Approved"],
+                ["completed", "Completed"],
+                ["rejected", "Rejected"],
+                ["all", "All"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  onClick={() => setStatusFilter(value as StatusFilter)}
+                  className={`rounded-full px-4 py-2 text-sm font-bold transition ${
+                    statusFilter === value
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {loading ? (
             <p className="text-slate-500">Loading appointment requests...</p>
           ) : appointments.length === 0 ? (
             <div className="rounded-2xl bg-slate-50 p-8 text-center text-slate-600">No appointment requests yet.</div>
+          ) : filteredAppointments.length === 0 ? (
+            <div className="rounded-2xl bg-slate-50 p-8 text-center text-slate-600">No appointments match the selected filters.</div>
           ) : (
             <div className="space-y-5">
-              {appointments.map((appointment) => {
+              {filteredAppointments.map((appointment) => {
                 const draft = drafts[appointment.id] || { advisor_note: "", meeting_link: "" };
 
                 return (
