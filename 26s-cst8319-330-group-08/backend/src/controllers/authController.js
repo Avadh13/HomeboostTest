@@ -18,18 +18,30 @@ const getRedirectPath = (role) => {
   return "/employee-portal";
 };
 
+const signAccessToken = (user) => {
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET is not configured");
+  }
+
+  return jwt.sign(
+    {
+      id: user.id,
+      role: user.role,
+      team_id: user.team_id,
+      partnership_id: user.partnership_id,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || "1d" }
+  );
+};
+
 exports.register = async (req, res) => {
   try {
     const { full_name, email, password, partnership_slug } = req.body;
 
-    if (!full_name || !email || !password || !partnership_slug) {
-      return res.status(400).json({
-        status: "error",
-        message: "Full name, email, password, and partnership slug are required",
-      });
-    }
-
     const cleanEmail = email.trim().toLowerCase();
+    const cleanName = full_name.trim();
+    const cleanSlug = partnership_slug.trim();
 
     const [existingUsers] = await pool.query(
       "SELECT id FROM users WHERE email = ?",
@@ -49,7 +61,7 @@ exports.register = async (req, res) => {
        WHERE slug = ? 
        AND status = 'active' 
        LIMIT 1`,
-      [partnership_slug.trim()]
+      [cleanSlug]
     );
 
     if (partnerships.length === 0) {
@@ -65,7 +77,7 @@ exports.register = async (req, res) => {
       `INSERT INTO users 
        (full_name, email, password, role, partnership_id, is_active)
        VALUES (?, ?, ?, 'employee', ?, 1)`,
-      [full_name.trim(), cleanEmail, passwordHash, partnerships[0].id]
+      [cleanName, cleanEmail, passwordHash, partnerships[0].id]
     );
 
     res.status(201).json({
@@ -75,10 +87,10 @@ exports.register = async (req, res) => {
       partnership_id: partnerships[0].id,
     });
   } catch (error) {
+    console.error("Registration failed", error);
     res.status(500).json({
       status: "error",
       message: "Registration failed",
-      error: error.message,
     });
   }
 };
@@ -86,14 +98,6 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        status: "error",
-        message: "Email and password are required",
-      });
-    }
-
     const cleanEmail = email.trim().toLowerCase();
 
     const [users] = await pool.query(
@@ -143,17 +147,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    const token = jwt.sign(
-      {
-        id: user.id,
-        role: user.role,
-        team_id: user.team_id,
-        partnership_id: user.partnership_id,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
-
+    const token = signAccessToken(user);
     const redirectTo = getRedirectPath(user.role);
 
     res.json({
@@ -175,10 +169,10 @@ exports.login = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("Login failed", error);
     res.status(500).json({
       status: "error",
       message: "Login failed",
-      error: error.message,
     });
   }
 };
