@@ -1,0 +1,183 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import API_BASE_URL from "../api/api";
+
+type Appointment = {
+  id: number;
+  topic: string;
+  preferred_date?: string | null;
+  message?: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  employee_name: string;
+  employee_email: string;
+  team_member_name?: string | null;
+  team_member_title?: string | null;
+  employer_name?: string | null;
+  partnership_slug?: string | null;
+};
+
+const statusClasses: Record<string, string> = {
+  pending: "bg-amber-50 text-amber-800 border-amber-200",
+  approved: "bg-blue-50 text-blue-800 border-blue-200",
+  rejected: "bg-red-50 text-red-700 border-red-200",
+  completed: "bg-emerald-50 text-emerald-800 border-emerald-200",
+};
+
+function HBTAppointments() {
+  const token = localStorage.getItem("token");
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const headers = { Authorization: `Bearer ${token}` };
+
+  const loadAppointments = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/appointments/hbt`, { headers });
+      const data = await response.json();
+      setAppointments(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to load HBT appointments:", error);
+      setNotice({ type: "error", message: "Could not load appointment requests." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAppointments();
+  }, []);
+
+  const updateStatus = async (id: number, status: string) => {
+    setNotice(null);
+    try {
+      setUpdatingId(id);
+      const response = await fetch(`${API_BASE_URL}/appointments/${id}/status`, {
+        method: "PUT",
+        headers: {
+          ...headers,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setNotice({ type: "error", message: data.message || "Status update failed." });
+        return;
+      }
+
+      setNotice({ type: "success", message: "Appointment status updated." });
+      await loadAppointments();
+    } catch (error) {
+      console.error("Status update failed:", error);
+      setNotice({ type: "error", message: "Could not update appointment status." });
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const stats = useMemo(() => {
+    return {
+      total: appointments.length,
+      pending: appointments.filter((item) => item.status === "pending").length,
+      approved: appointments.filter((item) => item.status === "approved").length,
+      completed: appointments.filter((item) => item.status === "completed").length,
+    };
+  }, [appointments]);
+
+  return (
+    <main className="min-h-screen bg-slate-50 px-6 py-8">
+      <div className="mx-auto max-w-7xl space-y-8">
+        <header className="rounded-[2rem] bg-gradient-to-br from-slate-950 to-blue-950 p-8 text-white shadow-xl">
+          <Link to="/hbt/dashboard" className="text-sm font-bold text-blue-200 hover:text-white">← Back to HBT dashboard</Link>
+          <h1 className="mt-4 text-4xl font-black">Appointment Requests</h1>
+          <p className="mt-3 max-w-2xl text-blue-100">Review employee appointment requests, approve follow-ups, and mark completed work.</p>
+        </header>
+
+        {notice && (
+          <div className={`rounded-2xl border px-5 py-4 font-semibold ${notice.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}>
+            {notice.message}
+          </div>
+        )}
+
+        <section className="grid gap-5 md:grid-cols-4">
+          {[
+            ["Total", stats.total],
+            ["Pending", stats.pending],
+            ["Approved", stats.approved],
+            ["Completed", stats.completed],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-3xl bg-white p-6 shadow">
+              <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">{label}</p>
+              <h2 className="mt-2 text-4xl font-black text-slate-950">{value}</h2>
+            </div>
+          ))}
+        </section>
+
+        <section className="rounded-[2rem] bg-white p-7 shadow-xl">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">Operations</p>
+              <h2 className="text-3xl font-black">Team appointment queue</h2>
+            </div>
+            <button onClick={loadAppointments} className="rounded-full bg-slate-100 px-5 py-2.5 font-bold text-slate-700 hover:bg-slate-200">Refresh</button>
+          </div>
+
+          {loading ? (
+            <p className="text-slate-500">Loading appointment requests...</p>
+          ) : appointments.length === 0 ? (
+            <div className="rounded-2xl bg-slate-50 p-8 text-center text-slate-600">No appointment requests yet.</div>
+          ) : (
+            <div className="space-y-5">
+              {appointments.map((appointment) => (
+                <article key={appointment.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-6">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-2xl font-black text-slate-950">{appointment.topic}</h3>
+                      <p className="mt-1 text-sm text-slate-500">{appointment.employee_name} · {appointment.employee_email}</p>
+                      <p className="mt-1 text-sm text-slate-500">{appointment.employer_name || "Employer"} / {appointment.partnership_slug || "partnership"}</p>
+                    </div>
+                    <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${statusClasses[appointment.status] || statusClasses.pending}`}>{appointment.status}</span>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
+                    <p><strong>Requested expert:</strong> {appointment.team_member_name || "Any available team member"}</p>
+                    <p><strong>Preferred time:</strong> {appointment.preferred_date ? new Date(appointment.preferred_date).toLocaleString() : "Not specified"}</p>
+                  </div>
+
+                  {appointment.message && <p className="mt-4 rounded-2xl bg-white p-4 text-sm leading-relaxed text-slate-600">{appointment.message}</p>}
+
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    {[
+                      ["approved", "Approve"],
+                      ["rejected", "Reject"],
+                      ["completed", "Complete"],
+                      ["pending", "Reset Pending"],
+                    ].map(([status, label]) => (
+                      <button
+                        key={status}
+                        disabled={updatingId === appointment.id || appointment.status === status}
+                        onClick={() => updateStatus(appointment.id, status)}
+                        className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {updatingId === appointment.id ? "Updating..." : label}
+                      </button>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+export default HBTAppointments;
