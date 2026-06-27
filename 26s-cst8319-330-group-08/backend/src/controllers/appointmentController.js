@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { createNotification, createAdminNotification } = require("../utils/notificationService");
 
 const VALID_STATUSES = new Set(["pending", "approved", "rejected", "completed"]);
 
@@ -37,6 +38,65 @@ const canManageAppointment = (user, appointment) => {
   return false;
 };
 
+const notifyAppointmentCreated = async ({ employee, partnershipId, teamId, topic }) => {
+  await createNotification({
+    target_role: "hbt_admin",
+    target_team_id: teamId,
+    title: "New appointment request",
+    message: `${employee.full_name} requested an appointment: ${topic}`,
+    link: "/hbt/appointments",
+    type: "appointment",
+  });
+
+  await createNotification({
+    target_role: "hbt_member",
+    target_team_id: teamId,
+    title: "New appointment request",
+    message: `${employee.full_name} requested an appointment: ${topic}`,
+    link: "/hbt/appointments",
+    type: "appointment",
+  });
+
+  await createAdminNotification({
+    title: "New employee appointment request",
+    message: `${employee.full_name} submitted a new appointment request.` ,
+    link: "/admin/appointments",
+    type: "appointment",
+  });
+
+  await createNotification({
+    user_id: employee.id,
+    target_partnership_id: partnershipId,
+    title: "Appointment request submitted",
+    message: "Your appointment request was sent to your Home Buying Team.",
+    link: "/employee/appointments",
+    type: "success",
+  });
+};
+
+const notifyAppointmentUpdated = async ({ appointment, status, meetingLink, advisorNote }) => {
+  const statusText = status.charAt(0).toUpperCase() + status.slice(1);
+  const hasMeetingUpdate = Boolean(meetingLink || advisorNote);
+
+  await createNotification({
+    user_id: appointment.employee_user_id,
+    target_partnership_id: appointment.partnership_id,
+    title: hasMeetingUpdate ? "Appointment details updated" : `Appointment ${statusText}`,
+    message: hasMeetingUpdate
+      ? "Your advisor added or updated the meeting details for your appointment."
+      : `Your appointment status changed to ${statusText}.`,
+    link: "/employee/appointments",
+    type: "appointment",
+  });
+
+  await createAdminNotification({
+    title: "Appointment updated",
+    message: `Appointment #${appointment.id} was updated to ${statusText}.`,
+    link: "/admin/appointments",
+    type: "appointment",
+  });
+};
+
 exports.createAppointment = async (req, res, next) => {
   try {
     if (req.user.role !== "employee") {
@@ -55,6 +115,16 @@ exports.createAppointment = async (req, res, next) => {
       return res.status(400).json({ status: "error", message: "Employee account is not linked to a partnership" });
     }
 
+    const [partnershipRows] = await pool.query(
+      "SELECT team_id FROM partnerships WHERE id = ? LIMIT 1",
+      [partnershipId]
+    );
+
+    if (partnershipRows.length === 0) {
+      return res.status(400).json({ status: "error", message: "Partnership not found" });
+    }
+
+    const teamId = partnershipRows[0].team_id;
     const teamMemberId = team_member_id || null;
 
     if (teamMemberId) {
@@ -74,6 +144,8 @@ exports.createAppointment = async (req, res, next) => {
       }
     }
 
+    const normalizedTopic = String(topic).trim();
+
     const [result] = await pool.query(
       `INSERT INTO appointments
        (employee_user_id, team_member_id, partnership_id, topic, preferred_date, message, status)
@@ -82,11 +154,18 @@ exports.createAppointment = async (req, res, next) => {
         req.user.id,
         teamMemberId,
         partnershipId,
-        String(topic).trim(),
+        normalizedTopic,
         normalizeDateForMySQL(preferred_date),
         message ? String(message).trim() : null,
       ]
     );
+
+    await notifyAppointmentCreated({
+      employee: req.user,
+      partnershipId,
+      teamId,
+      topic: normalizedTopic,
+    });
 
     res.status(201).json({
       status: "success",
@@ -247,7 +326,9 @@ exports.updateAppointmentStatus = async (req, res, next) => {
       return res.status(404).json({ status: "error", message: "Appointment not found" });
     }
 
-    if (!canManageAppointment(req.user, appointments[0])) {
+    const appointment = appointments[0];
+
+    if (!canManageAppointment(req.user, appointment)) {
       return res.status(403).json({ status: "error", message: "You are not allowed to update this appointment" });
     }
 
@@ -260,6 +341,13 @@ exports.updateAppointmentStatus = async (req, res, next) => {
        WHERE id = ?`,
       [status, advisorNote, meetingLink, id]
     );
+
+    await notifyAppointmentUpdated({
+      appointment,
+      status,
+      meetingLink,
+      advisorNote,
+    });
 
     res.json({ status: "success", message: "Appointment updated successfully" });
   } catch (error) {
