@@ -50,20 +50,46 @@ type FAQ = {
   page_slug?: string;
 };
 
+const fallbackPage: Page = {
+  id: 0,
+  title: "Home",
+  slug: "home",
+  sections: [],
+};
+
 function Home() {
   const [page, setPage] = useState<Page | null>(null);
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [apiWarning, setApiWarning] = useState("");
 
   useEffect(() => {
-    Promise.all([
-      fetch(`${API_BASE_URL}/pages/home`).then((res) => {
-        if (!res.ok) throw new Error("Failed to load home page");
+    const loadHomePage = async (): Promise<Page> => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/pages/home`);
+        if (!res.ok) {
+          throw new Error(`Home page API returned ${res.status}`);
+        }
         return res.json();
-      }),
-      fetch(`${API_BASE_URL}/faqs`).then((res) => (res.ok ? res.json() : [])),
-    ])
+      } catch (err) {
+        console.error("Home page API fallback:", err);
+        setApiWarning("Live CMS content could not be loaded, so the default landing page is being shown.");
+        return fallbackPage;
+      }
+    };
+
+    const loadFaqs = async (): Promise<FAQ[]> => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/faqs`);
+        if (!res.ok) return [];
+        return res.json();
+      } catch (err) {
+        console.error("FAQ API fallback:", err);
+        return [];
+      }
+    };
+
+    Promise.all([loadHomePage(), loadFaqs()])
       .then(([pageData, faqData]) => {
         setPage(pageData);
         setFaqs(
@@ -71,10 +97,6 @@ function Home() {
             ? faqData.filter((faq: FAQ) => !faq.page_slug || faq.page_slug === "home")
             : []
         );
-      })
-      .catch((err) => {
-        console.error("Home load error:", err);
-        setError("Could not load the home page. Check backend, database, and CORS settings.");
       })
       .finally(() => setLoading(false));
   }, []);
@@ -118,24 +140,17 @@ function Home() {
     );
   }
 
-  if (error) {
-    return (
-      <main className="min-h-screen bg-slate-50">
-        <Navbar />
-        <section className="mx-auto max-w-3xl px-6 py-16">
-          <div className="rounded-3xl border bg-white p-8 shadow-xl">
-            <h1 className="text-2xl font-bold text-red-600">Home page error</h1>
-            <p className="mt-3 text-slate-700">{error}</p>
-            <code className="mt-4 block rounded-xl bg-slate-100 p-3 text-sm">{API_BASE_URL}/pages/home</code>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
   return (
     <main className="min-h-screen overflow-hidden bg-slate-50 text-slate-950">
       <Navbar />
+
+      {apiWarning && (
+        <div className="mx-auto mt-6 max-w-7xl px-6">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-800">
+            {apiWarning}
+          </div>
+        </div>
+      )}
 
       <section className="relative px-6 py-20 lg:py-28">
         <div className="floating-orb -left-28 top-10 h-72 w-72 bg-blue-400" />
@@ -258,79 +273,42 @@ function Home() {
             <div>
               <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-600">Employee content</p>
               <h2 className="mt-2 text-4xl font-black">Resources employees actually want.</h2>
-              <p className="mt-3 max-w-2xl text-slate-600">The portal includes guides, checklists, planning tools, quizzes, and events so employees receive practical support.</p>
             </div>
-            <Link to="/resources" className="btn-secondary">View all resources</Link>
+            <Link to="/resources" className="font-bold text-blue-700 hover:text-blue-900">
+              Browse resources →
+            </Link>
           </div>
-
-          <div className="grid gap-6 md:grid-cols-3">
-            {((resourceSection?.cards || []).length > 0
-              ? resourceSection?.cards || []
-              : [
-                  { id: 1, title: "First-Time Buyer Guide", description: "A plain-English roadmap from pre-approval to closing day.", image_url: familyImage, button_text: "Read guide", button_link: "/resources" },
-                  { id: 2, title: "Mortgage Readiness", description: "Know your budget, documents, credit, and savings before shopping.", image_url: advisorImage, button_text: "Open checklist", button_link: "/resources" },
-                  { id: 3, title: "Booking Support", description: "Connect with mortgage, realtor, and planning experts from your HBT.", image_url: keysImage, button_text: "View portal", button_link: "/partners" },
-                ]).map((card) => (
-              <Link key={card.id} to={card.button_link || "/resources"} className="group overflow-hidden rounded-[2rem] bg-white shadow-xl shadow-slate-200/70 transition hover:-translate-y-2 hover:shadow-2xl">
-                <img src={card.image_url || familyImage} alt={card.title} className="h-56 w-full object-cover transition duration-500 group-hover:scale-105" />
-                <div className="p-6">
-                  <h3 className="text-2xl font-black">{card.title}</h3>
-                  <p className="mt-3 text-slate-600">{card.description}</p>
-                  <p className="mt-5 font-bold text-blue-700">{card.button_text || "Explore"} →</p>
-                </div>
-              </Link>
+          <div className="grid gap-5 md:grid-cols-3">
+            {(resourceSection?.cards?.length ? resourceSection.cards : [
+              { id: 1, title: "Mortgage readiness", description: "Simple education before employees talk to a lender." },
+              { id: 2, title: "Credit confidence", description: "Guidance that helps employees understand their buying position." },
+              { id: 3, title: "Trusted next steps", description: "Connect employees with the right advisor and support path." },
+            ]).map((card) => (
+              <div key={card.id} className="rounded-3xl border border-slate-100 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+                <h3 className="text-2xl font-black">{card.title}</h3>
+                <p className="mt-3 leading-relaxed text-slate-600">{card.description}</p>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="relative bg-slate-950 px-6 py-20 text-white">
-        <div className="floating-orb bottom-0 left-0 h-72 w-72 bg-blue-500" />
-        <div className="floating-orb right-0 top-0 h-72 w-72 bg-purple-500" />
-        <div className="relative mx-auto grid max-w-7xl gap-8 md:grid-cols-3">
-          {[
-            ["Admin", "Onboard HBTs, manage platform content, quizzes, pages, pricing, and messages."],
-            ["HBT Admin", "Create employer partnerships, manage team members, events, resources, and employees."],
-            ["Employee", "Access branded portal, resources, quiz, events, and appointment links."],
-          ].map(([title, text]) => (
-            <div key={title} className="rounded-[2rem] border border-white/10 bg-white/10 p-7 backdrop-blur transition hover:bg-white/15">
-              <h3 className="text-2xl font-black">{title}</h3>
-              <p className="mt-4 leading-relaxed text-slate-300">{text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {faqs.length > 0 && (
-        <section className="bg-slate-50 px-6 py-20">
+        <section className="bg-white px-6 py-20">
           <div className="mx-auto max-w-4xl">
-            <p className="text-center text-sm font-black uppercase tracking-[0.25em] text-blue-600">Questions</p>
-            <h2 className="mt-2 text-center text-4xl font-black">Frequently Asked Questions</h2>
-            <div className="mt-10 space-y-4">
-              {faqs.map((faq) => (
-                <details key={faq.id} className="group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm open:shadow-xl">
-                  <summary className="cursor-pointer list-none font-black text-lg text-slate-900">
-                    {faq.question}
-                    <span className="float-right text-blue-600 transition group-open:rotate-45">+</span>
-                  </summary>
-                  <p className="mt-4 leading-relaxed text-slate-600">{faq.answer}</p>
-                </details>
+            <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-600">FAQ</p>
+            <h2 className="mt-2 text-4xl font-black">Common questions</h2>
+            <div className="mt-8 space-y-4">
+              {faqs.slice(0, 4).map((faq) => (
+                <div key={faq.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-6">
+                  <h3 className="font-black text-slate-900">{faq.question}</h3>
+                  <p className="mt-2 leading-relaxed text-slate-600">{faq.answer}</p>
+                </div>
               ))}
             </div>
           </div>
         </section>
       )}
-
-      <section className="px-6 py-20">
-        <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-10 text-center text-white shadow-2xl shadow-blue-500/30 md:p-16">
-          <h2 className="text-4xl font-black md:text-5xl">Ready to launch the full flow?</h2>
-          <p className="mx-auto mt-5 max-w-2xl text-lg text-blue-50">Open a branded employer page, create an employee account, then log in and access the connected employee portal.</p>
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <Link to="/partners" className="rounded-full bg-white px-7 py-3 font-black text-blue-700 transition hover:-translate-y-1">Open employer portals</Link>
-            <Link to="/login" className="rounded-full border border-white/40 px-7 py-3 font-black text-white transition hover:bg-white/10">Login</Link>
-          </div>
-        </div>
-      </section>
     </main>
   );
 }
