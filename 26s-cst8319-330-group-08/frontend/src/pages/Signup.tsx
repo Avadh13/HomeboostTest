@@ -26,6 +26,7 @@ function Signup() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [partnershipSlug, setPartnershipSlug] = useState(searchParams.get("partnership") || "");
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<{ type: "error" | "success"; message: string } | null>(null);
 
   useEffect(() => {
     setPartnershipSlug(searchParams.get("partnership") || "");
@@ -33,19 +34,20 @@ function Signup() {
 
   const handleEmployeeSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    setNotice(null);
 
     if (!partnershipSlug.trim()) {
-      alert("Partnership slug is missing. Please sign up from your employer page.");
+      setNotice({ type: "error", message: "Partnership slug is missing. Please sign up from your employer page." });
       return;
     }
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match");
+      setNotice({ type: "error", message: "Passwords do not match." });
       return;
     }
 
     if (password.length < 8) {
-      alert("Password must be at least 8 characters");
+      setNotice({ type: "error", message: "Password must be at least 8 characters." });
       return;
     }
 
@@ -66,15 +68,15 @@ function Signup() {
 
       if (!response.ok) {
         const validationMessage = data.errors?.map((error) => error.message).join("\n");
-        alert(validationMessage || data.message || `Signup failed with status ${response.status}`);
+        setNotice({ type: "error", message: validationMessage || data.message || `Signup failed with status ${response.status}` });
         return;
       }
 
-      alert("Account created successfully. Please login.");
-      navigate("/login");
+      setNotice({ type: "success", message: "Account created successfully. Redirecting to login..." });
+      setTimeout(() => navigate("/login"), 900);
     } catch (error) {
       console.error("Signup error:", error);
-      alert(`Signup API failed. Check backend URL: ${API_BASE_URL}/auth/register`);
+      setNotice({ type: "error", message: `Signup API failed. Check backend URL: ${API_BASE_URL}/auth/register` });
     } finally {
       setLoading(false);
     }
@@ -101,6 +103,18 @@ function Signup() {
             <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-600">Employee signup</p>
             <h1 className="mt-3 text-4xl font-black md:text-5xl">Create your portal account</h1>
             <p className="mt-4 max-w-2xl text-slate-600">Use your employer partnership slug to unlock your branded home-buying benefit portal.</p>
+
+            {notice && (
+              <div
+                className={`mt-6 rounded-2xl border px-4 py-3 text-sm font-semibold whitespace-pre-line ${
+                  notice.type === "success"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : "border-red-200 bg-red-50 text-red-700"
+                }`}
+              >
+                {notice.message}
+              </div>
+            )}
 
             <div className="mt-8 grid gap-4">
               <input className="rounded-2xl border border-slate-200 bg-slate-50 p-4 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" type="text" placeholder="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
