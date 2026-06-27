@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import API_BASE_URL from "../api/api";
 import ChatWidget from "../components/ChatWidget";
 const dashboardImage =
   "https://images.unsplash.com/photo-1556761175-4b46a572b786?auto=format&fit=crop&w=1400&q=80";
@@ -11,9 +13,20 @@ type User = {
 
 function HBTDashboard() {
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
 
+  const token = localStorage.getItem("token");
   const userData = localStorage.getItem("user");
   const user: User = userData ? JSON.parse(userData) : {};
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/notifications/unread-count`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((payload) => setUnreadCount(Number(payload.unread_count || 0)))
+      .catch(() => setUnreadCount(0));
+  }, [token]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -25,6 +38,7 @@ function HBTDashboard() {
     { title: "Employer Partnerships", icon: "🏢", description: "View employer branded pages assigned to your Home Buying Team.", link: "/hbt/companies", accent: "from-blue-500 to-cyan-500" },
     { title: "Employees", icon: "👥", description: "View employees, quiz activity, interest level, and engagement.", link: "/hbt/employees", accent: "from-indigo-500 to-purple-500" },
     { title: "Appointments", icon: "📆", description: "Review employee appointment requests and manage follow-up status.", link: "/hbt/appointments", accent: "from-green-500 to-emerald-600" },
+    { title: "Notifications", icon: "🔔", description: "View appointment updates, meeting-link activity, and system messages.", link: "/notifications", accent: "from-blue-600 to-violet-600" },
     { title: "Team Members", icon: "🤝", description: "Manage mortgage advisors, realtors, planners, and booking links.", link: "/hbt/team-members", accent: "from-emerald-500 to-teal-500" },
     { title: "Resources", icon: "📚", description: "Curate guides, checklists, and tools for employees.", link: "/hbt/resources", accent: "from-amber-500 to-orange-500" },
     { title: "Quiz Submissions", icon: "🧠", description: "Review readiness quiz answers and prioritize warm follow-ups.", link: "/hbt/quiz-submissions", accent: "from-pink-500 to-rose-500" },
@@ -42,12 +56,18 @@ function HBTDashboard() {
               <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-300">Home Buying Team Control Center</p>
               <h1 className="mt-3 text-4xl font-black tracking-tight md:text-6xl">HBT Dashboard</h1>
               <p className="mt-4 max-w-2xl text-lg text-slate-300">
-                Welcome, <strong className="text-white">{user.full_name || "HBT Member"}</strong>. Manage partnerships, employee engagement, appointment requests, resources, events, and team members from one command center.
+                Welcome, <strong className="text-white">{user.full_name || "HBT Member"}</strong>. Manage partnerships, employee engagement, appointment requests, resources, events, and notifications from one command center.
               </p>
             </div>
-            <button onClick={handleLogout} className="rounded-full bg-red-600 px-7 py-3 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-red-700">
-              Logout
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <Link to="/notifications" className="relative rounded-full bg-blue-600 px-7 py-3 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-blue-700">
+                Notifications
+                {unreadCount > 0 && <span className="absolute -right-2 -top-2 rounded-full bg-red-600 px-2 py-0.5 text-xs font-black text-white">{unreadCount}</span>}
+              </Link>
+              <button onClick={handleLogout} className="rounded-full bg-red-600 px-7 py-3 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-red-700">
+                Logout
+              </button>
+            </div>
           </div>
         </section>
 
@@ -55,7 +75,7 @@ function HBTDashboard() {
           {[
             ["Active Partnerships", "Ready"],
             ["Employer Portals", "Configured"],
-            ["Appointment Flow", "Live"],
+            ["Unread Updates", String(unreadCount)],
           ].map(([label, value]) => (
             <div key={label} className="metric-card">
               <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">{label}</p>
@@ -84,15 +104,15 @@ function HBTDashboard() {
           <div className="rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white shadow-2xl shadow-blue-500/30">
             <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-100">Operational workflow</p>
             <h2 className="mt-3 text-3xl font-black">Next best action</h2>
-            <p className="mt-4 text-blue-50">Review appointment requests, then check quiz activity and employee engagement to prioritize warm follow-ups.</p>
-            <Link to="/hbt/appointments" className="mt-6 inline-flex rounded-full bg-white px-6 py-3 font-black text-blue-700 transition hover:-translate-y-1">
-              Review appointments
+            <p className="mt-4 text-blue-50">Review new notifications first, then handle appointment requests and employee follow-ups.</p>
+            <Link to="/notifications" className="mt-6 inline-flex rounded-full bg-white px-6 py-3 font-black text-blue-700 transition hover:-translate-y-1">
+              Open notifications
             </Link>
           </div>
           <div className="rounded-[2rem] bg-white p-8 shadow-xl">
             <h2 className="text-3xl font-black">What this dashboard proves</h2>
             <div className="mt-6 grid gap-4 md:grid-cols-3">
-              {["Role-based login", "Partnership ownership", "Appointment workflow"].map((item) => (
+              {["Role-based login", "Partnership ownership", "Notification workflow"].map((item) => (
                 <div key={item} className="rounded-3xl bg-slate-50 p-5 font-bold text-slate-700">
                   <span className="mr-2 text-blue-600">✓</span>{item}
                 </div>
