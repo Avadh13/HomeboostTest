@@ -1,18 +1,28 @@
 const pool = require("../config/db");
 
 const getAudienceCondition = (user) => {
-  const conditions = ["n.user_id = ?", "n.target_role = 'all'", "n.target_role = ?"];
-  const params = [user.id, user.role];
+  const conditions = ["n.user_id = ?", "n.target_role = 'all'"];
+  const params = [user.id];
+
+  let roleCondition = "n.target_role = ?";
+  const roleParams = [user.role];
 
   if (user.team_id) {
-    conditions.push("n.target_team_id = ?");
-    params.push(user.team_id);
+    roleCondition += " AND (n.target_team_id IS NULL OR n.target_team_id = ?)";
+    roleParams.push(user.team_id);
+  } else {
+    roleCondition += " AND n.target_team_id IS NULL";
   }
 
   if (user.partnership_id) {
-    conditions.push("n.target_partnership_id = ?");
-    params.push(user.partnership_id);
+    roleCondition += " AND (n.target_partnership_id IS NULL OR n.target_partnership_id = ?)";
+    roleParams.push(user.partnership_id);
+  } else {
+    roleCondition += " AND n.target_partnership_id IS NULL";
   }
+
+  conditions.push(`(${roleCondition})`);
+  params.push(...roleParams);
 
   return {
     where: `(${conditions.join(" OR ")})`,
@@ -74,7 +84,7 @@ exports.markNotificationRead = async (req, res, next) => {
 
     const [result] = await pool.query(
       `UPDATE notifications n
-       SET n.is_read = 1
+       SET is_read = 1
        WHERE n.id = ?
          AND ${audience.where}`,
       [id, ...audience.params]
@@ -96,7 +106,7 @@ exports.markAllRead = async (req, res, next) => {
 
     await pool.query(
       `UPDATE notifications n
-       SET n.is_read = 1
+       SET is_read = 1
        WHERE ${audience.where}`,
       audience.params
     );
