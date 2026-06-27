@@ -25,6 +25,7 @@ function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
 
   if (user.role !== "admin" && user.role !== "super_admin") {
     if (user.role === "hbt_admin") return <Navigate to="/hbt/dashboard" replace />;
+    if (user.role === "hbt_member") return <Navigate to="/hbt/member-dashboard" replace />;
     if (user.role === "employee") return <Navigate to="/employee-portal" replace />;
     return <Navigate to="/login" replace />;
   }
