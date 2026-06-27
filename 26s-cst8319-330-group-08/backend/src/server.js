@@ -1,6 +1,5 @@
 const express = require("express");
 const cors = require("cors");
-const helmet = require("helmet");
 require("dotenv").config();
 
 const pool = require("./config/db");
@@ -32,11 +31,13 @@ const app = express();
 
 app.set("trust proxy", 1);
 
-app.use(
-  helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
-  })
-);
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-XSS-Protection", "0");
+  next();
+});
 
 app.use(cors(corsOptions));
 app.use(apiLimiter);
