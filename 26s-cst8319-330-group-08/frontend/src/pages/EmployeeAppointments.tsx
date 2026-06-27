@@ -14,6 +14,8 @@ type Appointment = {
   topic: string;
   preferred_date?: string | null;
   message?: string | null;
+  advisor_note?: string | null;
+  meeting_link?: string | null;
   status: string;
   created_at: string;
   team_member_name?: string | null;
@@ -122,7 +124,7 @@ function EmployeeAppointments() {
         <header className="rounded-[2rem] bg-gradient-to-br from-blue-950 to-indigo-900 p-8 text-white shadow-xl">
           <Link to="/employee-portal" className="text-sm font-bold text-blue-200 hover:text-white">← Back to portal</Link>
           <h1 className="mt-4 text-4xl font-black">Appointment Requests</h1>
-          <p className="mt-3 max-w-2xl text-blue-100">Request a call with your Home Buying Team and track the status here.</p>
+          <p className="mt-3 max-w-2xl text-blue-100">Request a call with your Home Buying Team and track the status, meeting link, and advisor response here.</p>
         </header>
 
         {notice && (
@@ -192,8 +194,26 @@ function EmployeeAppointments() {
                       </div>
                       <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${statusClasses[appointment.status] || statusClasses.pending}`}>{appointment.status}</span>
                     </div>
+
                     {appointment.preferred_date && <p className="mt-3 text-sm text-slate-700"><strong>Preferred:</strong> {new Date(appointment.preferred_date).toLocaleString()}</p>}
                     {appointment.message && <p className="mt-3 text-sm leading-relaxed text-slate-600">{appointment.message}</p>}
+
+                    {(appointment.meeting_link || appointment.advisor_note) && (
+                      <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                        <p className="text-sm font-black uppercase tracking-[0.18em] text-blue-700">Advisor response</p>
+                        {appointment.advisor_note && <p className="mt-3 text-sm leading-relaxed text-slate-700">{appointment.advisor_note}</p>}
+                        {appointment.meeting_link && (
+                          <a
+                            href={appointment.meeting_link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-4 inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-black text-white hover:bg-blue-700"
+                          >
+                            Open Meeting Link
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </article>
                 ))}
               </div>
