@@ -17,16 +17,26 @@ type Partnership = {
 function Partners() {
   const [partners, setPartners] = useState<Partnership[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/public-partnerships`)
-      .then((res) => res.json())
+      .then(async (res) => {
+        const text = await res.text();
+        const data = text ? JSON.parse(text) : [];
+
+        if (!res.ok) {
+          throw new Error(data.message || `Request failed with status ${res.status}`);
+        }
+
+        return data;
+      })
       .then((data) => {
         setPartners(Array.isArray(data) ? data : []);
       })
       .catch((error) => {
         console.error("Failed to load partners:", error);
-        alert("Failed to load partner companies");
+        setError("Could not load employer portals. Please check backend/database setup.");
       })
       .finally(() => setLoading(false));
   }, []);
@@ -55,6 +65,10 @@ function Partners() {
           {loading ? (
             <div className="rounded-3xl bg-white p-8 text-center shadow-sm">
               Loading partner companies...
+            </div>
+          ) : error ? (
+            <div className="rounded-3xl border border-amber-200 bg-amber-50 p-8 text-center font-semibold text-amber-800 shadow-sm">
+              {error}
             </div>
           ) : partners.length === 0 ? (
             <div className="rounded-3xl bg-white p-8 text-center shadow-sm">
