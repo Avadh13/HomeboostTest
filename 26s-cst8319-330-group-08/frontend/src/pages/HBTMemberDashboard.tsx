@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 import ChatWidget from "../components/ChatWidget";
+
 type Partnership = {
   id: number;
   employer_name: string;
@@ -23,6 +24,19 @@ type Employee = {
   partnership_slug?: string;
 };
 
+type Appointment = {
+  id: number;
+  topic: string;
+  preferred_date?: string | null;
+  status: string;
+  employee_name: string;
+  employee_email: string;
+  employer_name?: string | null;
+  partnership_slug?: string | null;
+  team_member_name?: string | null;
+  meeting_link?: string | null;
+};
+
 type QuizSubmission = {
   id: number;
   quiz_title: string;
@@ -42,6 +56,8 @@ function HBTMemberDashboard() {
   const [partnerships, setPartnerships] = useState<Partnership[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [submissions, setSubmissions] = useState<QuizSubmission[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedSubmission, setSelectedSubmission] =
     useState<QuizSubmission | null>(null);
@@ -63,15 +79,19 @@ function HBTMemberDashboard() {
         Authorization: `Bearer ${token}`,
       };
 
-      const [partnershipRes, usersRes, quizRes] = await Promise.all([
+      const [partnershipRes, usersRes, quizRes, appointmentRes, notificationRes] = await Promise.all([
         fetch(`${API_BASE_URL}/admin-partnerships`, { headers }),
         fetch(`${API_BASE_URL}/users`, { headers }),
         fetch(`${API_BASE_URL}/quizzes/submissions`, { headers }),
+        fetch(`${API_BASE_URL}/appointments/hbt`, { headers }),
+        fetch(`${API_BASE_URL}/notifications/unread-count`, { headers }),
       ]);
 
       const partnershipData = await partnershipRes.json();
       const usersData = await usersRes.json();
       const quizData = await quizRes.json();
+      const appointmentData = await appointmentRes.json();
+      const notificationData = await notificationRes.json();
 
       setPartnerships(Array.isArray(partnershipData) ? partnershipData : []);
 
@@ -81,11 +101,15 @@ function HBTMemberDashboard() {
 
       setEmployees(employeeUsers);
       setSubmissions(Array.isArray(quizData) ? quizData : []);
+      setAppointments(Array.isArray(appointmentData) ? appointmentData : []);
+      setUnreadNotifications(Number(notificationData.unread_count || 0));
     } catch (error) {
       console.error("Failed to load HBT member dashboard:", error);
       setPartnerships([]);
       setEmployees([]);
       setSubmissions([]);
+      setAppointments([]);
+      setUnreadNotifications(0);
     } finally {
       setLoading(false);
     }
@@ -108,6 +132,14 @@ function HBTMemberDashboard() {
   const completed = submissions.filter(
     (item) => item.follow_up_status === "completed"
   ).length;
+
+  const pendingAppointments = appointments.filter(
+    (item) => item.status === "pending"
+  ).length;
+
+  const latestAppointments = useMemo(() => {
+    return appointments.slice(0, 4);
+  }, [appointments]);
 
   const latestSubmissions = useMemo(() => {
     return submissions.slice(0, 6);
@@ -180,6 +212,18 @@ function HBTMemberDashboard() {
               </p>
             </div>
 
+            <Link
+              to="/notifications"
+              className="relative rounded-full bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700"
+            >
+              Notifications
+              {unreadNotifications > 0 && (
+                <span className="absolute -right-2 -top-2 rounded-full bg-red-600 px-2 py-0.5 text-xs font-black text-white">
+                  {unreadNotifications}
+                </span>
+              )}
+            </Link>
+
             <button
               onClick={logout}
               className="rounded-full bg-red-600 px-5 py-3 text-sm font-bold text-white hover:bg-red-700"
@@ -202,14 +246,21 @@ function HBTMemberDashboard() {
             </h1>
 
             <p className="mt-3 max-w-3xl text-blue-100">
-              View your assigned client companies, employee leads, quiz
-              submissions, and follow-up work.
+              View your assigned client companies, employee leads, appointment
+              requests, quiz submissions, and follow-up work.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3">
               <Link
-                to="/hbt/quiz-submissions"
+                to="/hbt/appointments"
                 className="rounded-full bg-white px-5 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50"
+              >
+                View Appointments
+              </Link>
+
+              <Link
+                to="/hbt/quiz-submissions"
+                className="rounded-full border border-white/30 px-5 py-3 text-sm font-bold text-white hover:bg-white/10"
               >
                 View Quiz Leads
               </Link>
@@ -229,7 +280,7 @@ function HBTMemberDashboard() {
             </section>
           ) : (
             <>
-              <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-5">
+              <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-6">
                 <div className="rounded-2xl bg-white p-6 shadow">
                   <p className="text-sm font-semibold text-slate-500">
                     Assigned Companies
@@ -245,6 +296,15 @@ function HBTMemberDashboard() {
                   </p>
                   <h2 className="mt-2 text-5xl font-black text-slate-950">
                     {employees.length}
+                  </h2>
+                </div>
+
+                <div className="rounded-2xl bg-white p-6 shadow">
+                  <p className="text-sm font-semibold text-slate-500">
+                    Pending Appointments
+                  </p>
+                  <h2 className="mt-2 text-5xl font-black text-blue-600">
+                    {pendingAppointments}
                   </h2>
                 </div>
 
@@ -273,6 +333,72 @@ function HBTMemberDashboard() {
                   <h2 className="mt-2 text-5xl font-black text-green-600">
                     {completed}
                   </h2>
+                </div>
+              </section>
+
+              <section className="rounded-3xl bg-white p-6 shadow">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-950">
+                      Appointment Requests
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      These appointment requests belong to employees under your assigned HBT team.
+                    </p>
+                  </div>
+
+                  <Link
+                    to="/hbt/appointments"
+                    className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700"
+                  >
+                    Manage Appointments
+                  </Link>
+                </div>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                  {latestAppointments.map((appointment) => (
+                    <div key={appointment.id} className="rounded-2xl border p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-black text-slate-950">
+                            {appointment.topic}
+                          </p>
+                          <p className="text-sm text-slate-500">
+                            {appointment.employee_name} · {appointment.employee_email}
+                          </p>
+                          <p className="text-xs text-purple-700">
+                            {appointment.employer_name || "Company N/A"}
+                          </p>
+                        </div>
+
+                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black uppercase text-blue-700">
+                          {appointment.status}
+                        </span>
+                      </div>
+
+                      <p className="mt-3 text-sm text-slate-600">
+                        <strong>Preferred:</strong>{" "}
+                        {appointment.preferred_date
+                          ? new Date(appointment.preferred_date).toLocaleString()
+                          : "Not specified"}
+                      </p>
+
+                      {appointment.meeting_link && (
+                        <a
+                          href={appointment.meeting_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-3 inline-flex rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white"
+                        >
+                          Open Meeting Link
+                        </a>
+                      )}
+                    </div>
+                  ))}
+
+                  {latestAppointments.length === 0 && (
+                    <p className="text-slate-500">No appointment requests found.</p>
+                  )}
                 </div>
               </section>
 
