@@ -2,10 +2,11 @@ const pool = require("../config/db");
 const { createNotification, createAdminNotification } = require("../utils/notificationService");
 
 const VALID_STATUSES = new Set(["pending", "approved", "rejected", "completed"]);
+const MEETING_MINUTES = 60;
 
 const normalizeDateForMySQL = (value) => {
   if (!value) return null;
-  return String(value).trim().replace("T", " ");
+  return String(value).trim().replace("T", " ").slice(0, 19);
 };
 
 const normalizeOptionalText = (value, maxLength = 1000) => {
@@ -26,6 +27,14 @@ const normalizeMeetingLink = (value) => {
   return link;
 };
 
+const pad = (value) => String(value).padStart(2, "0");
+const toDateTime = (date, minutes) => `${date} ${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}:00`;
+const toDisplayTime = (dateTime) =>
+  new Date(dateTime.replace(" ", "T")).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
 const canManageAppointment = (user, appointment) => {
   if (!user || !appointment) return false;
 
@@ -36,6 +45,52 @@ const canManageAppointment = (user, appointment) => {
   }
 
   return false;
+};
+
+const verifyTeamMemberAccess = async ({ user, teamMemberId, partnershipId }) => {
+  if (!teamMemberId) return null;
+
+  let query = "SELECT id, team_id FROM team_members WHERE id = ? AND is_active = 1";
+  const params = [teamMemberId];
+
+  if (user.role === "employee") {
+    query = `SELECT tm.id, tm.team_id
+             FROM team_members tm
+             JOIN partnerships p ON tm.team_id = p.team_id
+             WHERE tm.id = ? AND p.id = ? AND tm.is_active = 1`;
+    params.push(partnershipId);
+  } else if (user.role === "hbt_admin" || user.role === "hbt_member") {
+    query += " AND team_id = ?";
+    params.push(user.team_id);
+  }
+
+  const [rows] = await pool.query(`${query} LIMIT 1`, params);
+  return rows[0] || null;
+};
+
+const findAppointmentConflict = async ({ teamMemberId, startDateTime, excludeAppointmentId = null }) => {
+  const params = [teamMemberId, startDateTime, startDateTime];
+  let excludeClause = "";
+
+  if (excludeAppointmentId) {
+    excludeClause = "AND id <> ?";
+    params.push(excludeAppointmentId);
+  }
+
+  const [rows] = await pool.query(
+    `SELECT id, topic, status, preferred_date
+     FROM appointments
+     WHERE team_member_id = ?
+       AND status IN ('pending', 'approved')
+       AND preferred_date IS NOT NULL
+       AND preferred_date < DATE_ADD(?, INTERVAL 60 MINUTE)
+       AND DATE_ADD(preferred_date, INTERVAL 60 MINUTE) > ?
+       ${excludeClause}
+     LIMIT 1`,
+    params
+  );
+
+  return rows[0] || null;
 };
 
 const notifyAppointmentCreated = async ({ employee, partnershipId, teamId, topic }) => {
@@ -59,7 +114,7 @@ const notifyAppointmentCreated = async ({ employee, partnershipId, teamId, topic
 
   await createAdminNotification({
     title: "New employee appointment request",
-    message: `${employee.full_name} submitted a new appointment request.` ,
+    message: `${employee.full_name} submitted a new appointment request.`,
     link: "/admin/appointments",
     type: "appointment",
   });
@@ -97,6 +152,48 @@ const notifyAppointmentUpdated = async ({ appointment, status, meetingLink, advi
   });
 };
 
+exports.getAvailableTimes = async (req, res, next) => {
+  try {
+    const teamMemberId = Number(req.query.team_member_id);
+    const date = String(req.query.date || "").trim();
+
+    if (!teamMemberId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ status: "error", message: "Advisor and date are required" });
+    }
+
+    const teamMember = await verifyTeamMemberAccess({
+      user: req.user,
+      teamMemberId,
+      partnershipId: req.user.partnership_id,
+    });
+
+    if (!teamMember) {
+      return res.status(403).json({ status: "error", message: "Advisor is not available for this account" });
+    }
+
+    const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
+
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      return res.json({ duration_minutes: MEETING_MINUTES, available_times: [] });
+    }
+
+    const availableTimes = [];
+
+    for (let minutes = 9 * 60; minutes < 17 * 60; minutes += MEETING_MINUTES) {
+      const value = toDateTime(date, minutes);
+      const conflict = await findAppointmentConflict({ teamMemberId, startDateTime: value });
+
+      if (!conflict) {
+        availableTimes.push({ value, label: toDisplayTime(value) });
+      }
+    }
+
+    res.json({ duration_minutes: MEETING_MINUTES, available_times: availableTimes });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.createAppointment = async (req, res, next) => {
   try {
     if (req.user.role !== "employee") {
@@ -104,6 +201,16 @@ exports.createAppointment = async (req, res, next) => {
     }
 
     const { team_member_id, topic, preferred_date, message } = req.body;
+    const teamMemberId = Number(team_member_id);
+    const normalizedPreferredDate = normalizeDateForMySQL(preferred_date);
+
+    if (!teamMemberId) {
+      return res.status(400).json({ status: "error", message: "Please select an advisor" });
+    }
+
+    if (!normalizedPreferredDate) {
+      return res.status(400).json({ status: "error", message: "Please select an available appointment time" });
+    }
 
     if (!topic || String(topic).trim().length < 3) {
       return res.status(400).json({ status: "error", message: "Appointment topic is required" });
@@ -125,23 +232,22 @@ exports.createAppointment = async (req, res, next) => {
     }
 
     const teamId = partnershipRows[0].team_id;
-    const teamMemberId = team_member_id || null;
+    const teamMember = await verifyTeamMemberAccess({ user: req.user, teamMemberId, partnershipId });
 
-    if (teamMemberId) {
-      const [members] = await pool.query(
-        `SELECT tm.id
-         FROM team_members tm
-         JOIN partnerships p ON tm.team_id = p.team_id
-         WHERE tm.id = ?
-           AND p.id = ?
-           AND tm.is_active = 1
-         LIMIT 1`,
-        [teamMemberId, partnershipId]
-      );
+    if (!teamMember) {
+      return res.status(400).json({ status: "error", message: "Selected advisor is not available for this partnership" });
+    }
 
-      if (members.length === 0) {
-        return res.status(400).json({ status: "error", message: "Selected team member is not available for this partnership" });
-      }
+    const conflict = await findAppointmentConflict({
+      teamMemberId,
+      startDateTime: normalizedPreferredDate,
+    });
+
+    if (conflict) {
+      return res.status(409).json({
+        status: "error",
+        message: "This advisor already has a meeting at that time. Please select another time.",
+      });
     }
 
     const normalizedTopic = String(topic).trim();
@@ -155,17 +261,12 @@ exports.createAppointment = async (req, res, next) => {
         teamMemberId,
         partnershipId,
         normalizedTopic,
-        normalizeDateForMySQL(preferred_date),
+        normalizedPreferredDate,
         message ? String(message).trim() : null,
       ]
     );
 
-    await notifyAppointmentCreated({
-      employee: req.user,
-      partnershipId,
-      teamId,
-      topic: normalizedTopic,
-    });
+    await notifyAppointmentCreated({ employee: req.user, partnershipId, teamId, topic: normalizedTopic });
 
     res.status(201).json({
       status: "success",
@@ -332,6 +433,21 @@ exports.updateAppointmentStatus = async (req, res, next) => {
       return res.status(403).json({ status: "error", message: "You are not allowed to update this appointment" });
     }
 
+    if (status === "approved" && appointment.team_member_id && appointment.preferred_date) {
+      const conflict = await findAppointmentConflict({
+        teamMemberId: appointment.team_member_id,
+        startDateTime: normalizeDateForMySQL(appointment.preferred_date),
+        excludeAppointmentId: appointment.id,
+      });
+
+      if (conflict) {
+        return res.status(409).json({
+          status: "error",
+          message: "This advisor already has another active meeting at that time.",
+        });
+      }
+    }
+
     const advisorNote = normalizeOptionalText(req.body.advisor_note);
     const meetingLink = normalizeMeetingLink(req.body.meeting_link);
 
@@ -342,12 +458,7 @@ exports.updateAppointmentStatus = async (req, res, next) => {
       [status, advisorNote, meetingLink, id]
     );
 
-    await notifyAppointmentUpdated({
-      appointment,
-      status,
-      meetingLink,
-      advisorNote,
-    });
+    await notifyAppointmentUpdated({ appointment, status, meetingLink, advisorNote });
 
     res.json({ status: "success", message: "Appointment updated successfully" });
   } catch (error) {
