@@ -1,7 +1,12 @@
+const normalizeOrigin = (origin) => {
+  if (!origin || typeof origin !== "string") return "";
+  return origin.trim().replace(/\/+$/, "");
+};
+
 const getAllowedOrigins = () => {
   const envOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "")
     .split(",")
-    .map((origin) => origin.trim())
+    .map(normalizeOrigin)
     .filter(Boolean);
 
   if (envOrigins.length > 0) {
@@ -29,8 +34,9 @@ const corsOptions = {
     if (!origin) return callback(null, true);
 
     const allowedOrigins = getAllowedOrigins();
+    const requestOrigin = normalizeOrigin(origin);
 
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(requestOrigin)) {
       return callback(null, true);
     }
 
