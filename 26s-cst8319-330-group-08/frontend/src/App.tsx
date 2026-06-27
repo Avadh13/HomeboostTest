@@ -4,6 +4,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import EmployeePortal from "./pages/EmployeePortal";
+import EmployeeAppointments from "./pages/EmployeeAppointments";
 import PartnershipLanding from "./pages/PartnershipLanding";
 import Resources from "./pages/Resources";
 import ResourceDetails from "./pages/ResourceDetails";
@@ -22,6 +23,7 @@ import HBTEmployees from "./pages/HBTEmployees";
 import HBTResources from "./pages/HBTResources";
 import HBTQuizSubmissions from "./pages/HBTQuizSubmissions";
 import HBTEvents from "./pages/HBTEvents";
+import HBTAppointments from "./pages/HBTAppointments";
 
 import AdminLogin from "./admin/pages/AdminLogin";
 import AdminDashboard from "./admin/pages/AdminDashboard";
@@ -39,6 +41,7 @@ import ManageHBTs from "./admin/pages/ManageHBTs";
 import QuizSubmissions from "./admin/pages/QuizSubmissions";
 import AdminPartnerships from "./admin/pages/AdminPartnerships";
 import AdminBuilder from "./admin/pages/AdminBuilder";
+import AdminAppointments from "./admin/pages/AdminAppointments";
 
 import AdminProtectedRoute from "./admin/components/AdminProtectedRoute";
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
@@ -61,6 +64,15 @@ function App() {
           element={
             <RoleProtectedRoute allowedRoles={["employee"]}>
               <EmployeePortal />
+            </RoleProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/employee/appointments"
+          element={
+            <RoleProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeAppointments />
             </RoleProtectedRoute>
           }
         />
@@ -165,6 +177,15 @@ function App() {
           }
         />
 
+        <Route
+          path="/hbt/appointments"
+          element={
+            <RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}>
+              <HBTAppointments />
+            </RoleProtectedRoute>
+          }
+        />
+
         {/* HBT Admin + HBT Member Shared Pages */}
         <Route
           path="/hbt/quiz-submissions"
@@ -230,6 +251,15 @@ function App() {
           element={
             <AdminProtectedRoute>
               <AdminPartnerships />
+            </AdminProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/appointments"
+          element={
+            <AdminProtectedRoute>
+              <AdminAppointments />
             </AdminProtectedRoute>
           }
         />
