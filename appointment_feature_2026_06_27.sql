@@ -17,6 +17,11 @@ CREATE TABLE IF NOT EXISTS appointments (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
+  INDEX idx_appointments_employee (employee_user_id),
+  INDEX idx_appointments_team_member (team_member_id),
+  INDEX idx_appointments_partnership (partnership_id),
+  INDEX idx_appointments_status (status),
+
   CONSTRAINT fk_appointments_employee
     FOREIGN KEY (employee_user_id) REFERENCES users(id)
     ON DELETE CASCADE,
@@ -29,8 +34,3 @@ CREATE TABLE IF NOT EXISTS appointments (
     FOREIGN KEY (partnership_id) REFERENCES partnerships(id)
     ON DELETE SET NULL
 );
-
-CREATE INDEX idx_appointments_employee ON appointments(employee_user_id);
-CREATE INDEX idx_appointments_team_member ON appointments(team_member_id);
-CREATE INDEX idx_appointments_partnership ON appointments(partnership_id);
-CREATE INDEX idx_appointments_status ON appointments(status);
