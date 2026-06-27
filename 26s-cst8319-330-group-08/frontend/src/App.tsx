@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import EmployeePortal from "./pages/EmployeePortal";
 import EmployeeAppointments from "./pages/EmployeeAppointments";
+import NotificationCenter from "./pages/NotificationCenter";
 import PartnershipLanding from "./pages/PartnershipLanding";
 import Resources from "./pages/Resources";
 import ResourceDetails from "./pages/ResourceDetails";
@@ -57,6 +58,16 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/partners" element={<Partners />} />
+
+        {/* Shared Protected Pages */}
+        <Route
+          path="/notifications"
+          element={
+            <RoleProtectedRoute allowedRoles={["admin", "super_admin", "hbt_admin", "hbt_member", "employee"]}>
+              <NotificationCenter />
+            </RoleProtectedRoute>
+          }
+        />
 
         {/* Employee Protected Pages */}
         <Route
@@ -219,158 +230,23 @@ function App() {
         <Route path="/admin/login" element={<AdminLogin />} />
 
         {/* Admin Protected Pages */}
-        <Route
-          path="/admin"
-          element={
-            <AdminProtectedRoute>
-              <AdminDashboard />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/builder"
-          element={
-            <AdminProtectedRoute>
-              <AdminBuilder />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/hbts"
-          element={
-            <AdminProtectedRoute>
-              <ManageHBTs />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/partnerships"
-          element={
-            <AdminProtectedRoute>
-              <AdminPartnerships />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/appointments"
-          element={
-            <AdminProtectedRoute>
-              <AdminAppointments />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/resources"
-          element={
-            <AdminProtectedRoute>
-              <ManageResources />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/users"
-          element={
-            <AdminProtectedRoute>
-              <ManageUsers />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/pages"
-          element={
-            <AdminProtectedRoute>
-              <ManagePages />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/sections"
-          element={
-            <AdminProtectedRoute>
-              <ManageSections />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/cards"
-          element={
-            <AdminProtectedRoute>
-              <ManageCards />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/pricing"
-          element={
-            <AdminProtectedRoute>
-              <ManagePricing />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/contact-messages"
-          element={
-            <AdminProtectedRoute>
-              <ContactMessages />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/faqs"
-          element={
-            <AdminProtectedRoute>
-              <ManageFAQs />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/quizzes"
-          element={
-            <AdminProtectedRoute>
-              <ManageQuizzes />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/quizzes/:quizId/questions"
-          element={
-            <AdminProtectedRoute>
-              <ManageQuizQuestions />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/quiz-submissions"
-          element={
-            <AdminProtectedRoute>
-              <QuizSubmissions />
-            </AdminProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/messages"
-          element={
-            <AdminProtectedRoute>
-              <MessageCenter />
-            </AdminProtectedRoute>
-          }
-        />
+        <Route path="/admin" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
+        <Route path="/admin/builder" element={<AdminProtectedRoute><AdminBuilder /></AdminProtectedRoute>} />
+        <Route path="/admin/hbts" element={<AdminProtectedRoute><ManageHBTs /></AdminProtectedRoute>} />
+        <Route path="/admin/partnerships" element={<AdminProtectedRoute><AdminPartnerships /></AdminProtectedRoute>} />
+        <Route path="/admin/appointments" element={<AdminProtectedRoute><AdminAppointments /></AdminProtectedRoute>} />
+        <Route path="/admin/resources" element={<AdminProtectedRoute><ManageResources /></AdminProtectedRoute>} />
+        <Route path="/admin/users" element={<AdminProtectedRoute><ManageUsers /></AdminProtectedRoute>} />
+        <Route path="/admin/pages" element={<AdminProtectedRoute><ManagePages /></AdminProtectedRoute>} />
+        <Route path="/admin/sections" element={<AdminProtectedRoute><ManageSections /></AdminProtectedRoute>} />
+        <Route path="/admin/cards" element={<AdminProtectedRoute><ManageCards /></AdminProtectedRoute>} />
+        <Route path="/admin/pricing" element={<AdminProtectedRoute><ManagePricing /></AdminProtectedRoute>} />
+        <Route path="/admin/contact-messages" element={<AdminProtectedRoute><ContactMessages /></AdminProtectedRoute>} />
+        <Route path="/admin/faqs" element={<AdminProtectedRoute><ManageFAQs /></AdminProtectedRoute>} />
+        <Route path="/admin/quizzes" element={<AdminProtectedRoute><ManageQuizzes /></AdminProtectedRoute>} />
+        <Route path="/admin/quizzes/:quizId/questions" element={<AdminProtectedRoute><ManageQuizQuestions /></AdminProtectedRoute>} />
+        <Route path="/admin/quiz-submissions" element={<AdminProtectedRoute><QuizSubmissions /></AdminProtectedRoute>} />
+        <Route path="/admin/messages" element={<AdminProtectedRoute><MessageCenter /></AdminProtectedRoute>} />
 
         {/* Employer Branded Public Page - keep near bottom */}
         <Route path="/:slug" element={<PartnershipLanding />} />
