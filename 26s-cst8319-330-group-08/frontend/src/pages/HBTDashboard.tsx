@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 import ChatWidget from "../components/ChatWidget";
@@ -11,21 +11,67 @@ type User = {
   role?: string;
 };
 
+type AvailabilityRow = {
+  team_member_id: number;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  is_available: number | boolean;
+};
+
+type TeamMember = {
+  id: number;
+  full_name: string;
+  title?: string;
+};
+
+type Appointment = {
+  id: number;
+  topic: string;
+  status: string;
+  preferred_date?: string | null;
+  employee_name: string;
+  team_member_name?: string | null;
+};
+
+const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const toTime = (value?: string) => (value ? value.slice(0, 5) : "--:--");
+
 function HBTDashboard() {
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [availability, setAvailability] = useState<AvailabilityRow[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   const token = localStorage.getItem("token");
   const userData = localStorage.getItem("user");
   const user: User = userData ? JSON.parse(userData) : {};
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/notifications/unread-count`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    const headers = { Authorization: `Bearer ${token}` };
+
+    fetch(`${API_BASE_URL}/notifications/unread-count`, { headers })
       .then((res) => res.json())
       .then((payload) => setUnreadCount(Number(payload.unread_count || 0)))
       .catch(() => setUnreadCount(0));
+
+    fetch(`${API_BASE_URL}/advisor-availability`, { headers })
+      .then((res) => res.json())
+      .then((payload) => {
+        setTeamMembers(Array.isArray(payload.team_members) ? payload.team_members : []);
+        setAvailability(Array.isArray(payload.availability) ? payload.availability : []);
+      })
+      .catch(() => {
+        setTeamMembers([]);
+        setAvailability([]);
+      });
+
+    fetch(`${API_BASE_URL}/appointments/hbt`, { headers })
+      .then((res) => res.json())
+      .then((payload) => setAppointments(Array.isArray(payload) ? payload : []))
+      .catch(() => setAppointments([]));
   }, [token]);
 
   const handleLogout = () => {
@@ -33,6 +79,36 @@ function HBTDashboard() {
     localStorage.removeItem("user");
     navigate("/login");
   };
+
+  const appointmentStats = useMemo(() => {
+    return {
+      pending: appointments.filter((item) => item.status === "pending").length,
+      approved: appointments.filter((item) => item.status === "approved").length,
+      completed: appointments.filter((item) => item.status === "completed").length,
+    };
+  }, [appointments]);
+
+  const workTimePreview = useMemo(() => {
+    return teamMembers.slice(0, 3).map((member) => {
+      const rows = availability
+        .filter((row) => Number(row.team_member_id) === Number(member.id) && Boolean(row.is_available))
+        .sort((a, b) => Number(a.day_of_week) - Number(b.day_of_week));
+
+      const first = rows[0];
+      const last = rows[rows.length - 1];
+
+      return {
+        member,
+        days: rows.length,
+        label:
+          first && last
+            ? `${dayNames[first.day_of_week]}-${dayNames[last.day_of_week]} · ${toTime(first.start_time)}-${toTime(first.end_time)}`
+            : "No work hours set",
+      };
+    });
+  }, [availability, teamMembers]);
+
+  const latestAppointments = appointments.slice(0, 3);
 
   const cards = [
     { title: "Employer Partnerships", icon: "🏢", description: "View employer branded pages assigned to your Home Buying Team.", link: "/hbt/companies", accent: "from-blue-500 to-cyan-500" },
@@ -74,8 +150,8 @@ function HBTDashboard() {
 
         <section className="grid gap-5 md:grid-cols-3">
           {[
-            ["Active Partnerships", "Ready"],
-            ["Booking Flow", "Conflict Safe"],
+            ["Pending Appts", String(appointmentStats.pending)],
+            ["Approved Appts", String(appointmentStats.approved)],
             ["Unread Updates", String(unreadCount)],
           ].map(([label, value]) => (
             <div key={label} className="metric-card">
@@ -83,6 +159,74 @@ function HBTDashboard() {
               <h2 className="mt-2 text-3xl font-black text-slate-950">{value}</h2>
             </div>
           ))}
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-2">
+          <div className="rounded-[2rem] bg-white p-7 shadow-xl">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">Work Time</p>
+                <h2 className="text-3xl font-black text-slate-950">Advisor work hours</h2>
+              </div>
+              <Link to="/hbt/availability" className="rounded-full bg-blue-600 px-5 py-2.5 text-sm font-black text-white hover:bg-blue-700">Manage hours</Link>
+            </div>
+
+            <div className="space-y-3">
+              {workTimePreview.length === 0 ? (
+                <p className="rounded-2xl bg-slate-50 p-4 text-slate-500">No advisors found. Add team members first.</p>
+              ) : (
+                workTimePreview.map((item) => (
+                  <div key={item.member.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <p className="font-black text-slate-950">{item.member.full_name}</p>
+                    <p className="text-sm text-slate-500">{item.member.title || "Advisor"}</p>
+                    <p className="mt-2 font-bold text-blue-700">{item.label}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] bg-white p-7 shadow-xl">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.2em] text-emerald-600">Appointment Time</p>
+                <h2 className="text-3xl font-black text-slate-950">Upcoming requests</h2>
+              </div>
+              <Link to="/hbt/appointments" className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-black text-white hover:bg-blue-700">Open queue</Link>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-amber-50 p-4 text-center">
+                <p className="text-3xl font-black text-amber-700">{appointmentStats.pending}</p>
+                <p className="text-xs font-black uppercase text-amber-700">Pending</p>
+              </div>
+              <div className="rounded-2xl bg-blue-50 p-4 text-center">
+                <p className="text-3xl font-black text-blue-700">{appointmentStats.approved}</p>
+                <p className="text-xs font-black uppercase text-blue-700">Approved</p>
+              </div>
+              <div className="rounded-2xl bg-emerald-50 p-4 text-center">
+                <p className="text-3xl font-black text-emerald-700">{appointmentStats.completed}</p>
+                <p className="text-xs font-black uppercase text-emerald-700">Completed</p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {latestAppointments.length === 0 ? (
+                <p className="rounded-2xl bg-slate-50 p-4 text-slate-500">No appointment requests yet.</p>
+              ) : (
+                latestAppointments.map((appointment) => (
+                  <div key={appointment.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-black text-slate-950">{appointment.topic}</p>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-black uppercase text-slate-700">{appointment.status}</span>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-500">{appointment.employee_name} · {appointment.team_member_name || "Advisor"}</p>
+                    <p className="mt-2 text-sm font-bold text-slate-700">{appointment.preferred_date ? new Date(appointment.preferred_date).toLocaleString() : "No time selected"}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </section>
 
         <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -99,27 +243,6 @@ function HBTDashboard() {
               </div>
             </Link>
           ))}
-        </section>
-
-        <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-          <div className="rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white shadow-2xl shadow-blue-500/30">
-            <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-100">Operational workflow</p>
-            <h2 className="mt-3 text-3xl font-black">Next best action</h2>
-            <p className="mt-4 text-blue-50">Review new notifications, then handle appointment requests and advisor availability.</p>
-            <Link to="/hbt/appointments" className="mt-6 inline-flex rounded-full bg-white px-6 py-3 font-black text-blue-700 transition hover:-translate-y-1">
-              Open appointments
-            </Link>
-          </div>
-          <div className="rounded-[2rem] bg-white p-8 shadow-xl">
-            <h2 className="text-3xl font-black">What this dashboard proves</h2>
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              {["Role-based login", "Conflict-safe booking", "Availability workflow"].map((item) => (
-                <div key={item} className="rounded-3xl bg-slate-50 p-5 font-bold text-slate-700">
-                  <span className="mr-2 text-blue-600">✓</span>{item}
-                </div>
-              ))}
-            </div>
-          </div>
         </section>
       </div>
       <ChatWidget />
