@@ -9,15 +9,22 @@ const hbtOnly = (req, res, next) => {
     return res.status(403).json({ status: "error", message: "HBT access required" });
   }
 
-  if (!req.user.team_id) {
-    return res.status(400).json({ status: "error", message: "HBT user is not linked to a team" });
-  }
-
   next();
 };
 
 router.get("/", protect, hbtOnly, async (req, res) => {
   try {
+    const [userRows] = await pool.query(
+      "SELECT team_id FROM users WHERE id = ? LIMIT 1",
+      [req.user.id]
+    );
+
+    const teamId = userRows[0]?.team_id || req.user.team_id;
+
+    if (!teamId) {
+      return res.json([]);
+    }
+
     const [rows] = await pool.query(
       `SELECT
         p.id,
@@ -35,7 +42,7 @@ router.get("/", protect, hbtOnly, async (req, res) => {
        JOIN employers e ON p.employer_id = e.id
        WHERE p.team_id = ?
        ORDER BY e.name ASC, p.id DESC`,
-      [req.user.team_id]
+      [teamId]
     );
 
     res.json(rows);
