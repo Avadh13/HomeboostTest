@@ -20,7 +20,11 @@ function ResourceDetails() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/resources/${id}`)
+    const token = localStorage.getItem("token");
+
+    fetch(`${API_BASE_URL}/resources/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load resource");
         return res.json();
@@ -39,7 +43,7 @@ function ResourceDetails() {
           <p className="mt-8 text-gray-600">Loading resource...</p>
         ) : !resource ? (
           <div className="bg-white rounded-xl shadow p-8 mt-8">
-            <h1 className="text-2xl font-bold text-red-600">Resource not found</h1>
+            <h1 className="text-2xl font-bold text-red-600">Resource not found or not assigned to your partnership</h1>
           </div>
         ) : (
           <article className="bg-white rounded-2xl shadow p-8 mt-8">
@@ -52,9 +56,7 @@ function ResourceDetails() {
             {resource.description && <p className="text-xl text-gray-600 mt-4">{resource.description}</p>}
             {resource.content && <p className="text-gray-700 mt-6 leading-8 whitespace-pre-line">{resource.content}</p>}
             {resource.resource_url && (
-              <a href={resource.resource_url} target="_blank" rel="noreferrer" className="inline-block mt-8 bg-black text-white px-6 py-3 rounded-lg">
-                Open Resource
-              </a>
+              <a href={resource.resource_url} target="_blank" rel="noreferrer" className="inline-block mt-8 bg-black text-white px-6 py-3 rounded-lg">Open Resource</a>
             )}
           </article>
         )}
