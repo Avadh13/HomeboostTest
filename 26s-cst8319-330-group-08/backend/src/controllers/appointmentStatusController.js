@@ -36,9 +36,10 @@ const canCancelAppointment = (user, appointment) => {
 
 const getAppointment = async (appointmentId) => {
   const [rows] = await pool.query(
-    `SELECT a.*, p.team_id
+    `SELECT a.*, p.team_id, u.full_name AS employee_name, u.email AS employee_email
      FROM appointments a
      LEFT JOIN partnerships p ON a.partnership_id = p.id
+     LEFT JOIN users u ON a.employee_user_id = u.id
      WHERE a.id = ?
      LIMIT 1`,
     [appointmentId]
@@ -82,6 +83,28 @@ const notifyAppointmentUpdated = async ({ appointment, title, message }) => {
     title,
     message: `Appointment #${appointment.id}: ${message}`,
     link: "/admin/appointments",
+    type: "appointment",
+  });
+};
+
+const notifyHBTTeam = async ({ appointment, title, message }) => {
+  if (!appointment.team_id) return;
+
+  await createNotification({
+    target_role: "hbt_admin",
+    target_team_id: appointment.team_id,
+    title,
+    message,
+    link: "/hbt/appointments",
+    type: "appointment",
+  });
+
+  await createNotification({
+    target_role: "hbt_member",
+    target_team_id: appointment.team_id,
+    title,
+    message,
+    link: "/hbt/appointments",
     type: "appointment",
   });
 };
@@ -253,6 +276,15 @@ exports.cancelAppointment = async (req, res, next) => {
       title: "Appointment cancelled",
       message: cancelNote,
     });
+
+    if (req.user.role === "employee") {
+      const employeeName = appointment.employee_name || req.user.full_name || "An employee";
+      await notifyHBTTeam({
+        appointment,
+        title: "Employee cancelled appointment",
+        message: `${employeeName} cancelled ${appointment.topic || "an appointment"}. ${reason ? `Reason: ${reason}` : ""}`.trim(),
+      });
+    }
 
     return res.json({ status: "success", message: "Appointment cancelled successfully" });
   } catch (error) {
