@@ -46,6 +46,10 @@ const isAllowedVercelPreview = (origin) => {
   );
 };
 
+const isAllowedCodespacesOrigin = (origin) => {
+  return /^https:\/\/[a-z0-9-]+-\d+\.app\.github\.dev$/i.test(origin);
+};
+
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) return callback(null, true);
@@ -53,10 +57,15 @@ const corsOptions = {
     const allowedOrigins = getAllowedOrigins();
     const requestOrigin = normalizeOrigin(origin);
 
-    if (allowedOrigins.includes(requestOrigin) || isAllowedVercelPreview(requestOrigin)) {
+    if (
+      allowedOrigins.includes(requestOrigin) ||
+      isAllowedVercelPreview(requestOrigin) ||
+      isAllowedCodespacesOrigin(requestOrigin)
+    ) {
       return callback(null, true);
     }
 
+    console.log("CORS blocked origin:", requestOrigin);
     return callback(new Error("Origin is not allowed by CORS policy"));
   },
   credentials: true,
