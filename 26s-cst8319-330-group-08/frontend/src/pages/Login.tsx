@@ -112,117 +112,60 @@ function Login() {
   };
 
   return (
-    <main className="grid min-h-screen bg-slate-50 lg:grid-cols-2">
+    <main className="grid min-h-screen bg-[#f8f7ff] lg:grid-cols-2">
       <section className="relative hidden overflow-hidden lg:block">
-        <img
-          src={loginImage}
-          alt="Modern home interior"
-          className="h-full w-full object-cover"
-        />
+        <img src={loginImage} alt="Modern home interior" className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-950/90 via-indigo-950/70 to-violet-900/40" />
 
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-950/85 via-blue-900/55 to-transparent" />
-
-        <div className="absolute bottom-10 left-10 right-10 rounded-[2rem] bg-white/15 p-8 text-white backdrop-blur-xl">
-          <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-100">
-            One login
-          </p>
-
-          <h2 className="mt-3 text-4xl font-black">
-            Same door. Different dashboard.
-          </h2>
-
-          <p className="mt-4 max-w-xl text-blue-50">
-            Super Admin, HBT Admin, HBT Team Members, and Employees all start
-            here. The system reads the role and sends each user to the right
-            place.
+        <div className="absolute bottom-10 left-10 right-10 rounded-[2rem] border border-white/15 bg-white/15 p-8 text-white backdrop-blur-xl">
+          <p className="text-sm font-black uppercase tracking-[0.25em] text-violet-100">One login</p>
+          <h2 className="mt-3 text-4xl font-black tracking-tight">Same door. Different dashboard.</h2>
+          <p className="mt-4 max-w-xl text-violet-50">
+            Admins, HBT teams, and employees all start here. The system reads the role and sends each user to the right place.
           </p>
         </div>
       </section>
 
-      <section className="flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-md">
-          <Link to="/" className="mb-8 inline-flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 font-black text-white shadow-lg shadow-blue-500/30">
-              HB
-            </span>
+      <section className="relative flex items-center justify-center overflow-hidden px-6 py-12">
+        <div className="floating-orb -right-24 top-20 h-80 w-80 bg-violet-400" />
+        <div className="floating-orb -left-32 bottom-20 h-80 w-80 bg-blue-400" />
 
+        <div className="relative w-full max-w-md">
+          <Link to="/" className="mb-8 inline-flex items-center gap-3">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 font-black text-white shadow-lg shadow-violet-500/30">HB</span>
             <div>
               <p className="text-2xl font-black">HomeBoost</p>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">
-                Employee Benefit
-              </p>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-violet-600">Employee Benefit</p>
             </div>
           </Link>
 
-          <form
-            onSubmit={handleLogin}
-            className="rounded-[2rem] bg-white p-8 shadow-2xl shadow-slate-200/70"
-          >
-            <p className="text-sm font-black uppercase tracking-[0.22em] text-blue-600">
-              Welcome back
-            </p>
-
-            <h1 className="mt-2 text-4xl font-black">Login</h1>
-
-            <p className="mt-3 text-slate-600">
-              Use your assigned account credentials to access your role-based
-              dashboard.
-            </p>
+          <form onSubmit={handleLogin} className="premium-card p-8">
+            <p className="eyebrow">Welcome back</p>
+            <h1 className="mt-2 text-5xl font-black tracking-tight">Login</h1>
+            <p className="mt-3 text-slate-600">Use your assigned account details to access your role-based dashboard.</p>
 
             {notice && (
-              <div
-                className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${
-                  notice.type === "success"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : "border-red-200 bg-red-50 text-red-700"
-                }`}
-              >
+              <div className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${notice.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}>
                 {notice.message}
               </div>
             )}
 
             <div className="mt-7 space-y-4">
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <input className="form-field p-4" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <input className="form-field p-4" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary mt-6 w-full disabled:opacity-60"
-            >
+            <button type="submit" disabled={loading} className="btn-primary mt-6 w-full disabled:opacity-60">
               {loading ? "Logging in..." : "Login"}
             </button>
 
-            <div className="mt-6 rounded-2xl bg-blue-50 p-4 text-sm text-slate-700">
-              <p className="font-black text-blue-700">Need access?</p>
-
-              <p className="mt-2">
-                Employees should start from their employer portal link. HBT team
-                members should use the login provided by their HBT Admin.
-              </p>
+            <div className="mt-6 rounded-2xl border border-violet-100 bg-violet-50/80 p-4 text-sm text-slate-700">
+              <p className="font-black text-violet-700">Need access?</p>
+              <p className="mt-2">Employees should start from their employer portal link. HBT team members should use the login provided by their HBT Admin.</p>
             </div>
 
             <p className="mt-6 text-center text-sm text-slate-600">
-              Employee?{" "}
-              <Link to="/partners" className="font-bold text-blue-700">
-                Start from your employer page
-              </Link>
+              Employee? <Link to="/partners" className="font-black text-violet-700">Start from your employer page</Link>
             </p>
           </form>
         </div>
