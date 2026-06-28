@@ -11,6 +11,7 @@ const getAllowedOrigins = () => {
 
   const defaultOrigins = process.env.NODE_ENV === "production"
     ? [
+        "https://homeboosttest.vercel.app",
         "https://homeboost-test.vercel.app",
         "https://homeboosttest-git-main-avadh2708s-projects.vercel.app",
       ]
@@ -31,6 +32,7 @@ const getAllowedOrigins = () => {
 const isAllowedVercelPreview = (origin) => {
   const allowedPreviewPrefixes = [
     "https://homeboost-test-",
+    "https://homeboosttest-",
     "https://homeboosttest-git-",
   ];
 
