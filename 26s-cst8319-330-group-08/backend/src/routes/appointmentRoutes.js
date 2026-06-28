@@ -12,6 +12,8 @@ router.post("/", appointmentController.createAppointment);
 router.get("/my", appointmentController.getMyAppointments);
 router.get("/hbt", appointmentController.getHBTAppointments);
 router.get("/admin", appointmentController.getAdminAppointments);
+router.put("/:id/reschedule", appointmentStatusController.rescheduleAppointment);
+router.put("/:id/cancel", appointmentStatusController.cancelAppointment);
 router.put("/:id/status", appointmentStatusController.updateAppointmentStatus);
 
 module.exports = router;
