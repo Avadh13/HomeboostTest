@@ -20,6 +20,18 @@ type Appointment = {
   partnership_slug?: string | null;
 };
 
+type TeamMember = {
+  id: number;
+  full_name: string;
+  title?: string;
+  email?: string;
+};
+
+type AvailableTime = {
+  value: string;
+  label: string;
+};
+
 type AdvisorDraft = {
   advisor_note: string;
   meeting_link: string;
@@ -27,6 +39,8 @@ type AdvisorDraft = {
 
 type StatusFilter = "active" | "all" | "pending" | "approved" | "completed" | "rejected";
 type SortBy = "newest" | "oldest" | "preferred_soonest" | "preferred_latest";
+
+const today = new Date().toISOString().split("T")[0];
 
 const statusClasses: Record<string, string> = {
   pending: "bg-amber-50 text-amber-800 border-amber-200",
@@ -41,12 +55,15 @@ const getTime = (value?: string | null) => {
   return Number.isNaN(time) ? 0 : time;
 };
 
+const toDateInput = (value?: string | null) => {
+  if (!value) return today;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? today : date.toISOString().split("T")[0];
+};
+
 const getPreferredTimeStyle = (appointment: Appointment) => {
   if (!appointment.preferred_date) {
-    return {
-      className: "bg-slate-100 text-slate-600 border-slate-200",
-      label: "No time selected",
-    };
+    return { className: "bg-slate-100 text-slate-600 border-slate-200", label: "No time selected" };
   }
 
   const activeStatus = appointment.status === "pending" || appointment.status === "approved";
@@ -55,35 +72,24 @@ const getPreferredTimeStyle = (appointment: Appointment) => {
   const twentyFourHours = 24 * 60 * 60 * 1000;
 
   if (activeStatus && preferredTime < now) {
-    return {
-      className: "bg-red-50 text-red-700 border-red-200",
-      label: "Past due",
-    };
+    return { className: "bg-red-50 text-red-700 border-red-200", label: "Past due" };
   }
 
   if (activeStatus && preferredTime - now <= twentyFourHours) {
-    return {
-      className: "bg-amber-50 text-amber-800 border-amber-200",
-      label: "Soon",
-    };
+    return { className: "bg-amber-50 text-amber-800 border-amber-200", label: "Soon" };
   }
 
   if (appointment.status === "completed") {
-    return {
-      className: "bg-emerald-50 text-emerald-800 border-emerald-200",
-      label: "Resolved",
-    };
+    return { className: "bg-emerald-50 text-emerald-800 border-emerald-200", label: "Resolved" };
   }
 
-  return {
-    className: "bg-slate-100 text-slate-700 border-slate-200",
-    label: "Scheduled",
-  };
+  return { className: "bg-slate-100 text-slate-700 border-slate-200", label: "Scheduled" };
 };
 
 function HBTAppointments() {
   const token = localStorage.getItem("token");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [drafts, setDrafts] = useState<Record<number, AdvisorDraft>>({});
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
@@ -91,6 +97,13 @@ function HBTAppointments() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("newest");
+  const [rescheduleTarget, setRescheduleTarget] = useState<Appointment | null>(null);
+  const [rescheduleAdvisorId, setRescheduleAdvisorId] = useState("");
+  const [rescheduleDate, setRescheduleDate] = useState(today);
+  const [reschedulePreferredDate, setReschedulePreferredDate] = useState("");
+  const [rescheduleNote, setRescheduleNote] = useState("");
+  const [availableTimes, setAvailableTimes] = useState<AvailableTime[]>([]);
+  const [loadingTimes, setLoadingTimes] = useState(false);
 
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -121,8 +134,19 @@ function HBTAppointments() {
     }
   };
 
+  const loadTeamMembers = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/advisor-availability`, { headers });
+      const data = await response.json();
+      setTeamMembers(Array.isArray(data.team_members) ? data.team_members : []);
+    } catch {
+      setTeamMembers([]);
+    }
+  };
+
   useEffect(() => {
     loadAppointments();
+    loadTeamMembers();
   }, []);
 
   const updateDraft = (id: number, field: keyof AdvisorDraft, value: string) => {
@@ -144,15 +168,8 @@ function HBTAppointments() {
       setUpdatingId(appointment.id);
       const response = await fetch(`${API_BASE_URL}/appointments/${appointment.id}/status`, {
         method: "PUT",
-        headers: {
-          ...headers,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          status,
-          advisor_note: draft.advisor_note,
-          meeting_link: draft.meeting_link,
-        }),
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ status, advisor_note: draft.advisor_note, meeting_link: draft.meeting_link }),
       });
 
       const data = await response.json().catch(() => ({}));
@@ -167,6 +184,126 @@ function HBTAppointments() {
     } catch (error) {
       console.error("Appointment update failed:", error);
       setNotice({ type: "error", message: "Could not update appointment." });
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const openReschedule = (appointment: Appointment) => {
+    const matchedAdvisor = teamMembers.find((member) => member.full_name === appointment.team_member_name);
+    setRescheduleTarget(appointment);
+    setRescheduleAdvisorId(matchedAdvisor ? String(matchedAdvisor.id) : teamMembers[0] ? String(teamMembers[0].id) : "");
+    setRescheduleDate(toDateInput(appointment.preferred_date));
+    setReschedulePreferredDate("");
+    setRescheduleNote(appointment.advisor_note || "");
+    setAvailableTimes([]);
+  };
+
+  const closeReschedule = () => {
+    setRescheduleTarget(null);
+    setRescheduleAdvisorId("");
+    setReschedulePreferredDate("");
+    setAvailableTimes([]);
+  };
+
+  const loadAvailableTimes = async () => {
+    setAvailableTimes([]);
+    setReschedulePreferredDate("");
+
+    if (!rescheduleTarget || !rescheduleAdvisorId || !rescheduleDate) return;
+
+    try {
+      setLoadingTimes(true);
+      const response = await fetch(
+        `${API_BASE_URL}/appointments/available-times?team_member_id=${rescheduleAdvisorId}&date=${rescheduleDate}`,
+        { headers }
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        setNotice({ type: "error", message: data.message || "Could not load available times." });
+        return;
+      }
+
+      setAvailableTimes(Array.isArray(data.available_times) ? data.available_times : []);
+    } catch (error) {
+      console.error("Load reschedule times failed:", error);
+      setNotice({ type: "error", message: "Could not load available times." });
+    } finally {
+      setLoadingTimes(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAvailableTimes();
+  }, [rescheduleTarget, rescheduleAdvisorId, rescheduleDate]);
+
+  const submitReschedule = async () => {
+    if (!rescheduleTarget) return;
+
+    if (!rescheduleAdvisorId || !reschedulePreferredDate) {
+      setNotice({ type: "error", message: "Select advisor and new available time." });
+      return;
+    }
+
+    const draft = drafts[rescheduleTarget.id] || { advisor_note: "", meeting_link: "" };
+
+    try {
+      setUpdatingId(rescheduleTarget.id);
+      const response = await fetch(`${API_BASE_URL}/appointments/${rescheduleTarget.id}/reschedule`, {
+        method: "PUT",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          team_member_id: rescheduleAdvisorId,
+          preferred_date: reschedulePreferredDate,
+          advisor_note: rescheduleNote,
+          meeting_link: draft.meeting_link,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setNotice({ type: "error", message: data.message || "Reschedule failed." });
+        await loadAvailableTimes();
+        return;
+      }
+
+      setNotice({ type: "success", message: "Appointment rescheduled and employee notified." });
+      closeReschedule();
+      await loadAppointments();
+    } catch (error) {
+      console.error("Reschedule failed:", error);
+      setNotice({ type: "error", message: "Could not reschedule appointment." });
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const cancelAppointment = async (appointment: Appointment) => {
+    const reason = window.prompt("Why are you cancelling this appointment?", "Schedule conflict");
+    if (reason === null) return;
+
+    try {
+      setUpdatingId(appointment.id);
+      const response = await fetch(`${API_BASE_URL}/appointments/${appointment.id}/cancel`, {
+        method: "PUT",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ cancel_reason: reason }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setNotice({ type: "error", message: data.message || "Cancel failed." });
+        return;
+      }
+
+      setNotice({ type: "success", message: "Appointment cancelled and employee notified." });
+      await loadAppointments();
+    } catch (error) {
+      console.error("Cancel failed:", error);
+      setNotice({ type: "error", message: "Could not cancel appointment." });
     } finally {
       setUpdatingId(null);
     }
@@ -187,12 +324,8 @@ function HBTAppointments() {
 
     return appointments
       .filter((appointment) => {
-        if (statusFilter === "active") {
-          return appointment.status === "pending" || appointment.status === "approved";
-        }
-
+        if (statusFilter === "active") return appointment.status === "pending" || appointment.status === "approved";
         if (statusFilter === "all") return true;
-
         return appointment.status === statusFilter;
       })
       .filter((appointment) => {
@@ -236,7 +369,7 @@ function HBTAppointments() {
         <header className="rounded-[2rem] bg-gradient-to-br from-slate-950 to-blue-950 p-8 text-white shadow-xl">
           <Link to="/hbt/dashboard" className="text-sm font-bold text-blue-200 hover:text-white">← Back to HBT dashboard</Link>
           <h1 className="mt-4 text-4xl font-black">Appointment Requests</h1>
-          <p className="mt-3 max-w-2xl text-blue-100">Review employee appointment requests, paste Google Meet or Zoom links, and send advisor notes.</p>
+          <p className="mt-3 max-w-2xl text-blue-100">Review, reschedule, cancel, and update employee appointments.</p>
         </header>
 
         {notice && (
@@ -253,11 +386,7 @@ function HBTAppointments() {
             ["Completed", stats.completed, "completed"],
             ["Rejected", stats.rejected, "rejected"],
           ].map(([label, value, filter]) => (
-            <button
-              key={label}
-              onClick={() => setStatusFilter(filter as StatusFilter)}
-              className={`rounded-3xl bg-white p-6 text-left shadow transition hover:-translate-y-1 hover:shadow-lg ${statusFilter === filter ? "ring-4 ring-blue-100" : ""}`}
-            >
+            <button key={label} onClick={() => setStatusFilter(filter as StatusFilter)} className={`rounded-3xl bg-white p-6 text-left shadow transition hover:-translate-y-1 hover:shadow-lg ${statusFilter === filter ? "ring-4 ring-blue-100" : ""}`}>
               <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">{label}</p>
               <h2 className="mt-2 text-4xl font-black text-slate-950">{value}</h2>
             </button>
@@ -269,9 +398,7 @@ function HBTAppointments() {
             <div>
               <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">Operations</p>
               <h2 className="text-3xl font-black">Team appointment queue</h2>
-              <p className="mt-2 text-sm text-slate-500">
-                Showing {filteredAppointments.length} of {appointments.length} appointment requests.
-              </p>
+              <p className="mt-2 text-sm text-slate-500">Showing {filteredAppointments.length} of {appointments.length} appointment requests.</p>
             </div>
             <button onClick={loadAppointments} className="rounded-full bg-slate-100 px-5 py-2.5 font-bold text-slate-700 hover:bg-slate-200">Refresh</button>
           </div>
@@ -280,21 +407,11 @@ function HBTAppointments() {
             <div className="grid gap-4 lg:grid-cols-[1.1fr_0.7fr_0.7fr_auto]">
               <label className="block">
                 <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">Search</span>
-                <input
-                  className="w-full rounded-2xl border border-slate-200 bg-white p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-                  placeholder="Search employee, email, company, topic, meeting link..."
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                />
+                <input className="w-full rounded-2xl border border-slate-200 bg-white p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" placeholder="Search employee, email, company, topic, meeting link..." value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
               </label>
-
               <label className="block">
                 <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">Status</span>
-                <select
-                  className="w-full rounded-2xl border border-slate-200 bg-white p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-                  value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-                >
+                <select className="w-full rounded-2xl border border-slate-200 bg-white p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
                   <option value="active">Active only</option>
                   <option value="all">All meetings</option>
                   <option value="pending">Pending</option>
@@ -303,52 +420,16 @@ function HBTAppointments() {
                   <option value="rejected">Rejected</option>
                 </select>
               </label>
-
               <label className="block">
                 <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">Sort</span>
-                <select
-                  className="w-full rounded-2xl border border-slate-200 bg-white p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-                  value={sortBy}
-                  onChange={(event) => setSortBy(event.target.value as SortBy)}
-                >
+                <select className="w-full rounded-2xl border border-slate-200 bg-white p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" value={sortBy} onChange={(event) => setSortBy(event.target.value as SortBy)}>
                   <option value="newest">Newest created</option>
                   <option value="oldest">Oldest created</option>
                   <option value="preferred_soonest">Preferred soonest</option>
                   <option value="preferred_latest">Preferred latest</option>
                 </select>
               </label>
-
-              <div className="flex items-end">
-                <button
-                  onClick={clearFilters}
-                  className="w-full rounded-2xl bg-slate-950 px-5 py-3 font-bold text-white hover:bg-blue-700 lg:w-auto"
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {[
-                ["active", "Active"],
-                ["pending", "Pending"],
-                ["approved", "Approved"],
-                ["completed", "Completed"],
-                ["rejected", "Rejected"],
-                ["all", "All"],
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  onClick={() => setStatusFilter(value as StatusFilter)}
-                  className={`rounded-full px-4 py-2 text-sm font-bold transition ${
-                    statusFilter === value
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+              <div className="flex items-end"><button onClick={clearFilters} className="w-full rounded-2xl bg-slate-950 px-5 py-3 font-bold text-white hover:bg-blue-700 lg:w-auto">Reset</button></div>
             </div>
           </div>
 
@@ -363,6 +444,7 @@ function HBTAppointments() {
               {filteredAppointments.map((appointment) => {
                 const draft = drafts[appointment.id] || { advisor_note: "", meeting_link: "" };
                 const preferredTimeStyle = getPreferredTimeStyle(appointment);
+                const isClosed = appointment.status === "completed" || appointment.status === "rejected";
 
                 return (
                   <article key={appointment.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-6">
@@ -378,9 +460,7 @@ function HBTAppointments() {
                     <div className="mt-4 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
                       <p><strong>Requested expert:</strong> {appointment.team_member_name || "Any available team member"}</p>
                       <div className={`rounded-2xl border px-4 py-3 font-bold ${preferredTimeStyle.className}`}>
-                        <p>
-                          Preferred time: {appointment.preferred_date ? new Date(appointment.preferred_date).toLocaleString() : "Not specified"}
-                        </p>
+                        <p>Preferred time: {appointment.preferred_date ? new Date(appointment.preferred_date).toLocaleString() : "Not specified"}</p>
                         <p className="mt-1 text-xs uppercase tracking-[0.16em]">{preferredTimeStyle.label}</p>
                       </div>
                     </div>
@@ -392,46 +472,32 @@ function HBTAppointments() {
                       <div className="mt-4 grid gap-4 lg:grid-cols-2">
                         <label className="block">
                           <span className="mb-2 block text-sm font-bold text-slate-700">Google Meet / Zoom link</span>
-                          <input
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-                            placeholder="https://meet.google.com/... or https://zoom.us/..."
-                            value={draft.meeting_link}
-                            onChange={(e) => updateDraft(appointment.id, "meeting_link", e.target.value)}
-                          />
+                          <input className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" placeholder="https://meet.google.com/... or https://zoom.us/..." value={draft.meeting_link} onChange={(e) => updateDraft(appointment.id, "meeting_link", e.target.value)} />
                         </label>
                         <label className="block">
                           <span className="mb-2 block text-sm font-bold text-slate-700">Message to employee</span>
-                          <textarea
-                            className="min-h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-                            placeholder="Example: Hi, here is the meeting link for our call. Please bring your mortgage documents."
-                            value={draft.advisor_note}
-                            onChange={(e) => updateDraft(appointment.id, "advisor_note", e.target.value)}
-                          />
+                          <textarea className="min-h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" placeholder="Example: Hi, here is the meeting link for our call." value={draft.advisor_note} onChange={(e) => updateDraft(appointment.id, "advisor_note", e.target.value)} />
                         </label>
                       </div>
                     </div>
 
                     <div className="mt-5 flex flex-wrap gap-3">
-                      <button
-                        disabled={updatingId === appointment.id}
-                        onClick={() => updateAppointment(appointment, appointment.status)}
-                        className="rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
-                      >
+                      <button disabled={updatingId === appointment.id} onClick={() => updateAppointment(appointment, appointment.status)} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
                         {updatingId === appointment.id ? "Saving..." : "Save Note/Link"}
                       </button>
-
+                      <button disabled={updatingId === appointment.id || isClosed} onClick={() => openReschedule(appointment)} className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
+                        Reschedule
+                      </button>
+                      <button disabled={updatingId === appointment.id || isClosed} onClick={() => cancelAppointment(appointment)} className="rounded-full bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
+                        Cancel
+                      </button>
                       {[
                         ["approved", "Approve"],
                         ["rejected", "Reject"],
                         ["completed", "Complete"],
                         ["pending", "Reset Pending"],
                       ].map(([status, label]) => (
-                        <button
-                          key={status}
-                          disabled={updatingId === appointment.id || appointment.status === status}
-                          onClick={() => updateAppointment(appointment, status)}
-                          className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
-                        >
+                        <button key={status} disabled={updatingId === appointment.id || appointment.status === status} onClick={() => updateAppointment(appointment, status)} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
                           {updatingId === appointment.id ? "Updating..." : label}
                         </button>
                       ))}
@@ -443,6 +509,66 @@ function HBTAppointments() {
           )}
         </section>
       </div>
+
+      {rescheduleTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white p-7 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.2em] text-indigo-600">Reschedule appointment</p>
+                <h2 className="mt-2 text-3xl font-black text-slate-950">{rescheduleTarget.topic}</h2>
+                <p className="mt-1 text-slate-500">{rescheduleTarget.employee_name} · {rescheduleTarget.employee_email}</p>
+              </div>
+              <button onClick={closeReschedule} className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">Close</button>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <label className="block">
+                <span className="mb-2 block text-sm font-bold text-slate-700">Advisor</span>
+                <select className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4" value={rescheduleAdvisorId} onChange={(e) => setRescheduleAdvisorId(e.target.value)}>
+                  <option value="">Select advisor</option>
+                  {teamMembers.map((member) => (
+                    <option key={member.id} value={member.id}>{member.full_name} — {member.title || "Advisor"}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-bold text-slate-700">New date</span>
+                <input type="date" min={today} className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4" value={rescheduleDate} onChange={(e) => setRescheduleDate(e.target.value)} />
+              </label>
+
+              <div>
+                <span className="mb-2 block text-sm font-bold text-slate-700">Available 1-hour times</span>
+                {!rescheduleAdvisorId ? (
+                  <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Select an advisor first.</div>
+                ) : loadingTimes ? (
+                  <div className="rounded-2xl bg-blue-50 p-4 text-sm font-semibold text-blue-700">Loading available times...</div>
+                ) : availableTimes.length === 0 ? (
+                  <div className="rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-800">No available times for this advisor/date. Try another date.</div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {availableTimes.map((time) => (
+                      <button key={time.value} type="button" onClick={() => setReschedulePreferredDate(time.value)} className={`rounded-2xl border px-4 py-3 text-left font-bold transition ${reschedulePreferredDate === time.value ? "border-blue-500 bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300 hover:bg-blue-50"}`}>
+                        {time.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-bold text-slate-700">Message to employee</span>
+                <textarea className="min-h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 p-4" value={rescheduleNote} onChange={(e) => setRescheduleNote(e.target.value)} placeholder="Example: We moved your meeting to this new time." />
+              </label>
+            </div>
+
+            <button disabled={updatingId === rescheduleTarget.id || loadingTimes} onClick={submitReschedule} className="mt-6 w-full rounded-full bg-indigo-600 px-6 py-3 font-black text-white hover:bg-indigo-700 disabled:opacity-50">
+              {updatingId === rescheduleTarget.id ? "Rescheduling..." : "Confirm Reschedule"}
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
