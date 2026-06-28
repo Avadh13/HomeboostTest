@@ -19,9 +19,7 @@ function Contact() {
 
       const response = await fetch(`${API_BASE_URL}/contact`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           full_name: fullName.trim(),
           email: email.trim(),
@@ -51,67 +49,52 @@ function Contact() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="theme-page">
       <Navbar />
 
-      <section className="px-6 py-16">
-        <div className="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow">
-          <p className="text-sm font-semibold tracking-wide text-gray-500 uppercase mb-3">
-            Contact
-          </p>
+      <section className="relative px-6 py-16">
+        <div className="floating-orb -left-24 top-20 h-80 w-80 bg-blue-400" />
+        <div className="floating-orb right-0 top-40 h-96 w-96 bg-violet-400" />
 
-          <h1 className="text-4xl font-bold mb-4">Get in touch</h1>
-
-          <p className="text-gray-600 mb-8">
-            Send us a message and we will get back to you soon.
-          </p>
-
-          {notice && (
-            <div
-              className={`mb-6 rounded-2xl border px-4 py-3 text-sm font-semibold ${
-                notice.type === "success"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                  : "border-red-200 bg-red-50 text-red-700"
-              }`}
-            >
-              {notice.message}
+        <div className="section-container grid items-stretch gap-8 lg:grid-cols-[0.82fr_1.18fr]">
+          <aside className="theme-panel flex flex-col justify-between">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.25em] text-violet-200">Contact</p>
+              <h1 className="mt-3 text-5xl font-black tracking-tight md:text-6xl">Let’s talk about the next employer portal.</h1>
+              <p className="mt-5 text-lg leading-relaxed text-violet-100">
+                Send a message for partnership questions, employer onboarding, or Home Buying Team support.
+              </p>
             </div>
-          )}
+            <div className="mt-10 grid gap-3">
+              {["Employer benefit setup", "Home Buying Team onboarding", "Portal support"].map((item) => (
+                <div key={item} className="rounded-2xl bg-white/10 px-4 py-3 font-bold text-violet-50 backdrop-blur">
+                  ✓ {item}
+                </div>
+              ))}
+            </div>
+          </aside>
 
-          <form onSubmit={handleSubmit}>
-            <input
-              className="w-full border p-3 rounded mb-4"
-              placeholder="Full Name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-            />
+          <form onSubmit={handleSubmit} className="premium-card p-8 md:p-10">
+            <p className="eyebrow">Message us</p>
+            <h2 className="mt-2 text-4xl font-black tracking-tight">Get in touch</h2>
+            <p className="mt-3 text-slate-600">Send us a message and we will get back to you soon.</p>
 
-            <input
-              className="w-full border p-3 rounded mb-4"
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            {notice && (
+              <div className={`mt-6 rounded-2xl border px-4 py-3 text-sm font-semibold ${notice.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}>
+                {notice.message}
+              </div>
+            )}
 
-            <input
-              className="w-full border p-3 rounded mb-4"
-              placeholder="Phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
+            <div className="mt-7 grid gap-4">
+              <input className="form-field" placeholder="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+              <div className="grid gap-4 md:grid-cols-2">
+                <input className="form-field" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <input className="form-field" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </div>
+              <textarea className="form-field min-h-36" placeholder="Message" value={message} onChange={(e) => setMessage(e.target.value)} required />
+            </div>
 
-            <textarea
-              className="w-full border p-3 rounded mb-4 min-h-32"
-              placeholder="Message"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              required
-            />
-
-            <button disabled={loading} className="bg-black text-white px-6 py-3 rounded-lg disabled:opacity-60">
+            <button disabled={loading} className="btn-primary mt-6 disabled:opacity-60">
               {loading ? "Sending..." : "Send Message"}
             </button>
           </form>
