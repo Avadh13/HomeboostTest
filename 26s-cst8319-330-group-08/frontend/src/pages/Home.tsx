@@ -15,6 +15,8 @@ const videoPoster =
   "https://images.unsplash.com/photo-1560520653-9e0e4c89eb11?auto=format&fit=crop&w=1400&q=80";
 const demoVideoUrl = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
 
+const defaultVideoHighlights = ["Portal walkthrough", "Advisor flow", "Resource experience"];
+
 type Card = {
   id: number;
   title: string;
@@ -58,6 +60,37 @@ const fallbackPage: Page = {
   title: "Home",
   slug: "home",
   sections: [],
+};
+
+const isDirectVideoUrl = (url: string) => /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
+
+const getEmbedUrl = (url: string) => {
+  try {
+    const parsed = new URL(url);
+
+    if (parsed.hostname.includes("youtube.com")) {
+      const videoId = parsed.searchParams.get("v");
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+    }
+
+    if (parsed.hostname.includes("youtu.be")) {
+      const videoId = parsed.pathname.replace("/", "");
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+    }
+
+    if (parsed.hostname.includes("vimeo.com")) {
+      const videoId = parsed.pathname.split("/").filter(Boolean)[0];
+      return videoId ? `https://player.vimeo.com/video/${videoId}` : url;
+    }
+
+    if (parsed.hostname.includes("loom.com") && parsed.pathname.includes("/share/")) {
+      return url.replace("/share/", "/embed/");
+    }
+  } catch {
+    return url;
+  }
+
+  return url;
 };
 
 function Home() {
@@ -107,6 +140,14 @@ function Home() {
   const sections = page?.sections || [];
   const hero = sections.find((section) => section.section_key === "hero");
   const resourceSection = sections.find((section) => section.section_key === "resources");
+  const videoSection = sections.find((section) => ["video_walkthrough", "video", "walkthrough"].includes(section.section_key));
+
+  const videoUrl = videoSection?.button_link || demoVideoUrl;
+  const videoEmbedUrl = getEmbedUrl(videoUrl);
+  const videoPosterUrl = videoSection?.image_url || videoPoster;
+  const videoHighlights = videoSection?.cards?.length
+    ? videoSection.cards.map((card) => card.title).filter(Boolean)
+    : defaultVideoHighlights;
 
   const featureCards = useMemo(
     () => [
@@ -138,11 +179,6 @@ function Home() {
     []
   );
 
-  const videoHighlights = useMemo(
-    () => ["Portal walkthrough", "Advisor flow", "Resource experience"],
-    []
-  );
-
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-50">
@@ -159,7 +195,7 @@ function Home() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-slate-50 text-slate-950">
+    <main className="theme-page overflow-hidden text-slate-950">
       <Navbar />
 
       {apiWarning && import.meta.env.DEV && (
@@ -260,18 +296,23 @@ function Home() {
 
       <section className="px-6 py-20">
         <div className="section-container premium-surface grid gap-10 p-6 lg:grid-cols-[0.92fr_1.08fr] lg:p-10">
-          <div className="flex flex-col justify-between rounded-[2rem] bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 p-8 text-white">
+          <div className="flex flex-col justify-between rounded-[2rem] bg-gradient-to-br from-slate-950 via-indigo-950 to-violet-950 p-8 text-white">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-200">Video walkthrough</p>
-              <h2 className="mt-4 text-4xl font-black tracking-tight md:text-5xl">Show the employee journey in seconds.</h2>
-              <p className="mt-5 text-lg leading-relaxed text-blue-100">
-                Use this section for Kelly's final promo video, a Loom walkthrough, or a short demo showing how employees enter their employer portal and book next steps.
+              <p className="text-sm font-black uppercase tracking-[0.25em] text-violet-200">
+                {videoSection?.title || "Video walkthrough"}
+              </p>
+              <h2 className="mt-4 text-4xl font-black tracking-tight md:text-5xl">
+                {videoSection?.subtitle || "Show the employee journey in seconds."}
+              </h2>
+              <p className="mt-5 text-lg leading-relaxed text-violet-100">
+                {videoSection?.content ||
+                  "Use this section for Kelly's final promo video, a Loom walkthrough, or a short demo showing how employees enter their employer portal and book next steps."}
               </p>
             </div>
 
             <div className="mt-8 grid gap-3">
               {videoHighlights.map((item) => (
-                <div key={item} className="flex items-center gap-3 rounded-2xl bg-white/10 px-4 py-3 font-bold text-blue-50 backdrop-blur">
+                <div key={item} className="flex items-center gap-3 rounded-2xl bg-white/10 px-4 py-3 font-bold text-violet-50 backdrop-blur">
                   <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-400 text-slate-950">✓</span>
                   {item}
                 </div>
@@ -280,10 +321,20 @@ function Home() {
           </div>
 
           <div className="video-card">
-            <video className="h-full min-h-[360px] w-full object-cover" controls poster={videoPoster} preload="metadata">
-              <source src={demoVideoUrl} type="video/mp4" />
-              Your browser does not support the video tag.
-            </video>
+            {isDirectVideoUrl(videoUrl) ? (
+              <video className="h-full min-h-[360px] w-full object-cover" controls poster={videoPosterUrl} preload="metadata">
+                <source src={videoUrl} />
+                Your browser does not support the video tag.
+              </video>
+            ) : (
+              <iframe
+                className="h-full min-h-[360px] w-full"
+                src={videoEmbedUrl}
+                title={videoSection?.subtitle || "HomeBoost video walkthrough"}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            )}
           </div>
         </div>
       </section>
