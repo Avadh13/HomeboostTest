@@ -63,7 +63,6 @@ function HBTResources() {
   }, []);
 
   const teamResources = useMemo(() => resources.filter((r) => Number(r.is_global) !== 1), [resources]);
-  const globalResources = useMemo(() => resources.filter((r) => Number(r.is_global) === 1), [resources]);
   const targetedResources = useMemo(() => teamResources.filter((r) => Number(r.assigned_partnership_count || 0) > 0), [teamResources]);
   const visibleResources = useMemo(() => {
     const q = search.toLowerCase().trim();
