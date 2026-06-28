@@ -108,6 +108,9 @@ function EmployeePortal() {
                 Notifications
                 {unreadCount > 0 && <span className="absolute -right-2 -top-2 rounded-full bg-red-600 px-2 py-0.5 text-xs font-black text-white">{unreadCount}</span>}
               </Link>
+              <Link to="/employee/messages" className="rounded-full bg-indigo-600 px-6 py-3 font-bold text-white transition hover:-translate-y-0.5 hover:bg-indigo-700">
+                Communication Center
+              </Link>
               <Link to="/employee/appointments" className="rounded-full bg-slate-950 px-6 py-3 font-bold text-white transition hover:-translate-y-0.5 hover:bg-blue-700">
                 My Appointments
               </Link>
@@ -134,6 +137,9 @@ function EmployeePortal() {
                 <Link to="/employee/appointments" className="rounded-full bg-slate-950 px-7 py-3 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-blue-700">
                   Request Appointment
                 </Link>
+                <Link to="/employee/messages" className="rounded-full bg-indigo-600 px-7 py-3 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-indigo-700">
+                  Message Your Team
+                </Link>
               </div>
             </div>
 
@@ -147,11 +153,12 @@ function EmployeePortal() {
             </div>
           </section>
 
-          <section className="grid gap-6 md:grid-cols-3">
+          <section className="grid gap-6 md:grid-cols-4">
             {[
               ["Resources", data.resources.length, "Guides, checklists, and planning tools"],
               ["Quizzes", data.quizzes.length, "Readiness checks and next steps"],
               ["Experts", data.team_members.length, "Advisors available for booking"],
+              ["Messages", "Open", "Use Communication Center for team conversations"],
             ].map(([label, count, text]) => (
               <div key={label} className="metric-card">
                 <p className="text-4xl font-black" style={{ color: primary }}>{count}</p>
@@ -159,6 +166,19 @@ function EmployeePortal() {
                 <p className="mt-2 text-sm text-slate-600">{text}</p>
               </div>
             ))}
+          </section>
+
+          <section className="rounded-[2rem] bg-white p-7 shadow-xl">
+            <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.22em]" style={{ color: primary }}>Communication</p>
+                <h2 className="mt-2 text-3xl font-black">All regular conversations live in Message Center</h2>
+                <p className="mt-3 max-w-3xl text-slate-600">Use Message Center to contact your Home Buying Team, continue conversations, and keep employee benefit communication separate from admin support.</p>
+              </div>
+              <Link to="/employee/messages" className="rounded-full bg-indigo-600 px-7 py-3 text-center font-black text-white hover:bg-indigo-700">
+                Open Communication Center
+              </Link>
+            </div>
           </section>
 
           <section className="grid gap-6 lg:grid-cols-2">
@@ -214,9 +234,14 @@ function EmployeePortal() {
                     <h3 className="text-xl font-black">{member.full_name}</h3>
                     <p className="font-semibold" style={{ color: primary }}>{member.title}</p>
                     <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-600">{member.bio}</p>
-                    <Link to="/employee/appointments" className="mt-5 inline-flex rounded-full px-5 py-2.5 text-sm font-black text-white" style={{ backgroundColor: primary }}>
-                      Request appointment
-                    </Link>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      <Link to="/employee/appointments" className="inline-flex rounded-full px-5 py-2.5 text-sm font-black text-white" style={{ backgroundColor: primary }}>
+                        Request appointment
+                      </Link>
+                      <Link to="/employee/messages" className="inline-flex rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-black text-white hover:bg-indigo-700">
+                        Message team
+                      </Link>
+                    </div>
                   </div>
                 </div>
               ))}
