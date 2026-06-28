@@ -53,7 +53,7 @@ function HBTResources() {
     try {
       const [resourcesRes, partnershipsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/resources`, { headers }),
-        fetch(`${API_BASE_URL}/admin-partnerships`, { headers }),
+        fetch(`${API_BASE_URL}/hbt-partnerships`, { headers }),
       ]);
 
       const resourcesData = await resourcesRes.json();
