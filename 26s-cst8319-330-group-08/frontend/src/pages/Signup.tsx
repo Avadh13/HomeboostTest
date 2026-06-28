@@ -83,60 +83,55 @@ function Signup() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="theme-page">
       <Navbar />
       <section className="relative px-6 py-14">
         <div className="floating-orb -left-24 top-20 h-80 w-80 bg-blue-400" />
-        <div className="floating-orb right-0 top-40 h-96 w-96 bg-indigo-400" />
+        <div className="floating-orb right-0 top-40 h-96 w-96 bg-violet-400" />
 
-        <div className="relative mx-auto grid max-w-7xl overflow-hidden rounded-[2.5rem] bg-white shadow-2xl lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="section-container premium-surface grid lg:grid-cols-[0.95fr_1.05fr]">
           <div className="relative hidden lg:block">
             <img src={signupImage} alt="Home exterior" className="h-full min-h-[720px] w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 to-transparent" />
-            <div className="absolute bottom-8 left-8 right-8 rounded-[2rem] bg-white/15 p-6 text-white backdrop-blur-xl">
-              <h2 className="text-3xl font-black">Join your employer benefit program.</h2>
-              <p className="mt-3 text-blue-50">Your signup connects you to the correct employer branding and Home Buying Team content.</p>
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-indigo-950/45 to-transparent" />
+            <div className="absolute bottom-8 left-8 right-8 rounded-[2rem] border border-white/15 bg-white/15 p-6 text-white backdrop-blur-xl">
+              <p className="text-sm font-black uppercase tracking-[0.22em] text-violet-100">Employer benefit</p>
+              <h2 className="mt-2 text-4xl font-black tracking-tight">Join your home-buying portal.</h2>
+              <p className="mt-3 text-violet-50">Your signup connects you to the correct employer branding and Home Buying Team content.</p>
             </div>
           </div>
 
           <form onSubmit={handleEmployeeSignup} className="p-8 md:p-12">
-            <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-600">Employee signup</p>
-            <h1 className="mt-3 text-4xl font-black md:text-5xl">Create your portal account</h1>
+            <p className="eyebrow">Employee signup</p>
+            <h1 className="mt-3 text-4xl font-black tracking-tight md:text-6xl">Create your portal account</h1>
             <p className="mt-4 max-w-2xl text-slate-600">Use your employer partnership slug to unlock your branded home-buying benefit portal.</p>
 
             {notice && (
-              <div
-                className={`mt-6 rounded-2xl border px-4 py-3 text-sm font-semibold whitespace-pre-line ${
-                  notice.type === "success"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : "border-red-200 bg-red-50 text-red-700"
-                }`}
-              >
+              <div className={`mt-6 whitespace-pre-line rounded-2xl border px-4 py-3 text-sm font-semibold ${notice.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}>
                 {notice.message}
               </div>
             )}
 
             <div className="mt-8 grid gap-4">
-              <input className="rounded-2xl border border-slate-200 bg-slate-50 p-4 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" type="text" placeholder="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-              <input className="rounded-2xl border border-slate-200 bg-slate-50 p-4 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <input className="form-field p-4" type="text" placeholder="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+              <input className="form-field p-4" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               <div className="grid gap-4 md:grid-cols-2">
-                <input className="rounded-2xl border border-slate-200 bg-slate-50 p-4 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" type="password" placeholder="Create Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-                <input className="rounded-2xl border border-slate-200 bg-slate-50 p-4 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+                <input className="form-field p-4" type="password" placeholder="Create Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <input className="form-field p-4" type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
               </div>
-              <input className="rounded-2xl border border-blue-200 bg-blue-50 p-4 font-semibold text-blue-900 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" type="text" placeholder="Partnership Slug" value={partnershipSlug} onChange={(e) => setPartnershipSlug(e.target.value)} required />
+              <input className="rounded-2xl border border-violet-200 bg-violet-50/90 p-4 font-semibold text-violet-950 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100" type="text" placeholder="Partnership Slug" value={partnershipSlug} onChange={(e) => setPartnershipSlug(e.target.value)} required />
             </div>
 
             <button disabled={loading} className="btn-primary mt-7 w-full disabled:opacity-60">
               {loading ? "Creating Account..." : "Create Employee Account"}
             </button>
 
-            <div className="mt-6 rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
+            <div className="mt-6 rounded-2xl border border-violet-100 bg-violet-50/70 p-5 text-sm text-slate-600">
               <p className="font-black text-slate-900">Employer enrollment</p>
               <p className="mt-2">Use the partnership slug provided by your employer, or start from your employer portal page.</p>
             </div>
 
             <p className="mt-6 text-center text-sm text-slate-600">
-              Already have an account? <Link to="/login" className="font-bold text-blue-700">Login</Link>
+              Already have an account? <Link to="/login" className="font-black text-violet-700">Login</Link>
             </p>
           </form>
         </div>
