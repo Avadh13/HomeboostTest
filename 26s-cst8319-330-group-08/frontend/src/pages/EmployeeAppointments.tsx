@@ -14,6 +14,13 @@ type AvailableTime = {
   label: string;
 };
 
+type WorkWindow = {
+  isAvailable: boolean;
+  startMinutes: number;
+  endMinutes: number;
+  source?: string;
+};
+
 type Appointment = {
   id: number;
   topic: string;
@@ -38,11 +45,18 @@ const statusClasses: Record<string, string> = {
 
 const today = new Date().toISOString().split("T")[0];
 
+const minutesToTime = (minutes: number) => {
+  const date = new Date();
+  date.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+};
+
 function EmployeeAppointments() {
   const token = localStorage.getItem("token");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [availableTimes, setAvailableTimes] = useState<AvailableTime[]>([]);
+  const [workWindow, setWorkWindow] = useState<WorkWindow | null>(null);
   const [teamMemberId, setTeamMemberId] = useState("");
   const [selectedDate, setSelectedDate] = useState(today);
   const [preferredDate, setPreferredDate] = useState("");
@@ -53,9 +67,7 @@ function EmployeeAppointments() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  const headers = {
-    Authorization: `Bearer ${token}`,
-  };
+  const headers = { Authorization: `Bearer ${token}` };
 
   const loadData = async () => {
     setLoading(true);
@@ -80,17 +92,14 @@ function EmployeeAppointments() {
 
   const loadAvailableTimes = async () => {
     setAvailableTimes([]);
+    setWorkWindow(null);
     setPreferredDate("");
 
     if (!teamMemberId || !selectedDate) return;
 
     try {
       setLoadingTimes(true);
-      const response = await fetch(
-        `${API_BASE_URL}/appointments/available-times?team_member_id=${teamMemberId}&date=${selectedDate}`,
-        { headers }
-      );
-
+      const response = await fetch(`${API_BASE_URL}/appointments/available-times?team_member_id=${teamMemberId}&date=${selectedDate}`, { headers });
       const data = await response.json();
 
       if (!response.ok) {
@@ -99,6 +108,7 @@ function EmployeeAppointments() {
       }
 
       setAvailableTimes(Array.isArray(data.available_times) ? data.available_times : []);
+      setWorkWindow(data.work_window || null);
     } catch (error) {
       console.error("Available times load failed:", error);
       setNotice({ type: "error", message: "Could not load available times. Please try again." });
@@ -138,10 +148,7 @@ function EmployeeAppointments() {
       setSaving(true);
       const response = await fetch(`${API_BASE_URL}/appointments`, {
         method: "POST",
-        headers: {
-          ...headers,
-          "Content-Type": "application/json",
-        },
+        headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({
           team_member_id: teamMemberId,
           topic: topic.trim(),
@@ -165,6 +172,7 @@ function EmployeeAppointments() {
       setPreferredDate("");
       setMessage("");
       setAvailableTimes([]);
+      setWorkWindow(null);
       await loadData();
     } catch (error) {
       console.error("Appointment submit failed:", error);
@@ -174,13 +182,44 @@ function EmployeeAppointments() {
     }
   };
 
+  const cancelAppointment = async (appointment: Appointment) => {
+    const reason = window.prompt("Why do you want to cancel this appointment?", "I need to reschedule");
+    if (reason === null) return;
+
+    try {
+      setSaving(true);
+      const response = await fetch(`${API_BASE_URL}/appointments/${appointment.id}/cancel`, {
+        method: "PUT",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ cancel_reason: reason }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setNotice({ type: "error", message: data.message || "Could not cancel appointment." });
+        return;
+      }
+
+      setNotice({ type: "success", message: "Appointment cancelled successfully." });
+      await loadData();
+    } catch (error) {
+      console.error("Cancel appointment failed:", error);
+      setNotice({ type: "error", message: "Could not cancel appointment." });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectedAdvisor = teamMembers.find((member) => String(member.id) === teamMemberId);
+
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-8">
       <div className="mx-auto max-w-7xl space-y-8">
         <header className="rounded-[2rem] bg-gradient-to-br from-blue-950 to-indigo-900 p-8 text-white shadow-xl">
           <Link to="/employee-portal" className="text-sm font-bold text-blue-200 hover:text-white">← Back to portal</Link>
           <h1 className="mt-4 text-4xl font-black">Appointment Requests</h1>
-          <p className="mt-3 max-w-2xl text-blue-100">Select an advisor, choose a date, and pick an available 1-hour meeting time.</p>
+          <p className="mt-3 max-w-2xl text-blue-100">Select an advisor, review their work time, and pick an available 1-hour meeting slot.</p>
         </header>
 
         {notice && (
@@ -206,6 +245,24 @@ function EmployeeAppointments() {
                 </select>
               </label>
 
+              {selectedAdvisor && (
+                <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                  <p className="text-sm font-black uppercase tracking-[0.18em] text-blue-700">Advisor work time</p>
+                  <p className="mt-2 font-bold text-slate-800">{selectedAdvisor.full_name}</p>
+                  {workWindow ? (
+                    workWindow.isAvailable ? (
+                      <p className="mt-1 text-sm text-slate-700">
+                        Available on selected date from {minutesToTime(workWindow.startMinutes)} to {minutesToTime(workWindow.endMinutes)}.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-sm font-semibold text-red-700">This advisor is off on the selected date.</p>
+                    )
+                  ) : (
+                    <p className="mt-1 text-sm text-slate-600">Select a date to view available work hours.</p>
+                  )}
+                </div>
+              )}
+
               <label className="block">
                 <span className="mb-2 block text-sm font-bold text-slate-700">Topic</span>
                 <input className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4" value={topic} onChange={(e) => setTopic(e.target.value)} required />
@@ -227,16 +284,7 @@ function EmployeeAppointments() {
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2">
                     {availableTimes.map((time) => (
-                      <button
-                        key={time.value}
-                        type="button"
-                        onClick={() => setPreferredDate(time.value)}
-                        className={`rounded-2xl border px-4 py-3 text-left font-bold transition ${
-                          preferredDate === time.value
-                            ? "border-blue-500 bg-blue-600 text-white shadow-lg shadow-blue-500/20"
-                            : "border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300 hover:bg-blue-50"
-                        }`}
-                      >
+                      <button key={time.value} type="button" onClick={() => setPreferredDate(time.value)} className={`rounded-2xl border px-4 py-3 text-left font-bold transition ${preferredDate === time.value ? "border-blue-500 bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300 hover:bg-blue-50"}`}>
                         {time.label}
                       </button>
                     ))}
@@ -270,32 +318,39 @@ function EmployeeAppointments() {
               <div className="rounded-2xl bg-slate-50 p-6 text-center text-slate-600">No appointment requests yet.</div>
             ) : (
               <div className="space-y-4">
-                {appointments.map((appointment) => (
-                  <article key={appointment.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-xl font-black text-slate-950">{appointment.topic}</h3>
-                        <p className="mt-1 text-sm text-slate-500">{appointment.team_member_name || "Advisor"}</p>
+                {appointments.map((appointment) => {
+                  const canCancel = appointment.status === "pending" || appointment.status === "approved";
+                  return (
+                    <article key={appointment.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-xl font-black text-slate-950">{appointment.topic}</h3>
+                          <p className="mt-1 text-sm text-slate-500">{appointment.team_member_name || "Advisor"}</p>
+                        </div>
+                        <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${statusClasses[appointment.status] || statusClasses.pending}`}>{appointment.status}</span>
                       </div>
-                      <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${statusClasses[appointment.status] || statusClasses.pending}`}>{appointment.status}</span>
-                    </div>
 
-                    {appointment.preferred_date && <p className="mt-3 text-sm text-slate-700"><strong>Preferred:</strong> {new Date(appointment.preferred_date).toLocaleString()} · 1 hour</p>}
-                    {appointment.message && <p className="mt-3 text-sm leading-relaxed text-slate-600">{appointment.message}</p>}
+                      {appointment.preferred_date && <p className="mt-3 text-sm text-slate-700"><strong>Preferred:</strong> {new Date(appointment.preferred_date).toLocaleString()} · 1 hour</p>}
+                      {appointment.message && <p className="mt-3 text-sm leading-relaxed text-slate-600">{appointment.message}</p>}
 
-                    {(appointment.meeting_link || appointment.advisor_note) && (
-                      <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-                        <p className="text-sm font-black uppercase tracking-[0.18em] text-blue-700">Advisor response</p>
-                        {appointment.advisor_note && <p className="mt-3 text-sm leading-relaxed text-slate-700">{appointment.advisor_note}</p>}
-                        {appointment.meeting_link && (
-                          <a href={appointment.meeting_link} target="_blank" rel="noreferrer" className="mt-4 inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-black text-white hover:bg-blue-700">
-                            Open Meeting Link
-                          </a>
-                        )}
-                      </div>
-                    )}
-                  </article>
-                ))}
+                      {(appointment.meeting_link || appointment.advisor_note) && (
+                        <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                          <p className="text-sm font-black uppercase tracking-[0.18em] text-blue-700">Advisor response</p>
+                          {appointment.advisor_note && <p className="mt-3 text-sm leading-relaxed text-slate-700">{appointment.advisor_note}</p>}
+                          {appointment.meeting_link && (
+                            <a href={appointment.meeting_link} target="_blank" rel="noreferrer" className="mt-4 inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-black text-white hover:bg-blue-700">Open Meeting Link</a>
+                          )}
+                        </div>
+                      )}
+
+                      {canCancel && (
+                        <button type="button" disabled={saving} onClick={() => cancelAppointment(appointment)} className="mt-4 rounded-full bg-red-600 px-5 py-2.5 text-sm font-black text-white hover:bg-red-700 disabled:opacity-50">
+                          Cancel Appointment
+                        </button>
+                      )}
+                    </article>
+                  );
+                })}
               </div>
             )}
           </section>
