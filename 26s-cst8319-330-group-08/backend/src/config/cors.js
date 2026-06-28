@@ -26,12 +26,6 @@ const getAllowedOrigins = () => {
         "http://127.0.0.1:8080",
 
 
-      "https://home-blue-rho.vercel.app",
-    "https://home-git-main-avadh2708s-projects.vercel.app",
-    "https://home-dn4c1k86e-avadh2708s-projects.vercel.app",
-    "https://homeboosttest.vercel.app",
-    "https://homeboost-test.vercel.app",
-    "https://homeboosttest-git-main-avadh2708s-projects.vercel.app",
       ];
 
   return [...new Set([...defaultOrigins, ...envOrigins])];
