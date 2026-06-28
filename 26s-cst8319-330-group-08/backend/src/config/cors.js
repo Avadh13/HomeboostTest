@@ -10,7 +10,10 @@ const getAllowedOrigins = () => {
     .filter(Boolean);
 
   const defaultOrigins = process.env.NODE_ENV === "production"
-    ? ["https://homeboost-test.vercel.app"]
+    ? [
+        "https://homeboost-test.vercel.app",
+        "https://homeboosttest-git-main-avadh2708s-projects.vercel.app",
+      ]
     : [
         "http://localhost:5173",
         "http://localhost:5174",
@@ -26,7 +29,19 @@ const getAllowedOrigins = () => {
 };
 
 const isAllowedVercelPreview = (origin) => {
-  return /^https:\/\/homeboost-test-[a-z0-9-]+-avadh13s-projects\.vercel\.app$/i.test(origin);
+  const allowedPreviewPrefixes = [
+    "https://homeboost-test-",
+    "https://homeboosttest-git-",
+  ];
+
+  const allowedPreviewSuffixes = [
+    "-avadh13s-projects.vercel.app",
+    "-avadh2708s-projects.vercel.app",
+  ];
+
+  return allowedPreviewPrefixes.some((prefix) =>
+    allowedPreviewSuffixes.some((suffix) => origin.startsWith(prefix) && origin.endsWith(suffix))
+  );
 };
 
 const corsOptions = {
