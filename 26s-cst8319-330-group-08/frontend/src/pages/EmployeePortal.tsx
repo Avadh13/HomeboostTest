@@ -218,33 +218,67 @@ function EmployeePortal() {
             </div>
           </section>
 
-          <section className="rounded-[2rem] bg-white p-7 shadow-xl">
-            <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
-              <div>
-                <p className="text-sm font-black uppercase tracking-[0.22em]" style={{ color: primary }}>Connect</p>
-                <h2 className="text-3xl font-black">Your Home Buying Team</h2>
-              </div>
-              <p className="max-w-2xl text-slate-600">Request an appointment with a specialist when you are ready to talk through your next step.</p>
-            </div>
-            <div className="grid gap-5 md:grid-cols-3">
-              {data.team_members.map((member) => (
-                <div key={member.id} className="overflow-hidden rounded-[2rem] border border-slate-100 bg-slate-50 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
-                  <img src={member.photo_url || defaultAvatar} alt={member.full_name} className="h-44 w-full object-cover" />
-                  <div className="p-5">
-                    <h3 className="text-xl font-black">{member.full_name}</h3>
-                    <p className="font-semibold" style={{ color: primary }}>{member.title}</p>
-                    <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-600">{member.bio}</p>
-                    <div className="mt-5 flex flex-wrap gap-2">
-                      <Link to="/employee/appointments" className="inline-flex rounded-full px-5 py-2.5 text-sm font-black text-white" style={{ backgroundColor: primary }}>
-                        Request appointment
-                      </Link>
-                      <Link to="/employee/messages" className="inline-flex rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-black text-white hover:bg-indigo-700">
-                        Message team
-                      </Link>
+          <section className="overflow-hidden rounded-[2.5rem] bg-white shadow-2xl">
+            <div className="grid gap-0 lg:grid-cols-[0.78fr_1.22fr]">
+              <div className="relative overflow-hidden p-8 text-white md:p-10" style={{ background: `linear-gradient(135deg, ${primary}, #111827)` }}>
+                <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-white/10" />
+                <div className="absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-white/10" />
+                <div className="relative">
+                  <p className="text-sm font-black uppercase tracking-[0.25em] text-white/75">Connect</p>
+                  <h2 className="mt-3 text-4xl font-black tracking-tight">Your Home Buying Team</h2>
+                  <p className="mt-4 text-base leading-relaxed text-white/80">
+                    Choose an advisor for a focused appointment or start a message in Communication Center when you need quick guidance.
+                  </p>
+                  <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                    <div className="rounded-2xl bg-white/12 p-4 backdrop-blur">
+                      <p className="text-3xl font-black">{data.team_members.length}</p>
+                      <p className="text-sm font-bold text-white/75">Available experts</p>
+                    </div>
+                    <div className="rounded-2xl bg-white/12 p-4 backdrop-blur">
+                      <p className="text-3xl font-black">1 hr</p>
+                      <p className="text-sm font-bold text-white/75">Standard appointment slot</p>
                     </div>
                   </div>
                 </div>
-              ))}
+              </div>
+
+              <div className="bg-slate-50 p-5 md:p-7">
+                <div className="grid gap-4">
+                  {data.team_members.map((member) => (
+                    <article key={member.id} className="group rounded-[2rem] border border-slate-100 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-xl md:p-5">
+                      <div className="grid gap-5 md:grid-cols-[150px_1fr_auto] md:items-center">
+                        <div className="relative mx-auto h-36 w-36 overflow-hidden rounded-[1.5rem] bg-slate-100 md:mx-0">
+                          <img src={member.photo_url || defaultAvatar} alt={member.full_name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                          <span className="absolute bottom-3 left-3 rounded-full bg-emerald-500 px-3 py-1 text-xs font-black text-white shadow">Expert</span>
+                        </div>
+
+                        <div className="text-center md:text-left">
+                          <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">HomeBoost advisor</p>
+                          <h3 className="mt-1 text-2xl font-black text-slate-950">{member.full_name}</h3>
+                          <p className="mt-1 text-lg font-bold" style={{ color: primary }}>{member.title}</p>
+                          <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">{member.bio || "Ready to support your home-buying questions and next steps."}</p>
+                        </div>
+
+                        <div className="flex flex-col gap-3 md:min-w-[190px]">
+                          <Link to="/employee/appointments" className="rounded-full px-5 py-3 text-center text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5" style={{ backgroundColor: primary }}>
+                            Request appointment
+                          </Link>
+                          <Link to="/employee/messages" className="rounded-full bg-indigo-600 px-5 py-3 text-center text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-indigo-700">
+                            Message advisor
+                          </Link>
+                          {member.email && <a href={`mailto:${member.email}`} className="text-center text-xs font-bold text-slate-500 hover:text-slate-900">{member.email}</a>}
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+
+                  {data.team_members.length === 0 && (
+                    <div className="rounded-3xl bg-white p-8 text-center text-slate-500 shadow-sm">
+                      Your Home Buying Team will appear here once advisors are assigned.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </section>
         </div>
