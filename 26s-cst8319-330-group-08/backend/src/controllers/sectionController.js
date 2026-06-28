@@ -6,6 +6,7 @@ exports.getSections = async (req, res) => {
       `SELECT ps.*, p.title AS page_title, p.slug AS page_slug
        FROM page_sections ps
        JOIN pages p ON ps.page_id = p.id
+       WHERE ps.is_active = TRUE
        ORDER BY ps.page_id ASC, ps.display_order ASC`
     );
 
@@ -117,22 +118,31 @@ exports.createSection = async (req, res) => {
 };
 
 exports.deleteSection = async (req, res) => {
+  const connection = await pool.getConnection();
+
   try {
     const { id } = req.params;
 
-    await pool.query("UPDATE page_sections SET is_active = FALSE WHERE id = ?", [
-      id,
-    ]);
+    await connection.beginTransaction();
+
+    await connection.query("UPDATE section_cards SET is_active = FALSE WHERE section_id = ?", [id]);
+    await connection.query("UPDATE page_sections SET is_active = FALSE WHERE id = ?", [id]);
+
+    await connection.commit();
 
     res.json({
       status: "success",
       message: "Section deleted successfully",
     });
   } catch (error) {
+    await connection.rollback();
+
     res.status(500).json({
       status: "error",
       message: "Failed to delete section",
       error: error.message,
     });
+  } finally {
+    connection.release();
   }
 };
