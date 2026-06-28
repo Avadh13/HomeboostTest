@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import API_BASE_URL from "../../api/api";
 import AdminLayout from "../components/AdminLayout";
 import ChatWidget from "../../components/ChatWidget";
+import { useToast } from "../../components/ToastProvider";
+
 type User = {
   id: number;
   full_name: string;
@@ -9,7 +11,6 @@ type User = {
   role: string;
   is_active: number;
   created_at: string;
-
   team_id?: number | null;
   partnership_id?: number | null;
   hbt_name?: string | null;
@@ -20,11 +21,21 @@ type User = {
 const ROLE_OPTIONS = [
   { value: "employee", label: "Employee" },
   { value: "hbt_admin", label: "HBT Admin" },
+  { value: "hbt_member", label: "HBT Member" },
+  { value: "company_admin", label: "Company Admin" },
   { value: "admin", label: "Admin" },
   { value: "super_admin", label: "Super Admin" },
 ];
 
+const roleBadgeClass = (role: string) => {
+  if (role === "super_admin" || role === "admin") return "bg-slate-900 text-white";
+  if (role === "hbt_admin" || role === "hbt_member") return "bg-violet-100 text-violet-700";
+  if (role === "company_admin") return "bg-blue-100 text-blue-700";
+  return "bg-emerald-100 text-emerald-700";
+};
+
 function ManageUsers() {
+  const toast = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -41,15 +52,13 @@ function ManageUsers() {
       setLoading(true);
 
       const response = await fetch(`${API_BASE_URL}/users`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.message || "Failed to load users");
+        toast.error(data.message || "Failed to load users.");
         setUsers([]);
         return;
       }
@@ -57,7 +66,7 @@ function ManageUsers() {
       setUsers(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to load users:", error);
-      alert("Failed to load users");
+      toast.error("Failed to load users.");
       setUsers([]);
     } finally {
       setLoading(false);
@@ -69,33 +78,16 @@ function ManageUsers() {
   }, []);
 
   const hbtOptions = useMemo(() => {
-    const uniqueTeams = new Map<string, string>();
-
-    users.forEach((user) => {
-      if (user.hbt_name) {
-        uniqueTeams.set(user.hbt_name, user.hbt_name);
-      }
-    });
-
-    return Array.from(uniqueTeams.values()).sort();
+    return [...new Set(users.map((user) => user.hbt_name).filter(Boolean) as string[])].sort();
   }, [users]);
 
   const companyOptions = useMemo(() => {
-    const uniqueCompanies = new Map<string, string>();
-
-    users.forEach((user) => {
-      if (user.employer_name) {
-        uniqueCompanies.set(user.employer_name, user.employer_name);
-      }
-    });
-
-    return Array.from(uniqueCompanies.values()).sort();
+    return [...new Set(users.map((user) => user.employer_name).filter(Boolean) as string[])].sort();
   }, [users]);
 
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const search = searchText.toLowerCase().trim();
-
       const matchesSearch =
         !search ||
         user.full_name?.toLowerCase().includes(search) ||
@@ -103,27 +95,12 @@ function ManageUsers() {
         user.role?.toLowerCase().includes(search) ||
         user.hbt_name?.toLowerCase().includes(search) ||
         user.employer_name?.toLowerCase().includes(search);
+      const matchesRole = roleFilter === "all" || user.role === roleFilter;
+      const matchesHBT = hbtFilter === "all" || user.hbt_name === hbtFilter;
+      const matchesCompany = companyFilter === "all" || user.employer_name === companyFilter;
+      const matchesStatus = statusFilter === "all" || String(Number(user.is_active)) === statusFilter;
 
-      const matchesRole =
-        roleFilter === "all" || user.role === roleFilter;
-
-      const matchesHBT =
-        hbtFilter === "all" || user.hbt_name === hbtFilter;
-
-      const matchesCompany =
-        companyFilter === "all" || user.employer_name === companyFilter;
-
-      const matchesStatus =
-        statusFilter === "all" ||
-        String(Number(user.is_active)) === statusFilter;
-
-      return (
-        matchesSearch &&
-        matchesRole &&
-        matchesHBT &&
-        matchesCompany &&
-        matchesStatus
-      );
+      return matchesSearch && matchesRole && matchesHBT && matchesCompany && matchesStatus;
     });
   }, [users, searchText, roleFilter, hbtFilter, companyFilter, statusFilter]);
 
@@ -136,234 +113,179 @@ function ManageUsers() {
   };
 
   const updateRole = async (id: number, role: string) => {
-    const response = await fetch(`${API_BASE_URL}/users/${id}/role`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ role }),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/${id}/role`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ role }),
+      });
 
-    const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
-    if (!response.ok) {
-      alert(data.message || "Failed to update user role");
-      return;
+      if (!response.ok) {
+        toast.error(data.message || "Failed to update user role.");
+        return;
+      }
+
+      toast.success("User role updated.");
+      loadUsers();
+    } catch (error) {
+      console.error("Role update error:", error);
+      toast.error("Could not update user role.");
     }
-
-    alert("User role updated");
-    loadUsers();
   };
 
   const updateStatus = async (id: number, is_active: number) => {
-    const response = await fetch(`${API_BASE_URL}/users/${id}/status`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ is_active }),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/${id}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ is_active }),
+      });
 
-    const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
-    if (!response.ok) {
-      alert(data.message || "Failed to update user status");
-      return;
+      if (!response.ok) {
+        toast.error(data.message || "Failed to update user status.");
+        return;
+      }
+
+      toast.success("User status updated.");
+      loadUsers();
+    } catch (error) {
+      console.error("Status update error:", error);
+      toast.error("Could not update user status.");
     }
-
-    alert("User status updated");
-    loadUsers();
   };
 
   return (
     <AdminLayout title="Manage Users">
-      <div className="mb-6 rounded-2xl bg-white p-6 shadow">
-        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">
-              User Filters
-            </h2>
-            <p className="text-sm text-gray-500">
-              Filter users by role, HBT team, company partnership, or status.
-            </p>
-          </div>
-
-          <button
-            onClick={clearFilters}
-            className="rounded-lg border px-4 py-2 font-semibold text-gray-700 hover:bg-gray-100"
-          >
+      <div className="mb-5 grid gap-4 xl:grid-cols-[1fr_340px]">
+        <div className="theme-panel">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-200">User directory</p>
+          <h2 className="mt-2 text-2xl font-black tracking-tight">Role and access control</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-violet-100">
+            Search employees, HBT users, company admins, and platform admins. Update roles and account status from one compact table.
+          </p>
+          <button type="button" onClick={clearFilters} className="mt-4 rounded-full bg-white px-4 py-2 text-xs font-black text-violet-800 hover:bg-violet-50">
             Clear Filters
           </button>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-          <input
-            className="rounded-lg border p-3"
-            placeholder="Search name, email, company..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-          />
+        <div className="premium-card">
+          <p className="eyebrow">Directory stats</p>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-2xl bg-violet-50 p-3">
+              <p className="text-2xl font-black text-violet-700">{users.length}</p>
+              <p className="text-[11px] font-bold text-slate-500">Users</p>
+            </div>
+            <div className="rounded-2xl bg-emerald-50 p-3">
+              <p className="text-2xl font-black text-emerald-700">{users.filter((user) => Number(user.is_active) === 1).length}</p>
+              <p className="text-[11px] font-bold text-slate-500">Active</p>
+            </div>
+            <div className="rounded-2xl bg-blue-50 p-3">
+              <p className="text-2xl font-black text-blue-700">{users.filter((user) => user.role?.includes("hbt")).length}</p>
+              <p className="text-[11px] font-bold text-slate-500">HBT</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-          <select
-            className="rounded-lg border p-3"
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-          >
+      <div className="premium-card mb-5 p-4">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+          <input className="form-field" placeholder="Search name, email, company..." value={searchText} onChange={(e) => setSearchText(e.target.value)} />
+          <select className="form-field" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
             <option value="all">All Roles</option>
-            {ROLE_OPTIONS.map((role) => (
-              <option key={role.value} value={role.value}>
-                {role.label}
-              </option>
-            ))}
+            {ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
           </select>
-
-          <select
-            className="rounded-lg border p-3"
-            value={hbtFilter}
-            onChange={(e) => setHbtFilter(e.target.value)}
-          >
+          <select className="form-field" value={hbtFilter} onChange={(e) => setHbtFilter(e.target.value)}>
             <option value="all">All HBT Teams</option>
-            {hbtOptions.map((teamName) => (
-              <option key={teamName} value={teamName}>
-                {teamName}
-              </option>
-            ))}
+            {hbtOptions.map((teamName) => <option key={teamName} value={teamName}>{teamName}</option>)}
           </select>
-
-          <select
-            className="rounded-lg border p-3"
-            value={companyFilter}
-            onChange={(e) => setCompanyFilter(e.target.value)}
-          >
+          <select className="form-field" value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}>
             <option value="all">All Companies</option>
-            {companyOptions.map((companyName) => (
-              <option key={companyName} value={companyName}>
-                {companyName}
-              </option>
-            ))}
+            {companyOptions.map((companyName) => <option key={companyName} value={companyName}>{companyName}</option>)}
           </select>
-
-          <select
-            className="rounded-lg border p-3"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
+          <select className="form-field" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="all">All Status</option>
             <option value="1">Active</option>
             <option value="0">Disabled</option>
           </select>
         </div>
-
-        <div className="mt-5 rounded-xl bg-gray-50 p-4 text-sm font-semibold text-gray-700">
-          Showing {filteredUsers.length} of {users.length} users
-        </div>
+        <p className="mt-3 text-sm font-bold text-slate-500">Showing {filteredUsers.length} of {users.length} users</p>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl bg-white p-6 shadow">
+      <div className="premium-card overflow-hidden p-0">
         {loading ? (
-          <p className="text-gray-600">Loading users...</p>
+          <div className="p-8 text-center font-bold text-slate-500">Loading users...</div>
         ) : (
           <>
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b bg-gray-50 text-left text-gray-600">
-                  <th className="p-3">ID</th>
-                  <th className="p-3">Full Name</th>
-                  <th className="p-3">Email</th>
-                  <th className="p-3">Role</th>
-                  <th className="p-3">HBT Team</th>
-                  <th className="p-3">Company</th>
-                  <th className="p-3">Status</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredUsers.map((user) => (
-                  <tr key={user.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3 font-semibold">{user.id}</td>
-
-                    <td className="p-3">
-                      <div className="font-semibold text-gray-900">
-                        {user.full_name}
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        Created:{" "}
-                        {user.created_at
-                          ? new Date(user.created_at).toLocaleDateString()
-                          : "N/A"}
-                      </div>
-                    </td>
-
-                    <td className="p-3">{user.email}</td>
-
-                    <td className="p-3">
-                      <select
-                        className="rounded border p-2"
-                        value={user.role}
-                        onChange={(e) => updateRole(user.id, e.target.value)}
-                      >
-                        {ROLE_OPTIONS.map((role) => (
-                          <option key={role.value} value={role.value}>
-                            {role.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-
-                    <td className="p-3">
-                      {user.hbt_name ? (
-                        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700">
-                          {user.hbt_name}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">N/A</span>
-                      )}
-                    </td>
-
-                    <td className="p-3">
-                      {user.employer_name ? (
-                        <div>
-                          <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-700">
-                            {user.employer_name}
-                          </span>
-
-                          {user.partnership_slug && (
-                            <div className="mt-1 text-xs text-gray-400">
-                              /{user.partnership_slug}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">N/A</span>
-                      )}
-                    </td>
-
-                    <td className="p-3">
-                      <select
-                        className={`rounded border p-2 font-semibold ${
-                          Number(user.is_active) === 1
-                            ? "text-green-700"
-                            : "text-red-700"
-                        }`}
-                        value={Number(user.is_active) === 1 ? "1" : "0"}
-                        onChange={(e) =>
-                          updateStatus(user.id, e.target.value === "1" ? 1 : 0)
-                        }
-                      >
-                        <option value="1">Active</option>
-                        <option value="0">Disabled</option>
-                      </select>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3">User</th>
+                    <th className="px-4 py-3">Role</th>
+                    <th className="px-4 py-3">HBT Team</th>
+                    <th className="px-4 py-3">Company</th>
+                    <th className="px-4 py-3">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
 
-            {filteredUsers.length === 0 && (
-              <p className="mt-4 text-gray-500">No users found.</p>
-            )}
+                <tbody>
+                  {filteredUsers.map((user) => (
+                    <tr key={user.id} className="border-b last:border-0 hover:bg-violet-50/40">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 text-sm font-black text-white">
+                            {(user.full_name || user.email || "U").charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-black text-slate-950">{user.full_name || "Unnamed user"}</p>
+                            <p className="text-xs font-semibold text-slate-500">{user.email}</p>
+                            <p className="text-[11px] text-slate-400">Created {user.created_at ? new Date(user.created_at).toLocaleDateString() : "N/A"}</p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <select className={`rounded-xl border border-slate-200 px-3 py-2 text-xs font-black ${roleBadgeClass(user.role)}`} value={user.role} onChange={(e) => updateRole(user.id, e.target.value)}>
+                          {ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
+                        </select>
+                      </td>
+
+                      <td className="px-4 py-3">
+                        {user.hbt_name ? <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700">{user.hbt_name}</span> : <span className="text-slate-400">N/A</span>}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        {user.employer_name ? (
+                          <div>
+                            <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700">{user.employer_name}</span>
+                            {user.partnership_slug && <div className="mt-1 text-xs font-semibold text-slate-400">/{user.partnership_slug}</div>}
+                          </div>
+                        ) : <span className="text-slate-400">N/A</span>}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <select className={`rounded-xl border px-3 py-2 text-xs font-black ${Number(user.is_active) === 1 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`} value={Number(user.is_active) === 1 ? "1" : "0"} onChange={(e) => updateStatus(user.id, e.target.value === "1" ? 1 : 0)}>
+                          <option value="1">Active</option>
+                          <option value="0">Disabled</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredUsers.length === 0 && <div className="p-8 text-center text-slate-500">No users found.</div>}
           </>
         )}
       </div>
