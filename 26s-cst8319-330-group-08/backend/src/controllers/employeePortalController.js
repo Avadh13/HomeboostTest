@@ -48,19 +48,45 @@ exports.getEmployeePortalData = async (req, res) => {
 
     const [quizzes] = await pool.query(
       `SELECT id, title, description
-       FROM quizzes
-       WHERE is_active = 1 AND (is_global = 1 OR team_id = ?)
+       FROM quizzes q
+       WHERE q.is_active = 1
+         AND (
+          q.is_global = 1
+          OR (
+            q.team_id = ?
+            AND (
+              NOT EXISTS (SELECT 1 FROM quiz_partnerships qp_all WHERE qp_all.quiz_id = q.id)
+              OR EXISTS (
+                SELECT 1 FROM quiz_partnerships qp
+                WHERE qp.quiz_id = q.id AND qp.partnership_id = ?
+              )
+            )
+          )
+         )
        ORDER BY id DESC`,
-      [employee.team_id]
+      [employee.team_id, employee.partnership_id]
     );
 
     const [resources] = await pool.query(
       `SELECT id, title, description, category, image_url, resource_url
-       FROM resources
-       WHERE is_active = 1 AND (is_global = 1 OR team_id = ?)
+       FROM resources r
+       WHERE r.is_active = 1
+         AND (
+          r.is_global = 1
+          OR (
+            r.team_id = ?
+            AND (
+              NOT EXISTS (SELECT 1 FROM resource_partnerships rp_all WHERE rp_all.resource_id = r.id)
+              OR EXISTS (
+                SELECT 1 FROM resource_partnerships rp
+                WHERE rp.resource_id = r.id AND rp.partnership_id = ?
+              )
+            )
+          )
+         )
        ORDER BY id DESC
        LIMIT 6`,
-      [employee.team_id]
+      [employee.team_id, employee.partnership_id]
     );
 
     res.json({ status: "success", employee, team_members: teamMembers, quizzes, resources });
