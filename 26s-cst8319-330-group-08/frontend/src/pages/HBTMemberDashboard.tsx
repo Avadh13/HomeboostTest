@@ -133,7 +133,6 @@ function HBTMemberDashboard() {
   const approvedAppointments = appointments.filter((item) => item.status === "approved").length;
   const completedAppointments = appointments.filter((item) => item.status === "completed").length;
   const newLeads = submissions.filter((item) => !item.follow_up_status || item.follow_up_status === "new").length;
-  const inProgress = submissions.filter((item) => item.follow_up_status === "contacted" || item.follow_up_status === "in_progress").length;
   const completed = submissions.filter((item) => item.follow_up_status === "completed").length;
 
   const latestAppointments = useMemo(() => appointments.slice(0, 4), [appointments]);
