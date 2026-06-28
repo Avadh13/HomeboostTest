@@ -50,17 +50,24 @@ function Navbar() {
   const employeeLinks: NavLinkItem[] = [
     { to: "/employee-portal", label: "Portal" },
     { to: "/resources", label: "Resources" },
-    { to: "/communication", label: "Messages" },
-    { to: "/quiz/1", label: "Quiz" },
+    { to: "/employee/messages", label: "Messages" },
+    { to: "/employee/appointments", label: "Appointments" },
   ];
 
-  const hbtLinks: NavLinkItem[] = [
+  const hbtAdminLinks: NavLinkItem[] = [
     { to: "/hbt/dashboard", label: "Dashboard" },
     { to: "/hbt/companies", label: "Companies" },
     { to: "/hbt/employees", label: "Employees" },
     { to: "/hbt/team-members", label: "Team" },
     { to: "/hbt/resources", label: "Resources" },
     { to: "/hbt/events", label: "Events" },
+  ];
+
+  const hbtMemberLinks: NavLinkItem[] = [
+    { to: "/hbt/member-dashboard", label: "Dashboard" },
+    { to: "/hbt/appointments", label: "Appointments" },
+    { to: "/hbt/availability", label: "Availability" },
+    { to: "/hbt/messages", label: "Messages" },
   ];
 
   const adminLinks: NavLinkItem[] = [
@@ -74,8 +81,8 @@ function Navbar() {
     if (!isLoggedIn) return publicLinks;
 
     if (user?.role === "employee") return employeeLinks;
-
-    if (user?.role === "hbt_admin" || user?.role === "hbt_member") return hbtLinks;
+    if (user?.role === "hbt_admin") return hbtAdminLinks;
+    if (user?.role === "hbt_member") return hbtMemberLinks;
 
     if (user?.role === "admin" || user?.role === "super_admin") {
       return adminLinks;
