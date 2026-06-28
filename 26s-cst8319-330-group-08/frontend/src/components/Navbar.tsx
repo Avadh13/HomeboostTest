@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 
 type User = {
@@ -10,9 +10,15 @@ type User = {
   partnership_id?: number | null;
 };
 
+type NavLinkItem = {
+  to: string;
+  label: string;
+};
+
 function Navbar() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const token = localStorage.getItem("token");
   const userData = localStorage.getItem("user");
@@ -34,20 +40,21 @@ function Navbar() {
     navigate("/login");
   };
 
-  const publicLinks = [
+  const publicLinks: NavLinkItem[] = [
     { to: "/", label: "Home" },
     { to: "/pricing", label: "Pricing" },
     { to: "/partners", label: "Employer Portals" },
     { to: "/contact", label: "Contact" },
   ];
 
-  const employeeLinks = [
+  const employeeLinks: NavLinkItem[] = [
     { to: "/employee-portal", label: "Portal" },
     { to: "/resources", label: "Resources" },
+    { to: "/communication", label: "Messages" },
     { to: "/quiz/1", label: "Quiz" },
   ];
 
-  const hbtLinks = [
+  const hbtLinks: NavLinkItem[] = [
     { to: "/hbt/dashboard", label: "Dashboard" },
     { to: "/hbt/companies", label: "Companies" },
     { to: "/hbt/employees", label: "Employees" },
@@ -56,7 +63,7 @@ function Navbar() {
     { to: "/hbt/events", label: "Events" },
   ];
 
-  const adminLinks = [
+  const adminLinks: NavLinkItem[] = [
     { to: "/admin", label: "Admin" },
     { to: "/admin/users", label: "Users" },
     { to: "/admin/hbts", label: "HBTs" },
@@ -68,7 +75,7 @@ function Navbar() {
 
     if (user?.role === "employee") return employeeLinks;
 
-    if (user?.role === "hbt_admin") return hbtLinks;
+    if (user?.role === "hbt_admin" || user?.role === "hbt_member") return hbtLinks;
 
     if (user?.role === "admin" || user?.role === "super_admin") {
       return adminLinks;
@@ -79,30 +86,32 @@ function Navbar() {
 
   const links = getLinks();
 
+  const isActive = (to: string) => {
+    if (to === "/") return location.pathname === "/";
+    return location.pathname === to || location.pathname.startsWith(`${to}/`);
+  };
+
   return (
-    <nav className="sticky top-0 z-50 border-b border-white/60 bg-white/85 backdrop-blur-xl shadow-sm">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <Link to="/" className="flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-lg font-black text-white shadow-lg shadow-blue-500/30">
+    <nav className="sticky top-0 z-50 border-b border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 backdrop-blur-2xl">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-6">
+        <Link to="/" className="group flex items-center gap-3">
+          <span className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 text-lg font-black text-white shadow-lg shadow-blue-500/30 transition group-hover:-translate-y-0.5 group-hover:shadow-xl">
             HB
+            <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />
           </span>
 
-          <div>
-            <p className="text-xl font-black tracking-tight text-slate-950">
-              HomeBoost
-            </p>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
-              Employee Benefit
-            </p>
+          <div className="leading-tight">
+            <p className="text-2xl font-black tracking-tight text-slate-950">HomeBoost</p>
+            <p className="text-xs font-black uppercase tracking-[0.26em] text-blue-600">Employee Benefit</p>
           </div>
         </Link>
 
-        <div className="hidden items-center gap-7 text-[15px] font-semibold text-slate-700 md:flex">
+        <div className="hidden items-center gap-1 rounded-full border border-slate-200 bg-white/70 p-1 text-[15px] font-bold text-slate-700 shadow-sm md:flex">
           {links.map((link) => (
             <Link
               key={link.to}
               to={link.to}
-              className="transition hover:text-blue-700"
+              className={`rounded-full px-4 py-2 transition ${isActive(link.to) ? "bg-blue-50 text-blue-700 shadow-sm" : "hover:bg-slate-50 hover:text-blue-700"}`}
             >
               {link.label}
             </Link>
@@ -114,33 +123,25 @@ function Navbar() {
             <>
               <Link
                 to="/login"
-                className="rounded-full px-5 py-2.5 font-semibold text-slate-700 transition hover:bg-slate-100"
+                className="rounded-full px-5 py-2.5 font-black text-slate-700 transition hover:bg-slate-100 hover:text-blue-700"
               >
                 Login
               </Link>
 
-              <Link
-                to="/partners"
-                className="rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:scale-105"
-              >
+              <Link to="/partners" className="btn-primary px-6 py-3">
                 Find Employer Portal
               </Link>
             </>
           ) : (
             <>
-              <div className="text-right">
-                <p className="text-sm font-bold text-slate-900">
-                  {user?.full_name}
-                </p>
-                <p className="text-xs uppercase tracking-wide text-slate-500">
+              <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-2 text-right shadow-sm">
+                <p className="text-sm font-black text-slate-900">{user?.full_name}</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
                   {user?.role?.replace("_", " ")}
                 </p>
               </div>
 
-              <button
-                onClick={handleLogout}
-                className="rounded-full bg-red-600 px-5 py-2.5 font-semibold text-white transition hover:bg-red-700"
-              >
+              <button onClick={handleLogout} className="btn-danger px-5 py-2.5">
                 Logout
               </button>
             </>
@@ -149,21 +150,21 @@ function Navbar() {
 
         <button
           onClick={() => setOpen(!open)}
-          className="rounded-full bg-slate-950 px-5 py-2.5 font-semibold text-white md:hidden"
+          className="rounded-full bg-slate-950 px-5 py-2.5 font-black text-white shadow-lg shadow-slate-900/20 md:hidden"
         >
           {open ? "Close" : "Menu"}
         </button>
       </div>
 
       {open && (
-        <div className="border-t border-slate-100 bg-white px-6 py-5 md:hidden">
+        <div className="border-t border-slate-100 bg-white/95 px-5 py-5 shadow-xl backdrop-blur-xl md:hidden">
           <div className="space-y-3">
             {links.map((link) => (
               <Link
                 key={link.to}
                 to={link.to}
                 onClick={() => setOpen(false)}
-                className="block rounded-2xl px-4 py-3 font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700"
+                className={`block rounded-2xl px-4 py-3 font-black transition ${isActive(link.to) ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}
               >
                 {link.label}
               </Link>
@@ -174,7 +175,7 @@ function Navbar() {
                 <Link
                   to="/login"
                   onClick={() => setOpen(false)}
-                  className="block rounded-2xl px-4 py-3 font-semibold text-slate-700 hover:bg-blue-50"
+                  className="block rounded-2xl px-4 py-3 font-black text-slate-700 hover:bg-blue-50"
                 >
                   Login
                 </Link>
@@ -182,16 +183,13 @@ function Navbar() {
                 <Link
                   to="/partners"
                   onClick={() => setOpen(false)}
-                  className="block rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-center font-semibold text-white"
+                  className="block rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-3 text-center font-black text-white"
                 >
                   Find Employer Portal
                 </Link>
               </>
             ) : (
-              <button
-                onClick={handleLogout}
-                className="block w-full rounded-2xl bg-red-600 px-4 py-3 text-center font-semibold text-white"
-              >
+              <button onClick={handleLogout} className="block w-full rounded-2xl bg-red-600 px-4 py-3 text-center font-black text-white">
                 Logout
               </button>
             )}
