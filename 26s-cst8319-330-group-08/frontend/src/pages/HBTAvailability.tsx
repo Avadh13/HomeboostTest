@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import API_BASE_URL from "../api/api";
+import { useToast } from "../components/ToastProvider";
 
 type TeamMember = {
   id: number;
@@ -48,6 +49,7 @@ const defaultRows = (teamMemberId: number): AvailabilityRow[] =>
 const toInputTime = (value?: string) => (value ? value.slice(0, 5) : "09:00");
 
 function HBTAvailability() {
+  const toast = useToast();
   const token = localStorage.getItem("token");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [availability, setAvailability] = useState<AvailabilityRow[]>([]);
@@ -59,22 +61,18 @@ function HBTAvailability() {
   const [offReason, setOffReason] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  const headers = {
-    Authorization: `Bearer ${token}`,
-  };
+  const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   const loadData = async () => {
     setLoading(true);
-    setNotice(null);
 
     try {
       const response = await fetch(`${API_BASE_URL}/advisor-availability`, { headers });
       const data = await response.json();
 
       if (!response.ok) {
-        setNotice({ type: "error", message: data.message || "Could not load availability." });
+        toast.error(data.message || "Could not load availability.");
         return;
       }
 
@@ -91,7 +89,7 @@ function HBTAvailability() {
       }
     } catch (error) {
       console.error("Availability load failed:", error);
-      setNotice({ type: "error", message: "Could not load availability data." });
+      toast.error("Could not load availability data.");
     } finally {
       setLoading(false);
     }
@@ -133,41 +131,35 @@ function HBTAvailability() {
     [timeOff, selectedTeamMemberId]
   );
 
+  const availableDayCount = rows.filter((row) => Boolean(row.is_available)).length;
+
   const updateRow = (day: number, field: keyof AvailabilityRow, value: string | boolean) => {
-    setRows((prev) =>
-      prev.map((row) =>
-        row.day_of_week === day ? { ...row, [field]: value } : row
-      )
-    );
+    setRows((prev) => prev.map((row) => (row.day_of_week === day ? { ...row, [field]: value } : row)));
   };
 
   const saveAvailability = async () => {
     if (!selectedTeamMemberId) return;
-    setNotice(null);
 
     try {
       setSaving(true);
       const response = await fetch(`${API_BASE_URL}/advisor-availability/${selectedTeamMemberId}`, {
         method: "PUT",
-        headers: {
-          ...headers,
-          "Content-Type": "application/json",
-        },
+        headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({ availability: rows }),
       });
 
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setNotice({ type: "error", message: data.message || "Could not save availability." });
+        toast.error(data.message || "Could not save availability.");
         return;
       }
 
-      setNotice({ type: "success", message: "Availability saved successfully." });
+      toast.success("Availability saved successfully.");
       await loadData();
     } catch (error) {
       console.error("Availability save failed:", error);
-      setNotice({ type: "error", message: "Could not save availability." });
+      toast.error("Could not save availability.");
     } finally {
       setSaving(false);
     }
@@ -177,7 +169,7 @@ function HBTAvailability() {
     event.preventDefault();
 
     if (!selectedTeamMemberId || !offStart || !offEnd) {
-      setNotice({ type: "error", message: "Select advisor, start time, and end time." });
+      toast.warning("Select advisor, start time, and end time.");
       return;
     }
 
@@ -185,10 +177,7 @@ function HBTAvailability() {
       setSaving(true);
       const response = await fetch(`${API_BASE_URL}/advisor-availability/time-off`, {
         method: "POST",
-        headers: {
-          ...headers,
-          "Content-Type": "application/json",
-        },
+        headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({
           team_member_id: selectedTeamMemberId,
           start_datetime: offStart,
@@ -200,18 +189,18 @@ function HBTAvailability() {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setNotice({ type: "error", message: data.message || "Could not add time off." });
+        toast.error(data.message || "Could not add time off.");
         return;
       }
 
-      setNotice({ type: "success", message: "Time off added." });
+      toast.success("Time off added.");
       setOffStart("");
       setOffEnd("");
       setOffReason("");
       await loadData();
     } catch (error) {
       console.error("Add time off failed:", error);
-      setNotice({ type: "error", message: "Could not add time off." });
+      toast.error("Could not add time off.");
     } finally {
       setSaving(false);
     }
@@ -220,53 +209,52 @@ function HBTAvailability() {
   const deleteTimeOff = async (id: number) => {
     try {
       setSaving(true);
-      const response = await fetch(`${API_BASE_URL}/advisor-availability/time-off/${id}`, {
-        method: "DELETE",
-        headers,
-      });
-
+      const response = await fetch(`${API_BASE_URL}/advisor-availability/time-off/${id}`, { method: "DELETE", headers });
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setNotice({ type: "error", message: data.message || "Could not remove time off." });
+        toast.error(data.message || "Could not remove time off.");
         return;
       }
 
-      setNotice({ type: "success", message: "Time off removed." });
+      toast.success("Time off removed.");
       await loadData();
     } catch (error) {
       console.error("Delete time off failed:", error);
-      setNotice({ type: "error", message: "Could not remove time off." });
+      toast.error("Could not remove time off.");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-8">
-      <div className="mx-auto max-w-7xl space-y-8">
-        <header className="rounded-[2rem] bg-gradient-to-br from-slate-950 to-blue-950 p-8 text-white shadow-xl">
-          <Link to="/hbt/dashboard" className="text-sm font-bold text-blue-200 hover:text-white">← Back to HBT dashboard</Link>
-          <h1 className="mt-4 text-4xl font-black">Advisor Availability</h1>
-          <p className="mt-3 max-w-3xl text-blue-100">Set advisor working hours and block off unavailable time. Employee booking will use these settings in the next slot-selection pass.</p>
+    <main className="theme-page min-h-screen px-4 py-6 md:px-6 md:py-8">
+      <div className="mx-auto max-w-7xl space-y-5">
+        <header className="theme-panel">
+          <Link to="/hbt/dashboard" className="text-sm font-black text-violet-200 hover:text-white">← Back to HBT dashboard</Link>
+          <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-200">Advisor Operations</p>
+              <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">Advisor Availability</h1>
+              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-violet-100 md:text-base">Set advisor working hours and block unavailable time. Employee booking uses these settings to show clean 1-hour meeting slots.</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 rounded-3xl bg-white/10 p-3 backdrop-blur">
+              <div><p className="text-2xl font-black">{teamMembers.length}</p><p className="text-[11px] font-bold uppercase text-violet-100">Advisors</p></div>
+              <div><p className="text-2xl font-black">{availableDayCount}</p><p className="text-[11px] font-bold uppercase text-violet-100">Work days</p></div>
+              <div><p className="text-2xl font-black">{selectedTimeOff.length}</p><p className="text-[11px] font-bold uppercase text-violet-100">Time off</p></div>
+            </div>
+          </div>
         </header>
 
-        {notice && (
-          <div className={`rounded-2xl border px-5 py-4 font-semibold ${notice.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}>
-            {notice.message}
-          </div>
-        )}
-
         {loading ? (
-          <section className="rounded-3xl bg-white p-8 shadow-xl">Loading availability...</section>
+          <section className="premium-card p-8 text-center font-bold text-slate-500">Loading availability...</section>
         ) : teamMembers.length === 0 ? (
-          <section className="rounded-3xl bg-white p-8 text-center text-slate-600 shadow-xl">No active team members found.</section>
+          <section className="premium-card p-8 text-center text-slate-600">No active team members found.</section>
         ) : (
-          <section className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr]">
-            <aside className="rounded-[2rem] bg-white p-6 shadow-xl">
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">Advisors</p>
-              <h2 className="mt-2 text-2xl font-black">Select advisor</h2>
-
+          <section className="grid gap-5 lg:grid-cols-[0.82fr_1.18fr]">
+            <aside className="premium-card">
+              <p className="eyebrow">Advisors</p>
+              <h2 className="mt-1 text-2xl font-black text-slate-950">Select advisor</h2>
               <div className="mt-5 space-y-3">
                 {teamMembers.map((member) => (
                   <button
@@ -274,8 +262,8 @@ function HBTAvailability() {
                     onClick={() => setSelectedTeamMemberId(member.id)}
                     className={`w-full rounded-2xl border p-4 text-left transition ${
                       Number(selectedTeamMemberId) === Number(member.id)
-                        ? "border-blue-500 bg-blue-50 shadow"
-                        : "border-slate-100 bg-slate-50 hover:border-blue-200"
+                        ? "border-violet-300 bg-violet-50 shadow"
+                        : "border-slate-100 bg-slate-50 hover:border-violet-200 hover:bg-violet-50/50"
                     }`}
                   >
                     <p className="font-black text-slate-950">{member.full_name}</p>
@@ -286,16 +274,14 @@ function HBTAvailability() {
               </div>
             </aside>
 
-            <div className="space-y-8">
-              <section className="rounded-[2rem] bg-white p-7 shadow-xl">
+            <div className="space-y-5">
+              <section className="premium-card">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">Weekly hours</p>
-                    <h2 className="text-3xl font-black">{selectedMember?.full_name || "Advisor"}</h2>
+                    <p className="eyebrow">Weekly hours</p>
+                    <h2 className="mt-1 text-2xl font-black text-slate-950 md:text-3xl">{selectedMember?.full_name || "Advisor"}</h2>
                   </div>
-                  <button disabled={saving} onClick={saveAvailability} className="rounded-full bg-blue-600 px-6 py-3 font-black text-white hover:bg-blue-700 disabled:opacity-60">
-                    {saving ? "Saving..." : "Save Hours"}
-                  </button>
+                  <button disabled={saving} onClick={saveAvailability} className="btn-primary disabled:opacity-60">{saving ? "Saving..." : "Save Hours"}</button>
                 </div>
 
                 <div className="mt-6 space-y-3">
@@ -303,7 +289,7 @@ function HBTAvailability() {
                     const dayName = days.find(([day]) => day === row.day_of_week)?.[1] || "Day";
                     return (
                       <div key={row.day_of_week} className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 md:grid-cols-[1fr_auto_auto_auto] md:items-center">
-                        <label className="flex items-center gap-3 font-bold text-slate-800">
+                        <label className="flex items-center gap-3 font-black text-slate-800">
                           <input type="checkbox" checked={Boolean(row.is_available)} onChange={(e) => updateRow(row.day_of_week, "is_available", e.target.checked)} />
                           {dayName}
                         </label>
@@ -315,40 +301,26 @@ function HBTAvailability() {
                           End
                           <input type="time" value={toInputTime(row.end_time)} onChange={(e) => updateRow(row.day_of_week, "end_time", e.target.value)} className="ml-2 rounded-xl border border-slate-200 bg-white p-2" disabled={!row.is_available} />
                         </label>
-                        <span className={`rounded-full px-3 py-1 text-xs font-black uppercase ${row.is_available ? "bg-emerald-50 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
-                          {row.is_available ? "Available" : "Off"}
-                        </span>
+                        <span className={`rounded-full px-3 py-1 text-xs font-black uppercase ${row.is_available ? "bg-emerald-50 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>{row.is_available ? "Available" : "Off"}</span>
                       </div>
                     );
                   })}
                 </div>
               </section>
 
-              <section className="rounded-[2rem] bg-white p-7 shadow-xl">
-                <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">Time off</p>
-                <h2 className="mt-2 text-3xl font-black">Block unavailable time</h2>
-
+              <section className="premium-card">
+                <p className="eyebrow">Time off</p>
+                <h2 className="mt-1 text-2xl font-black text-slate-950 md:text-3xl">Block unavailable time</h2>
                 <form onSubmit={addTimeOff} className="mt-6 grid gap-4 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end">
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-bold text-slate-700">Start</span>
-                    <input type="datetime-local" value={offStart} onChange={(e) => setOffStart(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-bold text-slate-700">End</span>
-                    <input type="datetime-local" value={offEnd} onChange={(e) => setOffEnd(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-bold text-slate-700">Reason</span>
-                    <input value={offReason} onChange={(e) => setOffReason(e.target.value)} placeholder="Vacation, unavailable..." className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3" />
-                  </label>
-                  <button disabled={saving} className="rounded-2xl bg-slate-950 px-6 py-3 font-black text-white hover:bg-blue-700 disabled:opacity-60">
-                    Add
-                  </button>
+                  <label className="block"><span className="mb-2 block text-sm font-bold text-slate-700">Start</span><input type="datetime-local" value={offStart} onChange={(e) => setOffStart(e.target.value)} className="form-field" /></label>
+                  <label className="block"><span className="mb-2 block text-sm font-bold text-slate-700">End</span><input type="datetime-local" value={offEnd} onChange={(e) => setOffEnd(e.target.value)} className="form-field" /></label>
+                  <label className="block"><span className="mb-2 block text-sm font-bold text-slate-700">Reason</span><input value={offReason} onChange={(e) => setOffReason(e.target.value)} placeholder="Vacation, unavailable..." className="form-field" /></label>
+                  <button disabled={saving} className="btn-dark disabled:opacity-60">Add</button>
                 </form>
 
                 <div className="mt-6 space-y-3">
                   {selectedTimeOff.length === 0 ? (
-                    <p className="rounded-2xl bg-slate-50 p-4 text-slate-500">No time off entries for this advisor.</p>
+                    <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No time off entries for this advisor.</p>
                   ) : (
                     selectedTimeOff.map((item) => (
                       <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
@@ -356,9 +328,7 @@ function HBTAvailability() {
                           <p className="font-black text-slate-950">{new Date(item.start_datetime).toLocaleString()} → {new Date(item.end_datetime).toLocaleString()}</p>
                           <p className="text-sm text-slate-500">{item.reason || "No reason provided"}</p>
                         </div>
-                        <button onClick={() => deleteTimeOff(item.id)} className="rounded-full bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700">
-                          Remove
-                        </button>
+                        <button onClick={() => deleteTimeOff(item.id)} className="btn-danger">Remove</button>
                       </div>
                     ))
                   )}
