@@ -22,53 +22,11 @@ type Partnership = {
   hbt_website?: string | null;
 };
 
-type Employee = {
-  id: number;
-  full_name: string;
-  email: string;
-  is_active: number;
-  created_at: string;
-};
-
-type Invite = {
-  id: number;
-  full_name: string;
-  email: string;
-  status: string;
-  created_at: string;
-  registered_at?: string | null;
-  revoked_at?: string | null;
-};
-
-type Batch = {
-  id: number;
-  original_filename: string;
-  created_count: number;
-  skipped_count: number;
-  status: string;
-  created_at: string;
-  revoked_at?: string | null;
-};
-
-type Submission = {
-  id: number;
-  quiz_title: string;
-  employee_name: string;
-  employee_email: string;
-  follow_up_status: string;
-  submitted_at: string;
-};
-
-type Appointment = {
-  id: number;
-  topic: string;
-  preferred_date?: string | null;
-  status: string;
-  employee_name: string;
-  employee_email: string;
-  team_member_name?: string | null;
-  created_at: string;
-};
+type Employee = { id: number; full_name: string; email: string; is_active: number; created_at: string };
+type Invite = { id: number; full_name: string; email: string; status: string; created_at: string; registered_at?: string | null; revoked_at?: string | null };
+type Batch = { id: number; original_filename: string; created_count: number; skipped_count: number; status: string; created_at: string; revoked_at?: string | null };
+type Submission = { id: number; quiz_title: string; employee_name: string; employee_email: string; follow_up_status: string; submitted_at: string };
+type Appointment = { id: number; topic: string; preferred_date?: string | null; status: string; employee_name: string; employee_email: string; team_member_name?: string | null; created_at: string };
 
 type DashboardData = {
   partnership: Partnership;
@@ -93,17 +51,28 @@ const formatDate = (value?: string | null) => {
 };
 
 const statusClass = (status: string) => {
-  if (status === "registered" || status === "active" || status === "confirmed" || status === "completed") return "bg-emerald-100 text-emerald-700";
-  if (status === "revoked" || status === "cancelled" || status === "disabled") return "bg-red-100 text-red-700";
-  if (status === "pending" || status === "invited") return "bg-blue-100 text-blue-700";
+  if (["registered", "active", "confirmed", "completed"].includes(status)) return "bg-emerald-100 text-emerald-700";
+  if (["revoked", "cancelled", "disabled"].includes(status)) return "bg-red-100 text-red-700";
+  if (["pending", "invited"].includes(status)) return "bg-blue-100 text-blue-700";
   return "bg-slate-100 text-slate-700";
 };
+
+const initials = (name: string) =>
+  name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((item) => item.charAt(0).toUpperCase())
+    .join("") || "E";
 
 function CompanyDashboard() {
   const toast = useToast();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [addingInvite, setAddingInvite] = useState(false);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const token = localStorage.getItem("token");
@@ -136,13 +105,46 @@ function CompanyDashboard() {
 
   const filteredInvites = useMemo(() => {
     const query = search.trim().toLowerCase();
-
     return (data?.invites || []).filter((invite) => {
       const matchesSearch = !query || [invite.full_name, invite.email].join(" ").toLowerCase().includes(query);
       const matchesStatus = statusFilter === "all" || invite.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
   }, [data?.invites, search, statusFilter]);
+
+  const addIndividualInvite = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!inviteName.trim() || !inviteEmail.trim()) {
+      toast.warning("Full name and email are required.");
+      return;
+    }
+
+    try {
+      setAddingInvite(true);
+      const response = await fetch(`${API_BASE_URL}/company-manager/invites`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ full_name: inviteName.trim(), email: inviteEmail.trim() }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        toast.error(payload.message || "Failed to add employee invite.");
+        return;
+      }
+
+      toast.success(payload.message || "Employee invite added.");
+      setInviteName("");
+      setInviteEmail("");
+      await loadDashboard();
+    } catch (error) {
+      console.error("Individual invite failed:", error);
+      toast.error("Failed to add employee invite.");
+    } finally {
+      setAddingInvite(false);
+    }
+  };
 
   const uploadCsv = async (file: File | null) => {
     if (!file) {
@@ -250,7 +252,7 @@ function CompanyDashboard() {
 
   const totalInvites = Math.max(data.stats.invited + data.stats.registered + data.stats.revoked, 1);
   const registrationRate = Math.round((data.stats.registered / totalInvites) * 100);
-  const recentEmployees = data.employees.slice(0, 5);
+  const recentEmployees = data.employees.slice(0, 6);
   const recentSubmissions = data.submissions.slice(0, 6);
   const recentAppointments = data.appointments.slice(0, 6);
   const latestBatch = data.batches[0];
@@ -320,14 +322,8 @@ function CompanyDashboard() {
               </div>
 
               <div className="mt-6 grid gap-3">
-                <div className="rounded-2xl bg-white/10 p-4">
-                  <p className="text-xs font-black uppercase tracking-wide text-white/60">HBT Team</p>
-                  <p className="mt-1 font-black">{data.partnership.hbt_name || "Assigned team"}</p>
-                </div>
-                <div className="rounded-2xl bg-white/10 p-4">
-                  <p className="text-xs font-black uppercase tracking-wide text-white/60">Latest Upload</p>
-                  <p className="mt-1 font-black">{latestBatch ? `Batch #${latestBatch.id}` : "No CSV uploaded"}</p>
-                </div>
+                <div className="rounded-2xl bg-white/10 p-4"><p className="text-xs font-black uppercase tracking-wide text-white/60">HBT Team</p><p className="mt-1 font-black">{data.partnership.hbt_name || "Assigned team"}</p></div>
+                <div className="rounded-2xl bg-white/10 p-4"><p className="text-xs font-black uppercase tracking-wide text-white/60">Latest Upload</p><p className="mt-1 font-black">{latestBatch ? `Batch #${latestBatch.id}` : "No CSV uploaded"}</p></div>
               </div>
             </aside>
           </div>
@@ -344,179 +340,131 @@ function CompanyDashboard() {
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[0.78fr_1.22fr]">
-          <div className="premium-card">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="eyebrow">Employee access</p>
-                <h2 className="mt-1 text-2xl font-black text-slate-950">Upload approved employees</h2>
+          <div className="grid gap-5">
+            <form onSubmit={addIndividualInvite} className="premium-card">
+              <div className="flex items-start justify-between gap-4">
+                <div><p className="eyebrow">Single employee</p><h2 className="mt-1 text-2xl font-black text-slate-950">Add individual invite</h2></div>
+                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">Fast add</span>
               </div>
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">Protected</span>
-            </div>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">Add one approved employee without uploading a CSV.</p>
+              <div className="mt-5 grid gap-3">
+                <input className="form-field" placeholder="Employee full name" value={inviteName} onChange={(event) => setInviteName(event.target.value)} />
+                <input className="form-field" type="email" placeholder="employee@company.com" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} />
+                <button type="submit" disabled={addingInvite} className="btn-primary w-full disabled:opacity-60">{addingInvite ? "Adding..." : "Add Employee Invite"}</button>
+              </div>
+            </form>
 
-            <p className="mt-3 text-sm leading-relaxed text-slate-600">
-              Upload a CSV with <strong>full_name,email</strong>. Only approved emails can create employee accounts for this employer portal.
-            </p>
-
-            <label className="mt-5 block rounded-[1.5rem] border-2 border-dashed border-violet-200 bg-violet-50/50 p-5 text-center transition hover:border-violet-300 hover:bg-violet-50">
-              <input type="file" accept=".csv" disabled={uploading} onChange={(event) => uploadCsv(event.target.files ? event.target.files[0] : null)} className="hidden" />
-              <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">⬆</span>
-              <span className="mt-3 block text-sm font-black text-slate-900">{uploading ? "Uploading..." : "Choose employee CSV"}</span>
-              <span className="mt-1 block text-xs font-semibold text-slate-500">Required columns: full_name,email</span>
-            </label>
-
-            <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-800">
-              Unknown emails are blocked even if they know the partnership slug.
+            <div className="premium-card">
+              <div className="flex items-start justify-between gap-4">
+                <div><p className="eyebrow">Bulk upload</p><h2 className="mt-1 text-2xl font-black text-slate-950">Upload employee CSV</h2></div>
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">Protected</span>
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">Upload a CSV with <strong>full_name,email</strong>. Only approved emails can sign up under your employer portal.</p>
+              <label className="mt-5 block rounded-[1.5rem] border-2 border-dashed border-violet-200 bg-violet-50/50 p-5 text-center transition hover:border-violet-300 hover:bg-violet-50">
+                <input type="file" accept=".csv" disabled={uploading} onChange={(event) => uploadCsv(event.target.files ? event.target.files[0] : null)} className="hidden" />
+                <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">⬆</span>
+                <span className="mt-3 block text-sm font-black text-slate-900">{uploading ? "Uploading..." : "Choose employee CSV"}</span>
+                <span className="mt-1 block text-xs font-semibold text-slate-500">Required columns: full_name,email</span>
+              </label>
+              <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-800">Unknown emails are blocked even if they know the partnership slug.</div>
             </div>
           </div>
 
-          <div className="premium-card overflow-hidden p-0">
-            <div className="border-b border-slate-100 p-4 md:p-5">
-              <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
-                <div>
-                  <p className="eyebrow">Employee access list</p>
-                  <h2 className="mt-1 text-2xl font-black text-slate-950">Approved employees</h2>
-                  <p className="mt-1 text-sm text-slate-500">Search and filter invited, registered, or revoked access.</p>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-[1fr_160px]">
-                  <input className="form-field" placeholder="Search name or email..." value={search} onChange={(event) => setSearch(event.target.value)} />
-                  <select className="form-field" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                    <option value="all">All status</option>
-                    <option value="invited">Invited</option>
-                    <option value="registered">Registered</option>
-                    <option value="revoked">Revoked</option>
-                  </select>
-                </div>
+          <div className="premium-card">
+            <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+              <div><p className="eyebrow">Employee access list</p><h2 className="mt-1 text-2xl font-black text-slate-950">Approved employees</h2><p className="mt-1 text-sm text-slate-500">Card view for invited, registered, and revoked access.</p></div>
+              <div className="grid gap-2 sm:grid-cols-[1fr_160px]">
+                <input className="form-field" placeholder="Search name or email..." value={search} onChange={(event) => setSearch(event.target.value)} />
+                <select className="form-field" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                  <option value="all">All status</option>
+                  <option value="invited">Invited</option>
+                  <option value="registered">Registered</option>
+                  <option value="revoked">Revoked</option>
+                </select>
               </div>
             </div>
 
-            <div className="max-h-[500px] overflow-auto">
-              <table className="w-full min-w-[640px] border-collapse text-sm">
-                <thead>
-                  <tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                    <th className="p-3">Employee</th>
-                    <th className="p-3">Email</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3">Created</th>
-                    <th className="p-3">Registered</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredInvites.map((invite) => (
-                    <tr key={invite.id} className="border-b last:border-0 hover:bg-violet-50/40">
-                      <td className="p-3 font-black text-slate-950">{invite.full_name}</td>
-                      <td className="p-3 text-slate-600">{invite.email}</td>
-                      <td className="p-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${statusClass(invite.status)}`}>{invite.status}</span></td>
-                      <td className="p-3 text-slate-500">{formatDate(invite.created_at)}</td>
-                      <td className="p-3 text-slate-500">{formatDate(invite.registered_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filteredInvites.length === 0 && <p className="p-8 text-center text-slate-500">No employee invites found.</p>}
+            <div className="mt-5 grid max-h-[640px] gap-3 overflow-auto pr-1 md:grid-cols-2">
+              {filteredInvites.map((invite) => (
+                <article key={invite.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-sm font-black text-violet-700 shadow-sm">{initials(invite.full_name)}</div>
+                      <div className="min-w-0"><h3 className="truncate font-black text-slate-950">{invite.full_name}</h3><p className="truncate text-xs font-semibold text-slate-500">{invite.email}</p></div>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${statusClass(invite.status)}`}>{invite.status}</span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-bold text-slate-500">
+                    <div className="rounded-2xl bg-white p-3"><p className="uppercase tracking-wide text-slate-400">Created</p><p className="mt-1 text-slate-700">{formatDate(invite.created_at)}</p></div>
+                    <div className="rounded-2xl bg-white p-3"><p className="uppercase tracking-wide text-slate-400">Registered</p><p className="mt-1 text-slate-700">{formatDate(invite.registered_at)}</p></div>
+                  </div>
+                </article>
+              ))}
+              {filteredInvites.length === 0 && <p className="rounded-3xl bg-slate-50 p-8 text-center text-slate-500 md:col-span-2">No employee invites found.</p>}
             </div>
           </div>
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-          <div className="premium-card overflow-hidden p-0">
-            <div className="border-b border-slate-100 p-5">
-              <p className="eyebrow">Enrollment uploads</p>
-              <h2 className="mt-1 text-2xl font-black text-slate-950">CSV invite batches</h2>
-            </div>
-            <div className="max-h-[460px] overflow-auto">
-              <table className="w-full min-w-[680px] border-collapse text-sm">
-                <thead>
-                  <tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                    <th className="p-3">Batch</th>
-                    <th className="p-3">File</th>
-                    <th className="p-3">Approved</th>
-                    <th className="p-3">Skipped</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.batches.map((batch) => (
-                    <tr key={batch.id} className="border-b last:border-0 hover:bg-slate-50">
-                      <td className="p-3 font-black">#{batch.id}</td>
-                      <td className="p-3"><p className="font-semibold text-slate-800">{batch.original_filename || "CSV Upload"}</p><p className="text-xs text-slate-400">{formatDate(batch.created_at)}</p></td>
-                      <td className="p-3 font-bold text-emerald-700">{batch.created_count}</td>
-                      <td className="p-3 font-bold text-amber-700">{batch.skipped_count}</td>
-                      <td className="p-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${statusClass(batch.status)}`}>{batch.status}</span></td>
-                      <td className="p-3">{batch.status === "active" ? <button onClick={() => revokeBatch(batch.id)} className="rounded-full bg-red-600 px-4 py-2 text-xs font-black text-white hover:bg-red-700">Revoke</button> : <span className="text-xs font-bold text-slate-400">Revoked</span>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {data.batches.length === 0 && <p className="p-8 text-center text-slate-500">No CSV upload batches yet.</p>}
+          <div className="premium-card">
+            <div className="mb-5"><p className="eyebrow">Enrollment uploads</p><h2 className="mt-1 text-2xl font-black text-slate-950">CSV invite batches</h2></div>
+            <div className="grid gap-3">
+              {data.batches.map((batch) => (
+                <article key={batch.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div><p className="text-xs font-black uppercase tracking-wide text-slate-400">Batch #{batch.id}</p><h3 className="mt-1 font-black text-slate-950">{batch.original_filename || "CSV Upload"}</h3><p className="mt-1 text-xs font-semibold text-slate-500">Uploaded {formatDate(batch.created_at)}</p></div>
+                    <span className={`w-fit rounded-full px-3 py-1 text-xs font-black ${statusClass(batch.status)}`}>{batch.status}</span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center text-sm">
+                    <div className="rounded-2xl bg-white p-3"><p className="text-2xl font-black text-emerald-700">{batch.created_count}</p><p className="text-xs font-bold text-slate-500">Approved</p></div>
+                    <div className="rounded-2xl bg-white p-3"><p className="text-2xl font-black text-amber-700">{batch.skipped_count}</p><p className="text-xs font-bold text-slate-500">Skipped</p></div>
+                    <div className="rounded-2xl bg-white p-3"><p className="text-2xl font-black text-slate-700">{batch.status === "active" ? "Open" : "Off"}</p><p className="text-xs font-bold text-slate-500">Access</p></div>
+                  </div>
+                  {batch.status === "active" && <button onClick={() => revokeBatch(batch.id)} className="mt-4 rounded-full bg-red-600 px-4 py-2 text-xs font-black text-white hover:bg-red-700">Revoke pending invites</button>}
+                </article>
+              ))}
+              {data.batches.length === 0 && <p className="rounded-3xl bg-slate-50 p-8 text-center text-slate-500">No CSV upload batches yet.</p>}
             </div>
           </div>
 
           <div className="premium-card">
-            <p className="eyebrow">Recently registered</p>
-            <h2 className="mt-1 text-2xl font-black text-slate-950">Employee account activity</h2>
-            <div className="mt-5 space-y-3">
+            <div className="mb-5"><p className="eyebrow">Recently registered</p><h2 className="mt-1 text-2xl font-black text-slate-950">Employee account activity</h2></div>
+            <div className="grid gap-3 md:grid-cols-2">
               {recentEmployees.map((employee) => (
-                <div key={employee.id} className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-sm font-black text-violet-700 shadow-sm">{employee.full_name.charAt(0)}</div>
-                    <div>
-                      <p className="font-black text-slate-950">{employee.full_name}</p>
-                      <p className="text-xs font-semibold text-slate-500">{employee.email}</p>
-                    </div>
-                  </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-black ${employee.is_active ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{employee.is_active ? "Active" : "Disabled"}</span>
-                </div>
+                <article key={employee.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
+                  <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-sm font-black text-violet-700 shadow-sm">{initials(employee.full_name)}</div><div><h3 className="font-black text-slate-950">{employee.full_name}</h3><p className="text-xs font-semibold text-slate-500">{employee.email}</p></div></div><span className={`rounded-full px-3 py-1 text-xs font-black ${employee.is_active ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{employee.is_active ? "Active" : "Disabled"}</span></div>
+                  <p className="mt-4 rounded-2xl bg-white p-3 text-xs font-bold text-slate-500">Joined {formatDate(employee.created_at)}</p>
+                </article>
               ))}
-              {recentEmployees.length === 0 && <p className="rounded-2xl bg-slate-50 p-6 text-center text-slate-500">No registered employees yet.</p>}
+              {recentEmployees.length === 0 && <p className="rounded-3xl bg-slate-50 p-8 text-center text-slate-500 md:col-span-2">No registered employees yet.</p>}
             </div>
           </div>
         </section>
 
         <section className="grid gap-5 xl:grid-cols-2">
-          <div className="premium-card overflow-hidden p-0">
-            <div className="border-b border-slate-100 p-5">
-              <p className="eyebrow">Employee process</p>
-              <h2 className="mt-1 text-2xl font-black text-slate-950">Quiz submissions</h2>
-            </div>
-            <div className="max-h-[420px] overflow-auto">
-              <table className="w-full min-w-[640px] border-collapse text-sm">
-                <thead><tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><th className="p-3">Employee</th><th className="p-3">Quiz</th><th className="p-3">Progress</th><th className="p-3">Submitted</th></tr></thead>
-                <tbody>
-                  {recentSubmissions.map((submission) => (
-                    <tr key={submission.id} className="border-b last:border-0 hover:bg-slate-50">
-                      <td className="p-3"><p className="font-black">{submission.employee_name}</p><p className="text-xs text-slate-500">{submission.employee_email}</p></td>
-                      <td className="p-3">{submission.quiz_title}</td>
-                      <td className="p-3"><span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700">{submission.follow_up_status}</span></td>
-                      <td className="p-3 text-slate-500">{formatDate(submission.submitted_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {recentSubmissions.length === 0 && <p className="p-8 text-center text-slate-500">No quiz submissions yet.</p>}
+          <div className="premium-card">
+            <div className="mb-5"><p className="eyebrow">Employee process</p><h2 className="mt-1 text-2xl font-black text-slate-950">Quiz submissions</h2></div>
+            <div className="grid gap-3">
+              {recentSubmissions.map((submission) => (
+                <article key={submission.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
+                  <div className="flex items-start justify-between gap-3"><div><h3 className="font-black text-slate-950">{submission.employee_name}</h3><p className="text-xs font-semibold text-slate-500">{submission.employee_email}</p></div><span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700">{submission.follow_up_status}</span></div>
+                  <div className="mt-4 rounded-2xl bg-white p-3"><p className="text-sm font-black text-slate-800">{submission.quiz_title}</p><p className="mt-1 text-xs font-semibold text-slate-500">Submitted {formatDate(submission.submitted_at)}</p></div>
+                </article>
+              ))}
+              {recentSubmissions.length === 0 && <p className="rounded-3xl bg-slate-50 p-8 text-center text-slate-500">No quiz submissions yet.</p>}
             </div>
           </div>
 
-          <div className="premium-card overflow-hidden p-0">
-            <div className="border-b border-slate-100 p-5">
-              <p className="eyebrow">Appointments</p>
-              <h2 className="mt-1 text-2xl font-black text-slate-950">Employee meetings</h2>
-            </div>
-            <div className="max-h-[420px] overflow-auto">
-              <table className="w-full min-w-[640px] border-collapse text-sm">
-                <thead><tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><th className="p-3">Employee</th><th className="p-3">Topic</th><th className="p-3">Advisor</th><th className="p-3">Status</th></tr></thead>
-                <tbody>
-                  {recentAppointments.map((appointment) => (
-                    <tr key={appointment.id} className="border-b last:border-0 hover:bg-slate-50">
-                      <td className="p-3"><p className="font-black">{appointment.employee_name}</p><p className="text-xs text-slate-500">{appointment.employee_email}</p></td>
-                      <td className="p-3">{appointment.topic}</td>
-                      <td className="p-3">{appointment.team_member_name || "Not assigned"}</td>
-                      <td className="p-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${statusClass(appointment.status)}`}>{appointment.status}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {recentAppointments.length === 0 && <p className="p-8 text-center text-slate-500">No appointments yet.</p>}
+          <div className="premium-card">
+            <div className="mb-5"><p className="eyebrow">Appointments</p><h2 className="mt-1 text-2xl font-black text-slate-950">Employee meetings</h2></div>
+            <div className="grid gap-3">
+              {recentAppointments.map((appointment) => (
+                <article key={appointment.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
+                  <div className="flex items-start justify-between gap-3"><div><h3 className="font-black text-slate-950">{appointment.employee_name}</h3><p className="text-xs font-semibold text-slate-500">{appointment.employee_email}</p></div><span className={`rounded-full px-3 py-1 text-xs font-black ${statusClass(appointment.status)}`}>{appointment.status}</span></div>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2"><div className="rounded-2xl bg-white p-3"><p className="text-xs font-black uppercase tracking-wide text-slate-400">Topic</p><p className="mt-1 text-sm font-bold text-slate-700">{appointment.topic}</p></div><div className="rounded-2xl bg-white p-3"><p className="text-xs font-black uppercase tracking-wide text-slate-400">Advisor</p><p className="mt-1 text-sm font-bold text-slate-700">{appointment.team_member_name || "Not assigned"}</p></div></div>
+                </article>
+              ))}
+              {recentAppointments.length === 0 && <p className="rounded-3xl bg-slate-50 p-8 text-center text-slate-500">No appointments yet.</p>}
             </div>
           </div>
         </section>
@@ -526,24 +474,11 @@ function CompanyDashboard() {
             <div className="rounded-[1.75rem] p-6 text-white" style={{ backgroundColor: primary }}>
               <p className="text-xs font-black uppercase tracking-[0.22em] text-white/70">Partnership details</p>
               <h2 className="mt-3 text-3xl font-black">Company + HBT information</h2>
-              <p className="mt-3 text-sm leading-relaxed text-white/80">Use this section to quickly verify the employer profile and assigned Home Buying Team.</p>
+              <p className="mt-3 text-sm leading-relaxed text-white/80">Quick verification for the employer profile and assigned Home Buying Team.</p>
             </div>
-
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-3xl bg-slate-50 p-5">
-                <h3 className="text-lg font-black text-slate-950">Employer</h3>
-                <p className="mt-3 font-semibold text-slate-700">{data.partnership.employer_name}</p>
-                <p className="text-sm text-slate-600">{data.partnership.contact_email || "No contact email"}</p>
-                <p className="text-sm text-slate-600">{data.partnership.phone || "No phone"}</p>
-                {data.partnership.website && <a href={data.partnership.website} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-sm font-black text-violet-700">Open website →</a>}
-              </div>
-              <div className="rounded-3xl bg-slate-50 p-5">
-                <h3 className="text-lg font-black text-slate-950">Home Buying Team</h3>
-                <p className="mt-3 font-semibold text-slate-700">{data.partnership.hbt_name || "Assigned team"}</p>
-                <p className="text-sm text-slate-600">{data.partnership.hbt_email || "No email"}</p>
-                <p className="text-sm text-slate-600">{data.partnership.hbt_phone || "No phone"}</p>
-                {data.partnership.hbt_website && <a href={data.partnership.hbt_website} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-sm font-black text-violet-700">Open HBT website →</a>}
-              </div>
+              <div className="rounded-3xl bg-slate-50 p-5"><h3 className="text-lg font-black text-slate-950">Employer</h3><p className="mt-3 font-semibold text-slate-700">{data.partnership.employer_name}</p><p className="text-sm text-slate-600">{data.partnership.contact_email || "No contact email"}</p><p className="text-sm text-slate-600">{data.partnership.phone || "No phone"}</p>{data.partnership.website && <a href={data.partnership.website} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-sm font-black text-violet-700">Open website →</a>}</div>
+              <div className="rounded-3xl bg-slate-50 p-5"><h3 className="text-lg font-black text-slate-950">Home Buying Team</h3><p className="mt-3 font-semibold text-slate-700">{data.partnership.hbt_name || "Assigned team"}</p><p className="text-sm text-slate-600">{data.partnership.hbt_email || "No email"}</p><p className="text-sm text-slate-600">{data.partnership.hbt_phone || "No phone"}</p>{data.partnership.hbt_website && <a href={data.partnership.hbt_website} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-sm font-black text-violet-700">Open HBT website →</a>}</div>
             </div>
           </div>
         </section>
