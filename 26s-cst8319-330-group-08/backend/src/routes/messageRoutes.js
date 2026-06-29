@@ -26,19 +26,30 @@ const threadSelectSql = `
     mt.hbt_team_id,
     mt.partnership_id,
     mt.assigned_member_id,
+    mt.recipient_id,
     mt.status,
     mt.created_by,
     mt.created_at,
     mt.updated_at,
+
     employee.full_name AS employee_name,
     employee.email AS employee_email,
+
     creator.full_name AS created_by_name,
+    creator.email AS created_by_email,
     creator.role AS created_by_role,
+
+    recipient.full_name AS recipient_name,
+    recipient.email AS recipient_email,
+    recipient.role AS recipient_role,
+
     assigned.full_name AS assigned_member_name,
     assigned.email AS assigned_member_email,
+
     h.name AS hbt_team_name,
     e.name AS company_name,
     p.slug AS partnership_slug,
+
     (
       SELECT message_body
       FROM messages
@@ -46,6 +57,7 @@ const threadSelectSql = `
       ORDER BY id DESC
       LIMIT 1
     ) AS last_message,
+
     (
       SELECT created_at
       FROM messages
@@ -53,6 +65,7 @@ const threadSelectSql = `
       ORDER BY id DESC
       LIMIT 1
     ) AS last_message_at,
+
     (
       SELECT COUNT(*)
       FROM messages
@@ -63,6 +76,7 @@ const threadSelectSql = `
   FROM message_threads mt
   LEFT JOIN users employee ON mt.employee_id = employee.id
   LEFT JOIN users creator ON mt.created_by = creator.id
+  LEFT JOIN users recipient ON mt.recipient_id = recipient.id
   LEFT JOIN users assigned ON mt.assigned_member_id = assigned.id
   LEFT JOIN home_buying_teams h ON mt.hbt_team_id = h.id
   LEFT JOIN partnerships p ON mt.partnership_id = p.id
@@ -90,143 +104,80 @@ const getCompanyPartnership = async (partnershipId) => {
   return partnership || null;
 };
 
-const getAccessClause = (user) => {
-  if (isAdmin(user)) {
-    return {
-      where: `WHERE (
-        mt.hbt_team_id IS NULL
-        OR mt.created_by = ?
-        OR EXISTS (
-          SELECT 1
-          FROM messages admin_messages
-          JOIN users admin_sender ON admin_messages.sender_id = admin_sender.id
-          WHERE admin_messages.thread_id = mt.id
-          AND admin_sender.role IN ('admin', 'super_admin')
-        )
-      )`,
-      params: [user.id],
-    };
-  }
-
-  if (user.role === "hbt_admin") {
-    return {
-      where: `WHERE mt.hbt_team_id = ?
-        AND (
-          mt.assigned_member_id IS NULL
-          OR mt.assigned_member_id = ?
-          OR mt.created_by = ?
-        )`,
-      params: [user.team_id, user.id, user.id],
-    };
-  }
-
-  if (user.role === "hbt_member") {
-    return {
-      where: `WHERE mt.hbt_team_id = ?
-        AND (
-          mt.assigned_member_id = ?
-          OR mt.created_by = ?
-          OR EXISTS (
-            SELECT 1
-            FROM employee_lead_assignments ela
-            WHERE ela.employee_user_id = mt.employee_id
-            AND ela.team_member_user_id = ?
-          )
-        )`,
-      params: [user.team_id, user.id, user.id, user.id],
-    };
-  }
-
-  if (isCompanyManager(user)) {
-    return {
-      where: `WHERE mt.partnership_id = ?
-        AND (
-          mt.created_by = ?
-          OR mt.employee_id IS NULL
-          OR EXISTS (
-            SELECT 1
-            FROM users company_employee
-            WHERE company_employee.id = mt.employee_id
-            AND company_employee.partnership_id = ?
-          )
-        )`,
-      params: [user.partnership_id, user.id, user.partnership_id],
-    };
-  }
-
-  return {
-    where: "WHERE mt.employee_id = ?",
-    params: [user.id],
-  };
-};
+const getThreadAccessWhere = () => ({
+  where: "WHERE (mt.created_by = ? OR mt.recipient_id = ?)",
+});
 
 const getThreadForAccess = async (threadId, user) => {
-  const access = getAccessClause(user);
+  const access = getThreadAccessWhere();
   const [rows] = await pool.query(
     `SELECT mt.*
      FROM message_threads mt
      ${access.where}
      AND mt.id = ?
      LIMIT 1`,
-    [...access.params, threadId]
+    [user.id, user.id, threadId]
   );
 
   return rows[0] || null;
 };
 
+const normalizeContacts = (contacts) => ({
+  quick_actions: [],
+  users: contacts.users.map((contact) => ({
+    id: contact.id,
+    full_name: contact.full_name,
+    email: contact.email,
+    role: contact.role,
+    team_id: contact.team_id,
+    partnership_id: contact.partnership_id,
+    title: contact.title,
+    hbt_team_name: contact.hbt_team_name,
+    company_name: contact.company_name,
+    partnership_slug: contact.partnership_slug,
+    is_online: Number(contact.is_online_now) === 1,
+    status_label: Number(contact.is_online_now) === 1 ? "Online" : "Offline",
+    last_seen_at: contact.last_seen_at,
+  })),
+});
+
 const getContacts = async (req, res) => {
   try {
     const user = req.user;
-    const contacts = { quick_actions: [], users: [] };
+    const contacts = { users: [] };
 
     if (user.role === "employee") {
-      if (!user.partnership_id) {
-        return res.json({
-          quick_actions: [{ type: "admin", label: "Contact Admin Support", description: "Ask HomeBoost admin for help." }],
-          users: [],
-        });
-      }
+      if (!user.partnership_id) return res.json(normalizeContacts(contacts));
 
       const partnership = await getCompanyPartnership(user.partnership_id);
+      if (!partnership) return res.json(normalizeContacts(contacts));
 
-      contacts.quick_actions.push({
-        type: "hbt_team",
-        label: "Contact My HBT Team",
-        description: `Send a message to ${partnership?.hbt_team_name || "your HBT team"}.`,
-        partnership_id: user.partnership_id,
-        hbt_team_id: partnership?.team_id || null,
-      });
-      contacts.quick_actions.push({ type: "admin", label: "Contact Admin Support", description: "Ask HomeBoost admin for help." });
+      const [users] = await pool.query(
+        `SELECT u.id, u.full_name, u.email, u.role, u.team_id, u.partnership_id, u.last_seen_at,
+          ${isRecentlyOnlineSql} AS is_online_now,
+          tm.title,
+          e.name AS company_name,
+          p.slug AS partnership_slug
+         FROM users u
+         LEFT JOIN team_members tm ON tm.user_id = u.id
+         LEFT JOIN partnerships p ON u.partnership_id = p.id
+         LEFT JOIN employers e ON p.employer_id = e.id
+         WHERE u.is_active = 1
+         AND u.id != ?
+         AND (
+           (u.team_id = ? AND u.role IN ('hbt_admin', 'hbt_member'))
+           OR (u.partnership_id = ? AND u.role IN ('company_admin', 'company'))
+           OR u.role IN ('admin', 'super_admin')
+         )
+         ORDER BY is_online_now DESC, FIELD(u.role, 'hbt_member', 'hbt_admin', 'company_admin', 'company', 'admin', 'super_admin'), u.full_name ASC`,
+        [user.id, partnership.team_id, user.partnership_id]
+      );
 
-      if (partnership?.team_id) {
-        const [users] = await pool.query(
-          `SELECT u.id, u.full_name, u.email, u.role, u.team_id, u.partnership_id, u.last_seen_at,
-            ${isRecentlyOnlineSql} AS is_online_now,
-            tm.title,
-            e.name AS company_name,
-            p.slug AS partnership_slug
-           FROM users u
-           LEFT JOIN team_members tm ON tm.user_id = u.id
-           LEFT JOIN partnerships p ON u.partnership_id = p.id
-           LEFT JOIN employers e ON p.employer_id = e.id
-           WHERE u.is_active = 1
-           AND (
-             (u.team_id = ? AND u.role IN ('hbt_admin', 'hbt_member'))
-             OR u.role IN ('admin', 'super_admin')
-           )
-           ORDER BY is_online_now DESC, FIELD(u.role, 'hbt_member', 'hbt_admin', 'admin', 'super_admin'), u.full_name ASC`,
-          [partnership.team_id]
-        );
-        contacts.users = users;
-      }
-
+      contacts.users = users;
       return res.json(normalizeContacts(contacts));
     }
 
     if (isHbtUser(user)) {
-      contacts.quick_actions.push({ type: "hbt_team", label: "Message My HBT Team", description: "Start a team conversation.", hbt_team_id: user.team_id });
-      contacts.quick_actions.push({ type: "admin", label: "Contact Admin Support", description: "Ask HomeBoost admin for help." });
-
       const [users] = await pool.query(
         `SELECT u.id, u.full_name, u.email, u.role, u.team_id, u.partnership_id, u.last_seen_at,
           ${isRecentlyOnlineSql} AS is_online_now,
@@ -245,24 +196,14 @@ const getContacts = async (req, res) => {
          ORDER BY is_online_now DESC, FIELD(u.role, 'employee', 'company_admin', 'company', 'hbt_member', 'hbt_admin', 'admin', 'super_admin'), u.full_name ASC`,
         [user.id, user.team_id, user.team_id]
       );
+
       contacts.users = users;
       return res.json(normalizeContacts(contacts));
     }
 
     if (isCompanyManager(user)) {
       const partnership = await getCompanyPartnership(user.partnership_id);
-      if (!partnership) {
-        return res.status(400).json({ status: "error", message: "Company account is not linked to a valid partnership" });
-      }
-
-      contacts.quick_actions.push({
-        type: "hbt_team",
-        label: "Message Assigned HBT Team",
-        description: `Send a message to ${partnership.hbt_team_name || "the assigned HBT team"}.`,
-        partnership_id: partnership.id,
-        hbt_team_id: partnership.team_id,
-      });
-      contacts.quick_actions.push({ type: "admin", label: "Contact Admin Support", description: "Ask HomeBoost admin for help.", partnership_id: partnership.id });
+      if (!partnership) return res.json(normalizeContacts(contacts));
 
       const [users] = await pool.query(
         `SELECT u.id, u.full_name, u.email, u.role, u.team_id, u.partnership_id, u.last_seen_at,
@@ -284,13 +225,12 @@ const getContacts = async (req, res) => {
          ORDER BY is_online_now DESC, FIELD(u.role, 'hbt_admin', 'hbt_member', 'employee', 'admin', 'super_admin'), u.full_name ASC`,
         [user.id, partnership.team_id, user.partnership_id]
       );
+
       contacts.users = users;
       return res.json(normalizeContacts(contacts));
     }
 
     if (isAdmin(user)) {
-      contacts.quick_actions.push({ type: "admin", label: "Admin Support", description: "Internal admin communication." });
-
       const [users] = await pool.query(
         `SELECT u.id, u.full_name, u.email, u.role, u.team_id, u.partnership_id, u.last_seen_at,
           ${isRecentlyOnlineSql} AS is_online_now,
@@ -306,6 +246,7 @@ const getContacts = async (req, res) => {
          ORDER BY is_online_now DESC, u.role ASC, u.full_name ASC`,
         [user.id]
       );
+
       contacts.users = users;
       return res.json(normalizeContacts(contacts));
     }
@@ -316,34 +257,15 @@ const getContacts = async (req, res) => {
   }
 };
 
-const normalizeContacts = (contacts) => ({
-  quick_actions: contacts.quick_actions,
-  users: contacts.users.map((contact) => ({
-    id: contact.id,
-    full_name: contact.full_name,
-    email: contact.email,
-    role: contact.role,
-    team_id: contact.team_id,
-    partnership_id: contact.partnership_id,
-    title: contact.title,
-    hbt_team_name: contact.hbt_team_name,
-    company_name: contact.company_name,
-    partnership_slug: contact.partnership_slug,
-    is_online: Number(contact.is_online_now) === 1,
-    status_label: Number(contact.is_online_now) === 1 ? "Online" : "Offline",
-    last_seen_at: contact.last_seen_at,
-  })),
-});
-
 const getThreads = async (req, res) => {
   try {
     const user = req.user;
-    const access = getAccessClause(user);
+    const access = getThreadAccessWhere();
     const [threads] = await pool.query(
       `${threadSelectSql}
        ${access.where}
        ORDER BY COALESCE(last_message_at, mt.updated_at) DESC, mt.id DESC`,
-      [user.id, ...access.params]
+      [user.id, user.id, user.id]
     );
 
     return res.json(threads);
@@ -394,159 +316,136 @@ const getThreadDetails = async (req, res) => {
   }
 };
 
+const getRecipient = async (recipientId) => {
+  const [[recipient]] = await pool.query(
+    `SELECT id, full_name, email, role, team_id, partnership_id
+     FROM users
+     WHERE id = ? AND is_active = 1
+     LIMIT 1`,
+    [recipientId]
+  );
+
+  return recipient || null;
+};
+
+const canMessageRecipient = async (sender, recipient) => {
+  if (!recipient || Number(sender.id) === Number(recipient.id)) return { allowed: false, message: "Invalid recipient" };
+  if (isAdmin(sender) || isAdmin(recipient)) return { allowed: true };
+
+  if (sender.role === "employee") {
+    const partnership = await getCompanyPartnership(sender.partnership_id);
+    if (!partnership) return { allowed: false, message: "Employee is not linked to a partnership" };
+
+    if (isHbtUser(recipient) && Number(recipient.team_id) === Number(partnership.team_id)) return { allowed: true };
+    if (isCompanyManager(recipient) && Number(recipient.partnership_id) === Number(sender.partnership_id)) return { allowed: true };
+    return { allowed: false, message: "Recipient is not connected to your employer partnership" };
+  }
+
+  if (isCompanyManager(sender)) {
+    const partnership = await getCompanyPartnership(sender.partnership_id);
+    if (!partnership) return { allowed: false, message: "Company account is not linked to a partnership" };
+
+    if (recipient.role === "employee" && Number(recipient.partnership_id) === Number(sender.partnership_id)) return { allowed: true };
+    if (isHbtUser(recipient) && Number(recipient.team_id) === Number(partnership.team_id)) return { allowed: true };
+    return { allowed: false, message: "Recipient is not connected to your company partnership" };
+  }
+
+  if (isHbtUser(sender)) {
+    if (isHbtUser(recipient) && Number(recipient.team_id) === Number(sender.team_id)) return { allowed: true };
+
+    if (recipient.role === "employee") {
+      const partnership = await getCompanyPartnership(recipient.partnership_id);
+      if (partnership && Number(partnership.team_id) === Number(sender.team_id)) return { allowed: true };
+    }
+
+    if (isCompanyManager(recipient)) {
+      const partnership = await getCompanyPartnership(recipient.partnership_id);
+      if (partnership && Number(partnership.team_id) === Number(sender.team_id)) return { allowed: true };
+    }
+
+    return { allowed: false, message: "Recipient is not connected to your HBT team" };
+  }
+
+  return { allowed: false, message: "You are not allowed to message this recipient" };
+};
+
+const buildThreadMetadata = async (sender, recipient) => {
+  let employeeId = null;
+  let partnershipId = null;
+  let hbtTeamId = null;
+  let assignedMemberId = null;
+
+  if (sender.role === "employee") {
+    employeeId = sender.id;
+    partnershipId = sender.partnership_id;
+  }
+
+  if (recipient.role === "employee") {
+    employeeId = recipient.id;
+    partnershipId = recipient.partnership_id;
+  }
+
+  if (isCompanyManager(sender)) partnershipId = sender.partnership_id;
+  if (isCompanyManager(recipient)) partnershipId = recipient.partnership_id;
+
+  if (isHbtUser(sender)) {
+    hbtTeamId = sender.team_id;
+    assignedMemberId = sender.id;
+  }
+
+  if (isHbtUser(recipient)) {
+    hbtTeamId = recipient.team_id;
+    assignedMemberId = recipient.id;
+  }
+
+  if (!hbtTeamId && partnershipId) {
+    const partnership = await getCompanyPartnership(partnershipId);
+    hbtTeamId = partnership?.team_id || null;
+  }
+
+  if (isAdmin(sender) || isAdmin(recipient)) {
+    hbtTeamId = null;
+    assignedMemberId = isHbtUser(sender) ? sender.id : isHbtUser(recipient) ? recipient.id : null;
+  }
+
+  return { employeeId, partnershipId, hbtTeamId, assignedMemberId };
+};
+
 const createThread = async (req, res) => {
   const connection = await pool.getConnection();
 
   try {
     const user = req.user;
-    const { subject, message_body, recipient_id, employee_id, partnership_id, assigned_member_id, contact_type } = req.body;
+    const { subject, message_body, recipient_id } = req.body;
 
-    if (!subject || !message_body) {
-      return res.status(400).json({ status: "error", message: "Subject and message are required" });
+    if (!subject || !message_body || !recipient_id) {
+      return res.status(400).json({ status: "error", message: "Subject, message, and recipient are required for one-to-one conversations" });
     }
 
-    let finalEmployeeId = null;
-    let finalPartnershipId = null;
-    let finalTeamId = null;
-    let finalAssignedMemberId = assigned_member_id || null;
+    const recipient = await getRecipient(recipient_id);
+    const access = await canMessageRecipient(user, recipient);
 
-    if (user.role === "employee") {
-      finalEmployeeId = user.id;
-      finalPartnershipId = user.partnership_id;
-      const partnership = await getCompanyPartnership(finalPartnershipId);
-
-      if (!partnership) {
-        return res.status(400).json({ status: "error", message: "Employee is not connected to a valid partnership" });
-      }
-
-      finalTeamId = partnership.team_id;
-
-      if (contact_type === "admin") {
-        finalTeamId = null;
-        finalAssignedMemberId = null;
-      }
-    } else if (isCompanyManager(user)) {
-      finalPartnershipId = user.partnership_id;
-      const partnership = await getCompanyPartnership(finalPartnershipId);
-
-      if (!partnership) {
-        return res.status(400).json({ status: "error", message: "Company account is not linked to a valid partnership" });
-      }
-
-      finalTeamId = contact_type === "admin" ? null : partnership.team_id;
-    } else if (isHbtUser(user)) {
-      finalTeamId = contact_type === "admin" ? null : user.team_id;
-    } else if (isAdmin(user)) {
-      finalTeamId = null;
-    } else {
-      return res.status(403).json({ status: "error", message: "You are not allowed to create messages" });
+    if (!access.allowed) {
+      return res.status(403).json({ status: "error", message: access.message || "You cannot message this recipient" });
     }
 
-    const targetRecipientId = recipient_id || null;
-
-    if (targetRecipientId) {
-      const [[recipient]] = await connection.query(
-        `SELECT id, role, team_id, partnership_id
-         FROM users
-         WHERE id = ? AND is_active = 1
-         LIMIT 1`,
-        [targetRecipientId]
-      );
-
-      if (!recipient) {
-        return res.status(404).json({ status: "error", message: "Recipient not found" });
-      }
-
-      if (recipient.role === "employee") {
-        const [[employee]] = await connection.query(
-          `SELECT u.id, u.partnership_id, p.team_id
-           FROM users u
-           JOIN partnerships p ON u.partnership_id = p.id
-           WHERE u.id = ? AND u.role = 'employee'
-           LIMIT 1`,
-          [recipient.id]
-        );
-
-        if (!employee) {
-          return res.status(404).json({ status: "error", message: "Employee recipient not found" });
-        }
-
-        if (isCompanyManager(user) && Number(employee.partnership_id) !== Number(user.partnership_id)) {
-          return res.status(403).json({ status: "error", message: "Employee is not part of your company partnership" });
-        }
-
-        if (isHbtUser(user) && Number(employee.team_id) !== Number(user.team_id)) {
-          return res.status(403).json({ status: "error", message: "Employee is not assigned to your HBT team" });
-        }
-
-        finalEmployeeId = employee.id;
-        finalPartnershipId = employee.partnership_id;
-        finalTeamId = isAdmin(user) ? null : employee.team_id;
-      } else if (recipient.role === "hbt_admin" || recipient.role === "hbt_member") {
-        const expectedTeamId = user.role === "employee" || isCompanyManager(user)
-          ? (await getCompanyPartnership(finalPartnershipId))?.team_id
-          : user.team_id;
-
-        if (!isAdmin(user) && Number(recipient.team_id) !== Number(expectedTeamId)) {
-          return res.status(403).json({ status: "error", message: "HBT contact is not assigned to this partnership/team" });
-        }
-
-        finalAssignedMemberId = recipient.id;
-        finalTeamId = recipient.team_id;
-      } else if (recipient.role === "company_admin" || recipient.role === "company") {
-        const partnership = await getCompanyPartnership(recipient.partnership_id);
-
-        if (!partnership) {
-          return res.status(400).json({ status: "error", message: "Company recipient is not linked to a partnership" });
-        }
-
-        if (isHbtUser(user) && Number(partnership.team_id) !== Number(user.team_id)) {
-          return res.status(403).json({ status: "error", message: "Company is not assigned to your HBT team" });
-        }
-
-        finalEmployeeId = null;
-        finalPartnershipId = recipient.partnership_id;
-        finalTeamId = isAdmin(user) ? null : partnership.team_id;
-      } else if (recipient.role === "admin" || recipient.role === "super_admin") {
-        finalTeamId = null;
-        if (isCompanyManager(user)) finalPartnershipId = user.partnership_id;
-      } else {
-        return res.status(403).json({ status: "error", message: "Recipient role is not supported" });
-      }
-    }
-
-    if (!targetRecipientId && employee_id && isHbtUser(user)) {
-      const [[employee]] = await connection.query(
-        `SELECT u.id, u.partnership_id, p.team_id
-         FROM users u
-         JOIN partnerships p ON u.partnership_id = p.id
-         WHERE u.id = ? AND u.role = 'employee'
-         LIMIT 1`,
-        [employee_id]
-      );
-
-      if (!employee || Number(employee.team_id) !== Number(user.team_id)) {
-        return res.status(403).json({ status: "error", message: "Employee is not assigned to your HBT team" });
-      }
-
-      finalEmployeeId = employee.id;
-      finalPartnershipId = employee.partnership_id;
-      finalTeamId = employee.team_id;
-    }
-
-    if (!targetRecipientId && partnership_id && isAdmin(user)) {
-      finalPartnershipId = partnership_id;
-      const partnership = await getCompanyPartnership(partnership_id);
-      finalTeamId = partnership?.team_id || null;
-    }
+    const metadata = await buildThreadMetadata(user, recipient);
 
     await connection.beginTransaction();
 
     const [threadResult] = await connection.query(
       `INSERT INTO message_threads
-       (subject, employee_id, hbt_team_id, partnership_id, assigned_member_id, status, created_by)
-       VALUES (?, ?, ?, ?, ?, 'open', ?)`,
-      [subject.trim(), finalEmployeeId, finalTeamId, finalPartnershipId, finalAssignedMemberId || null, user.id]
+       (subject, employee_id, hbt_team_id, partnership_id, assigned_member_id, recipient_id, status, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
+      [
+        subject.trim(),
+        metadata.employeeId,
+        metadata.hbtTeamId,
+        metadata.partnershipId,
+        metadata.assignedMemberId,
+        recipient.id,
+        user.id,
+      ]
     );
 
     const threadId = threadResult.insertId;
@@ -613,10 +512,6 @@ const updateThreadStatus = async (req, res) => {
       return res.status(404).json({ status: "error", message: "Thread not found or access denied" });
     }
 
-    if (user.role === "employee") {
-      return res.status(403).json({ status: "error", message: "Employees cannot update conversation status" });
-    }
-
     await pool.query(`UPDATE message_threads SET status = ? WHERE id = ?`, [status, id]);
 
     return res.json({ status: "success", message: "Thread status updated successfully" });
@@ -630,22 +525,20 @@ const deleteMessage = async (req, res) => {
     const { messageId } = req.params;
     const user = req.user;
 
-    const [rows] = await pool.query(
-      `SELECT m.id, m.thread_id, m.sender_id, mt.employee_id, mt.hbt_team_id, mt.partnership_id, mt.assigned_member_id, mt.created_by
+    const [[message]] = await pool.query(
+      `SELECT m.id, m.thread_id, m.sender_id
        FROM messages m
-       JOIN message_threads mt ON m.thread_id = mt.id
        WHERE m.id = ?
        LIMIT 1`,
       [messageId]
     );
 
-    if (rows.length === 0) {
+    if (!message) {
       return res.status(404).json({ status: "error", message: "Message not found" });
     }
 
-    const message = rows[0];
     const thread = await getThreadForAccess(message.thread_id, user);
-    const canDelete = thread && (isAdmin(user) || Number(message.sender_id) === Number(user.id));
+    const canDelete = thread && (Number(message.sender_id) === Number(user.id) || isAdmin(user));
 
     if (!canDelete) {
       return res.status(403).json({ status: "error", message: "You cannot delete this message" });
@@ -672,10 +565,10 @@ const deleteThread = async (req, res) => {
       return res.status(404).json({ status: "error", message: "Thread not found or access denied" });
     }
 
-    const canDelete = isAdmin(user) || Number(thread.created_by) === Number(user.id) || (user.role === "employee" && Number(thread.employee_id) === Number(user.id));
+    const canDelete = Number(thread.created_by) === Number(user.id) || isAdmin(user);
 
     if (!canDelete) {
-      return res.status(403).json({ status: "error", message: "You cannot delete this conversation" });
+      return res.status(403).json({ status: "error", message: "Only the conversation creator can delete the full conversation" });
     }
 
     await connection.beginTransaction();
