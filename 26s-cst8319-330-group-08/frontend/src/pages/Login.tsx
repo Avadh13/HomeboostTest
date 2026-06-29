@@ -61,6 +61,11 @@ function Login() {
       return;
     }
 
+    if (role === "company_admin" || role === "company") {
+      navigate("/company/dashboard");
+      return;
+    }
+
     if (role === "employee") {
       navigate("/employee-portal");
       return;
@@ -128,9 +133,9 @@ function Login() {
         <div className="absolute bottom-10 left-10 right-10 rounded-[2rem] border border-white/15 bg-white/15 p-8 text-white backdrop-blur-xl">
           <p className="text-sm font-black uppercase tracking-[0.25em] text-violet-100">One login</p>
           <h2 className="mt-3 text-4xl font-black tracking-tight">Same door. Different dashboard.</h2>
-          <p className="mt-4 max-w-xl text-violet-50">Admins, HBT teams, advisors, and employees all start here. The system reads the role and sends each user to the right place.</p>
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            {["Admin", "HBT", "Employee"].map((item) => <div key={item} className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black backdrop-blur">{item}</div>)}
+          <p className="mt-4 max-w-xl text-violet-50">Admins, HBT teams, employer managers, advisors, and employees all start here. The system reads the role and sends each user to the right place.</p>
+          <div className="mt-6 grid gap-3 sm:grid-cols-4">
+            {["Admin", "HBT", "Employer", "Employee"].map((item) => <div key={item} className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black backdrop-blur">{item}</div>)}
           </div>
         </div>
       </section>
@@ -181,7 +186,7 @@ function Login() {
 
             <div className="mt-6 rounded-2xl border border-violet-100 bg-violet-50/80 p-4 text-sm text-slate-700">
               <p className="font-black text-violet-700">Need access?</p>
-              <p className="mt-2">Employees should start from their employer portal link. HBT team members should use the login provided by their HBT Admin.</p>
+              <p className="mt-2">Employees should start from their employer portal link. Employer managers and HBT team members should use the account provided by admin.</p>
             </div>
 
             <div className="mt-6 grid gap-3 text-center text-sm text-slate-600">
