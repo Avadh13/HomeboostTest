@@ -113,7 +113,8 @@ function HBTDashboard() {
 
   const cards = [
     { title: "Employer Partnerships", icon: "🏢", description: "View employer branded pages assigned to your Home Buying Team.", link: "/hbt/companies", accent: "from-blue-500 to-cyan-500" },
-    { title: "Employees", icon: "👥", description: "View employees, quiz activity, interest level, and engagement.", link: "/hbt/employees", accent: "from-indigo-500 to-purple-500" },
+    { title: "Employees", icon: "👥", description: "View employees, assign leads to team members, and track progress.", link: "/hbt/employees", accent: "from-indigo-500 to-purple-500" },
+    { title: "Messages", icon: "💬", description: "End-to-end communication with employees, company managers, HBT members, and admin support.", link: "/hbt/messages", accent: "from-violet-600 to-fuchsia-600" },
     { title: "Appointments", icon: "📆", description: "Review employee appointment requests and manage follow-up status.", link: "/hbt/appointments", accent: "from-green-500 to-emerald-600" },
     { title: "Availability", icon: "⏰", description: "Set advisor working hours and block off unavailable times.", link: "/hbt/availability", accent: "from-cyan-500 to-blue-600" },
     { title: "Notifications", icon: "🔔", description: "View appointment updates, meeting-link activity, and system messages.", link: "/notifications", accent: "from-blue-600 to-violet-600" },
@@ -134,10 +135,11 @@ function HBTDashboard() {
               <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-200">Home Buying Team Control Center</p>
               <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">HBT Dashboard</h1>
               <p className="mt-3 max-w-3xl text-sm leading-relaxed text-violet-100 md:text-base">
-                Welcome, <strong className="text-white">{user.full_name || "HBT Member"}</strong>. Manage partnerships, employees, appointments, availability, resources, events, and notifications from one command center.
+                Welcome, <strong className="text-white">{user.full_name || "HBT Member"}</strong>. Manage partnerships, employees, communication, appointments, availability, resources, events, and notifications from one command center.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Link to="/hbt/messages" className="rounded-full bg-white px-4 py-2 text-sm font-black text-violet-800 shadow-md transition hover:-translate-y-0.5 hover:bg-violet-50">Messages</Link>
               <Link to="/notifications" className="relative rounded-full bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-md transition hover:-translate-y-0.5 hover:bg-blue-700">
                 Notifications
                 {unreadCount > 0 && <span className="absolute -right-2 -top-2 rounded-full bg-red-600 px-2 py-0.5 text-xs font-black text-white">{unreadCount}</span>}
