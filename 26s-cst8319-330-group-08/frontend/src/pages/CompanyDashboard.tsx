@@ -53,7 +53,6 @@ function CompanyDashboard() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const token = localStorage.getItem("token");
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   const loadDashboard = async () => {
@@ -163,7 +162,9 @@ function CompanyDashboard() {
     return (
       <main className="theme-page min-h-screen">
         <Navbar />
-        <section className="mx-auto max-w-7xl px-4 py-8"><div className="premium-card p-8 text-center font-bold text-slate-500">Loading employer manager dashboard...</div></section>
+        <section className="mx-auto max-w-7xl px-4 py-8">
+          <div className="premium-card p-8 text-center font-bold text-slate-500">Loading employer manager dashboard...</div>
+        </section>
       </main>
     );
   }
@@ -172,7 +173,9 @@ function CompanyDashboard() {
     return (
       <main className="theme-page min-h-screen">
         <Navbar />
-        <section className="mx-auto max-w-7xl px-4 py-8"><div className="premium-card p-8 text-center text-slate-500">Employer dashboard is not available for this account.</div></section>
+        <section className="mx-auto max-w-7xl px-4 py-8">
+          <div className="premium-card p-8 text-center text-slate-500">Employer dashboard is not available for this account.</div>
+        </section>
       </main>
     );
   }
@@ -186,7 +189,9 @@ function CompanyDashboard() {
             <div>
               <p className="text-xs font-black uppercase tracking-[0.22em] text-white/75">Employer Manager</p>
               <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">{data.partnership.employer_name}</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/85 md:text-base">Manage approved employee access, review employee progress, and see partnership details connected to {data.partnership.hbt_name || "your Home Buying Team"}.</p>
+              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/85 md:text-base">
+                Manage approved employee access, review employee progress, and see partnership details connected to {data.partnership.hbt_name || "your Home Buying Team"}.
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <a href={`/${data.partnership.slug}`} target="_blank" rel="noreferrer" className="rounded-full bg-white px-4 py-2 text-sm font-black text-slate-950">View Portal</a>
@@ -210,7 +215,10 @@ function CompanyDashboard() {
             ["Quiz Progress", data.stats.quiz_submissions, "text-amber-700", "bg-amber-50"],
             ["Pending Appts", data.stats.pending_appointments, "text-slate-700", "bg-slate-100"],
           ].map(([label, value, tone, bg]) => (
-            <div key={String(label)} className="metric-card"><p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">{label}</p><h2 className={`mt-2 rounded-2xl px-3 py-2 text-3xl font-black ${tone} ${bg}`}>{value}</h2></div>
+            <div key={String(label)} className="metric-card">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">{label}</p>
+              <h2 className={`mt-2 rounded-2xl px-3 py-2 text-3xl font-black ${tone} ${bg}`}>{value}</h2>
+            </div>
           ))}
         </section>
 
@@ -225,15 +233,74 @@ function CompanyDashboard() {
           </div>
 
           <div className="premium-card overflow-hidden p-0">
-            <div className="border-b border-slate-100 p-4"><div className="mb-4"><p className="eyebrow">Employee invite list</p><h2 className="mt-1 text-2xl font-black text-slate-950">Approved access</h2></div><div className="grid gap-3 md:grid-cols-[1fr_180px]"><input className="form-field" placeholder="Search employee name or email..." value={search} onChange={(e) => setSearch(e.target.value)} /><select className="form-field" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="all">All status</option><option value="invited">Invited</option><option value="registered">Registered</option><option value="revoked">Revoked</option></select></div></div>
-            <div className="max-h-[460px] overflow-auto"><table className="w-full border-collapse text-sm"><thead><tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><th className="p-3">Employee</th><th className="p-3">Email</th><th className="p-3">Status</th><th className="p-3">Created</th></tr></thead><tbody>{filteredInvites.map((invite) => <tr key={invite.id} className="border-b last:border-0"><td className="p-3 font-black text-slate-950">{invite.full_name}</td><td className="p-3 text-slate-600">{invite.email}</td><td className="p-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${invite.status === "registered" ? "bg-emerald-100 text-emerald-700" : invite.status === "revoked" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{invite.status}</span></td><td className="p-3 text-slate-500">{invite.created_at ? new Date(invite.created_at).toLocaleDateString() : "-"}</td></tr>)}</tbody></table>{filteredInvites.length === 0 && <p className="p-6 text-center text-slate-500">No employee invites found.</p>}</div>
+            <div className="border-b border-slate-100 p-4">
+              <div className="mb-4"><p className="eyebrow">Employee invite list</p><h2 className="mt-1 text-2xl font-black text-slate-950">Approved access</h2></div>
+              <div className="grid gap-3 md:grid-cols-[1fr_180px]">
+                <input className="form-field" placeholder="Search employee name or email..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                <select className="form-field" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                  <option value="all">All status</option>
+                  <option value="invited">Invited</option>
+                  <option value="registered">Registered</option>
+                  <option value="revoked">Revoked</option>
+                </select>
+              </div>
+            </div>
+            <div className="max-h-[460px] overflow-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead><tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><th className="p-3">Employee</th><th className="p-3">Email</th><th className="p-3">Status</th><th className="p-3">Created</th></tr></thead>
+                <tbody>{filteredInvites.map((invite) => <tr key={invite.id} className="border-b last:border-0"><td className="p-3 font-black text-slate-950">{invite.full_name}</td><td className="p-3 text-slate-600">{invite.email}</td><td className="p-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${invite.status === "registered" ? "bg-emerald-100 text-emerald-700" : invite.status === "revoked" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{invite.status}</span></td><td className="p-3 text-slate-500">{invite.created_at ? new Date(invite.created_at).toLocaleDateString() : "-"}</td></tr>)}</tbody>
+              </table>
+              {filteredInvites.length === 0 && <p className="p-6 text-center text-slate-500">No employee invites found.</p>}
+            </div>
+          </div>
+        </section>
+
+        <section className="premium-card overflow-hidden p-0">
+          <div className="border-b border-slate-100 p-4">
+            <p className="eyebrow">Enrollment uploads</p>
+            <h2 className="mt-1 text-2xl font-black text-slate-950">CSV invite batches</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th className="p-3">Batch</th>
+                  <th className="p-3">File</th>
+                  <th className="p-3">Approved</th>
+                  <th className="p-3">Skipped</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3">Created</th>
+                  <th className="p-3">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.batches.map((batch) => (
+                  <tr key={batch.id} className="border-b last:border-0">
+                    <td className="p-3 font-black">#{batch.id}</td>
+                    <td className="p-3">{batch.original_filename || "CSV Upload"}</td>
+                    <td className="p-3 font-bold text-emerald-700">{batch.created_count}</td>
+                    <td className="p-3 font-bold text-amber-700">{batch.skipped_count}</td>
+                    <td className="p-3"><span className={`rounded-full px-3 py-1 text-xs font-black ${batch.status === "revoked" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>{batch.status}</span></td>
+                    <td className="p-3 text-slate-500">{batch.created_at ? new Date(batch.created_at).toLocaleDateString() : "-"}</td>
+                    <td className="p-3">{batch.status === "active" ? <button onClick={() => revokeBatch(batch.id)} className="rounded-full bg-red-600 px-4 py-2 text-xs font-black text-white hover:bg-red-700">Revoke</button> : <span className="text-xs text-slate-400">Revoked</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {data.batches.length === 0 && <p className="p-6 text-center text-slate-500">No CSV upload batches yet.</p>}
           </div>
         </section>
 
         <section className="grid gap-5 xl:grid-cols-2">
-          <div className="premium-card overflow-hidden p-0"><div className="border-b border-slate-100 p-4"><p className="eyebrow">Employee process</p><h2 className="mt-1 text-2xl font-black text-slate-950">Quiz submissions</h2></div><div className="max-h-[420px] overflow-auto"><table className="w-full border-collapse text-sm"><thead><tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><th className="p-3">Employee</th><th className="p-3">Quiz</th><th className="p-3">Progress</th><th className="p-3">Submitted</th></tr></thead><tbody>{data.submissions.map((submission) => <tr key={submission.id} className="border-b last:border-0"><td className="p-3"><p className="font-black">{submission.employee_name}</p><p className="text-xs text-slate-500">{submission.employee_email}</p></td><td className="p-3">{submission.quiz_title}</td><td className="p-3"><span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700">{submission.follow_up_status}</span></td><td className="p-3 text-slate-500">{submission.submitted_at ? new Date(submission.submitted_at).toLocaleDateString() : "-"}</td></tr>)}</tbody></table>{data.submissions.length === 0 && <p className="p-6 text-center text-slate-500">No quiz submissions yet.</p>}</div></div>
+          <div className="premium-card overflow-hidden p-0">
+            <div className="border-b border-slate-100 p-4"><p className="eyebrow">Employee process</p><h2 className="mt-1 text-2xl font-black text-slate-950">Quiz submissions</h2></div>
+            <div className="max-h-[420px] overflow-auto"><table className="w-full border-collapse text-sm"><thead><tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><th className="p-3">Employee</th><th className="p-3">Quiz</th><th className="p-3">Progress</th><th className="p-3">Submitted</th></tr></thead><tbody>{data.submissions.map((submission) => <tr key={submission.id} className="border-b last:border-0"><td className="p-3"><p className="font-black">{submission.employee_name}</p><p className="text-xs text-slate-500">{submission.employee_email}</p></td><td className="p-3">{submission.quiz_title}</td><td className="p-3"><span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700">{submission.follow_up_status}</span></td><td className="p-3 text-slate-500">{submission.submitted_at ? new Date(submission.submitted_at).toLocaleDateString() : "-"}</td></tr>)}</tbody></table>{data.submissions.length === 0 && <p className="p-6 text-center text-slate-500">No quiz submissions yet.</p>}</div>
+          </div>
 
-          <div className="premium-card overflow-hidden p-0"><div className="border-b border-slate-100 p-4"><p className="eyebrow">Appointments</p><h2 className="mt-1 text-2xl font-black text-slate-950">Employee meetings</h2></div><div className="max-h-[420px] overflow-auto"><table className="w-full border-collapse text-sm"><thead><tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><th className="p-3">Employee</th><th className="p-3">Topic</th><th className="p-3">Advisor</th><th className="p-3">Status</th></tr></thead><tbody>{data.appointments.map((appointment) => <tr key={appointment.id} className="border-b last:border-0"><td className="p-3"><p className="font-black">{appointment.employee_name}</p><p className="text-xs text-slate-500">{appointment.employee_email}</p></td><td className="p-3">{appointment.topic}</td><td className="p-3">{appointment.team_member_name || "-"}</td><td className="p-3"><span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700">{appointment.status}</span></td></tr>)}</tbody></table>{data.appointments.length === 0 && <p className="p-6 text-center text-slate-500">No appointments yet.</p>}</div></div>
+          <div className="premium-card overflow-hidden p-0">
+            <div className="border-b border-slate-100 p-4"><p className="eyebrow">Appointments</p><h2 className="mt-1 text-2xl font-black text-slate-950">Employee meetings</h2></div>
+            <div className="max-h-[420px] overflow-auto"><table className="w-full border-collapse text-sm"><thead><tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><th className="p-3">Employee</th><th className="p-3">Topic</th><th className="p-3">Advisor</th><th className="p-3">Status</th></tr></thead><tbody>{data.appointments.map((appointment) => <tr key={appointment.id} className="border-b last:border-0"><td className="p-3"><p className="font-black">{appointment.employee_name}</p><p className="text-xs text-slate-500">{appointment.employee_email}</p></td><td className="p-3">{appointment.topic}</td><td className="p-3">{appointment.team_member_name || "-"}</td><td className="p-3"><span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700">{appointment.status}</span></td></tr>)}</tbody></table>{data.appointments.length === 0 && <p className="p-6 text-center text-slate-500">No appointments yet.</p>}</div>
+          </div>
         </section>
 
         <section className="premium-card">
