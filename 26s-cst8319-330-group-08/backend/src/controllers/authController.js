@@ -6,6 +6,7 @@ const getRedirectPath = (role) => {
   if (role === "admin" || role === "super_admin") return "/admin";
   if (role === "hbt_admin") return "/hbt/dashboard";
   if (role === "hbt_member") return "/hbt/member-dashboard";
+  if (role === "company_admin" || role === "company") return "/company/dashboard";
   return "/employee-portal";
 };
 
@@ -154,21 +155,14 @@ exports.login = async (req, res) => {
       [cleanEmail]
     );
 
-    if (users.length === 0) {
-      return res.status(401).json({ status: "error", message: "Invalid email or password" });
-    }
+    if (users.length === 0) return res.status(401).json({ status: "error", message: "Invalid email or password" });
 
     const user = users[0];
 
-    if (Number(user.is_active) !== 1) {
-      return res.status(403).json({ status: "error", message: "Account is disabled" });
-    }
+    if (Number(user.is_active) !== 1) return res.status(403).json({ status: "error", message: "Account is disabled" });
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordCorrect) {
-      return res.status(401).json({ status: "error", message: "Invalid email or password" });
-    }
+    if (!isPasswordCorrect) return res.status(401).json({ status: "error", message: "Invalid email or password" });
 
     const token = signAccessToken(user);
     const redirectTo = getRedirectPath(user.role);
