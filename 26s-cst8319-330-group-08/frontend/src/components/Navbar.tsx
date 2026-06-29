@@ -8,6 +8,7 @@ type User = {
   role: string;
   team_id?: number | null;
   partnership_id?: number | null;
+  photo_url?: string | null;
 };
 
 type NavLinkItem = {
@@ -15,6 +16,8 @@ type NavLinkItem = {
   label: string;
   shortLabel?: string;
 };
+
+const initials = (name?: string) => (name || "User").trim().charAt(0).toUpperCase() || "U";
 
 function Navbar() {
   const [open, setOpen] = useState(false);
@@ -54,6 +57,7 @@ function Navbar() {
     { to: "/employee/messages", label: "Messages" },
     { to: "/employee/appointments", label: "Appointments", shortLabel: "Appts" },
     { to: "/notifications", label: "Notifications", shortLabel: "Alerts" },
+    { to: "/profile", label: "Profile" },
   ];
 
   const companyLinks: NavLinkItem[] = [
@@ -61,6 +65,7 @@ function Navbar() {
     { to: "/company/dashboard", label: "Employees" },
     { to: "/company/messages", label: "Messages" },
     { to: "/notifications", label: "Notifications", shortLabel: "Alerts" },
+    { to: "/profile", label: "Profile" },
   ];
 
   const hbtAdminLinks: NavLinkItem[] = [
@@ -69,6 +74,7 @@ function Navbar() {
     { to: "/hbt/employees", label: "Employees" },
     { to: "/hbt/messages", label: "Messages" },
     { to: "/notifications", label: "Notifications", shortLabel: "Alerts" },
+    { to: "/profile", label: "Profile" },
   ];
 
   const hbtMemberLinks: NavLinkItem[] = [
@@ -77,12 +83,14 @@ function Navbar() {
     { to: "/notifications", label: "Notifications", shortLabel: "Alerts" },
     { to: "/hbt/appointments", label: "Appointments", shortLabel: "Appts" },
     { to: "/hbt/availability", label: "Availability", shortLabel: "Hours" },
+    { to: "/profile", label: "Profile" },
   ];
 
   const adminLinks: NavLinkItem[] = [
     { to: "/admin", label: "Admin" },
     { to: "/admin/messages", label: "Messages" },
-    { to: "/notifications", label: "Notifications", shortLabel: "Alerts" },
+    { to: "/admin/notifications", label: "Notifications", shortLabel: "Alerts" },
+    { to: "/admin/profile", label: "Profile" },
     { to: "/admin/users", label: "Users" },
     { to: "/admin/hbts", label: "HBTs" },
   ];
@@ -121,12 +129,7 @@ function Navbar() {
 
         <div className="hide-scrollbar hidden max-w-[46vw] items-center gap-1 overflow-x-auto rounded-full border border-slate-200 bg-white/70 p-1 text-xs font-bold text-slate-700 shadow-sm lg:flex xl:max-w-none xl:text-sm">
           {links.map((link) => (
-            <Link
-              key={`${link.to}-${link.label}`}
-              to={link.to}
-              title={link.label}
-              className={`whitespace-nowrap rounded-full px-3 py-2 transition xl:px-4 ${isActive(link.to) ? "bg-blue-50 text-blue-700 shadow-sm" : "hover:bg-slate-50 hover:text-blue-700"}`}
-            >
+            <Link key={`${link.to}-${link.label}`} to={link.to} title={link.label} className={`whitespace-nowrap rounded-full px-3 py-2 transition xl:px-4 ${isActive(link.to) ? "bg-blue-50 text-blue-700 shadow-sm" : "hover:bg-slate-50 hover:text-blue-700"}`}>
               <span className="xl:hidden">{link.shortLabel || link.label}</span>
               <span className="hidden xl:inline">{link.label}</span>
             </Link>
@@ -141,10 +144,15 @@ function Navbar() {
             </>
           ) : (
             <>
-              <div className="max-w-[170px] rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-right shadow-sm xl:max-w-[220px] xl:px-4">
-                <p className="truncate text-sm font-black text-slate-900">{user?.full_name}</p>
-                <p className="truncate text-[11px] font-bold uppercase tracking-wide text-slate-500">{user?.role?.replace("_", " ")}</p>
-              </div>
+              <Link to={user?.role === "admin" || user?.role === "super_admin" ? "/admin/profile" : "/profile"} className="flex max-w-[210px] items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-right shadow-sm transition hover:border-blue-200 hover:bg-blue-50 xl:max-w-[260px] xl:px-4">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-sm font-black text-blue-700 ring-1 ring-blue-200">
+                  {user?.photo_url ? <img src={user.photo_url} alt={user.full_name} className="h-full w-full object-cover" /> : initials(user?.full_name)}
+                </span>
+                <span className="min-w-0">
+                  <p className="truncate text-sm font-black text-slate-900">{user?.full_name}</p>
+                  <p className="truncate text-[11px] font-bold uppercase tracking-wide text-slate-500">{user?.role?.replace("_", " ")}</p>
+                </span>
+              </Link>
               <button onClick={handleLogout} className="btn-danger px-4 py-2.5 text-sm xl:px-5">Logout</button>
             </>
           )}
