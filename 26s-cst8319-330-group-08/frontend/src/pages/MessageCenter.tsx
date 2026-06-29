@@ -47,7 +47,10 @@ type ContactUser = {
   hbt_team_name?: string | null;
   partnership_slug?: string | null;
   title?: string | null;
+  photo_url?: string | null;
   is_online?: boolean;
+  status_label?: string | null;
+  last_seen_at?: string | null;
 };
 
 type CurrentUser = {
@@ -58,9 +61,15 @@ type CurrentUser = {
 };
 
 type PersonPreview = {
+  id?: number | null;
   name: string;
   email?: string | null;
   role?: string | null;
+  company_name?: string | null;
+  photo_url?: string | null;
+  is_online?: boolean;
+  status_label?: string | null;
+  last_seen_at?: string | null;
 };
 
 const readUser = (): CurrentUser => {
@@ -85,7 +94,7 @@ const formatTime = (value?: string | null) => {
 };
 
 const formatDate = (value?: string | null) => {
-  if (!value) return "No date";
+  if (!value) return "";
   return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 };
 
@@ -98,6 +107,12 @@ const formatFullDate = (value?: string | null) => {
     hour: "numeric",
     minute: "2-digit",
   });
+};
+
+const getLastSeenLabel = (person: PersonPreview) => {
+  if (person.is_online) return "Online";
+  if (!person.last_seen_at) return "Offline";
+  return `Last seen ${formatFullDate(person.last_seen_at)}`;
 };
 
 const getRoleMeta = (role?: string) => {
@@ -140,6 +155,29 @@ const getRoleMeta = (role?: string) => {
   };
 };
 
+type AvatarProps = {
+  person: PersonPreview;
+  size?: "sm" | "md" | "lg";
+  showStatus?: boolean;
+};
+
+function ProfileAvatar({ person, size = "md", showStatus = true }: AvatarProps) {
+  const sizeClass = size === "lg" ? "h-14 w-14 text-base" : size === "sm" ? "h-10 w-10 text-xs" : "h-12 w-12 text-sm";
+
+  return (
+    <div className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 font-black text-white shadow-md`}>
+      {person.photo_url ? (
+        <img src={person.photo_url} alt={person.name} className="h-full w-full object-cover" />
+      ) : (
+        <span>{initials(person.name)}</span>
+      )}
+      {showStatus && (
+        <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white ${person.is_online ? "bg-emerald-500" : "bg-slate-400"}`} />
+      )}
+    </div>
+  );
+}
+
 function MessageCenter() {
   const toast = useToast();
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -160,19 +198,40 @@ function MessageCenter() {
   const isAdmin = user.role === "admin" || user.role === "super_admin";
   const authHeaders = useMemo<Record<string, string>>(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
+  const contactById = useMemo(() => {
+    const map = new Map<number, ContactUser>();
+    contacts.forEach((contact) => map.set(Number(contact.id), contact));
+    return map;
+  }, [contacts]);
+
   const getOtherPerson = (thread: Thread): PersonPreview => {
+    const otherId = Number(thread.created_by) === Number(user.id) ? thread.recipient_id : thread.created_by;
+    const contact = otherId ? contactById.get(Number(otherId)) : undefined;
+
     if (Number(thread.created_by) === Number(user.id)) {
       return {
-        name: thread.recipient_name || "Recipient",
-        email: thread.recipient_email,
-        role: thread.recipient_role,
+        id: thread.recipient_id,
+        name: contact?.full_name || thread.recipient_name || "Recipient",
+        email: contact?.email || thread.recipient_email,
+        role: contact?.role || thread.recipient_role,
+        company_name: contact?.company_name || thread.company_name,
+        photo_url: contact?.photo_url || null,
+        is_online: Boolean(contact?.is_online),
+        status_label: contact?.status_label,
+        last_seen_at: contact?.last_seen_at,
       };
     }
 
     return {
-      name: thread.created_by_name || "Sender",
-      email: thread.created_by_email,
-      role: thread.created_by_role,
+      id: thread.created_by,
+      name: contact?.full_name || thread.created_by_name || "Sender",
+      email: contact?.email || thread.created_by_email,
+      role: contact?.role || thread.created_by_role,
+      company_name: contact?.company_name || thread.company_name,
+      photo_url: contact?.photo_url || null,
+      is_online: Boolean(contact?.is_online),
+      status_label: contact?.status_label,
+      last_seen_at: contact?.last_seen_at,
     };
   };
 
@@ -185,16 +244,29 @@ function MessageCenter() {
       const other = getOtherPerson(thread);
       return (
         !search ||
-        [thread.subject, other.name, other.email, thread.company_name, thread.hbt_team_name, thread.last_message]
+        [thread.subject, other.name, other.email, other.company_name, thread.hbt_team_name, thread.last_message]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
           .includes(search)
       );
     });
-  }, [threads, searchText, user.id]);
+  }, [threads, searchText, user.id, contactById]);
 
   const unreadTotal = threads.reduce((sum, thread) => sum + Number(thread.unread_count || 0), 0);
+
+  const updatePresence = async () => {
+    if (!token) return;
+
+    try {
+      await fetch(`${API_BASE_URL}/messages/presence`, {
+        method: "POST",
+        headers: authHeaders,
+      });
+    } catch {
+      // Presence should never block the message UI.
+    }
+  };
 
   const loadThreads = async () => {
     try {
@@ -246,8 +318,20 @@ function MessageCenter() {
   };
 
   useEffect(() => {
+    updatePresence();
     loadThreads();
     loadContacts();
+
+    const presenceTimer = window.setInterval(updatePresence, 60_000);
+    const refreshTimer = window.setInterval(() => {
+      loadThreads();
+      loadContacts();
+    }, 90_000);
+
+    return () => {
+      window.clearInterval(presenceTimer);
+      window.clearInterval(refreshTimer);
+    };
   }, []);
 
   const createThread = async (event: FormEvent) => {
@@ -373,28 +457,28 @@ function MessageCenter() {
     <main className="min-h-screen bg-[#e8eef7] text-slate-950">
       <Navbar />
 
-      <section className="mx-auto flex h-[calc(100vh-76px)] max-w-7xl overflow-hidden border-x border-white/70 bg-white shadow-2xl shadow-slate-300/60">
+      <section className="mx-auto flex h-[calc(100dvh-76px)] max-w-7xl overflow-hidden border-x border-white/70 bg-white shadow-2xl shadow-slate-300/60">
         <aside className={`${selected ? "hidden md:flex" : "flex"} w-full flex-col border-r border-slate-200 bg-white md:w-[390px]`}>
           <div className="border-b border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <Link to={meta.homePath} className="text-xs font-black text-blue-600 hover:text-blue-800">← Dashboard</Link>
                 <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">{meta.title}</h1>
-                <p className="text-xs font-semibold text-slate-500">{meta.subtitle}</p>
+                <p className="truncate text-xs font-semibold text-slate-500">{meta.subtitle}</p>
               </div>
               <button
                 onClick={() => {
                   setSelected(null);
                   setShowNewChat(true);
                 }}
-                className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-2xl font-black text-white shadow-lg shadow-blue-500/30 transition hover:-translate-y-0.5 hover:bg-blue-700"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-2xl font-black text-white shadow-lg shadow-blue-500/30 transition hover:-translate-y-0.5 hover:bg-blue-700"
                 title="New chat"
               >
                 +
               </button>
             </div>
 
-            <div className="mt-4 flex items-center gap-2 rounded-full bg-slate-100 px-4 py-3">
+            <div className="mt-4 flex items-center gap-2 rounded-full bg-slate-100 px-4 py-3 ring-1 ring-slate-200">
               <span className="text-slate-400">⌕</span>
               <input
                 className="w-full bg-transparent text-sm font-semibold outline-none placeholder:text-slate-400"
@@ -421,24 +505,13 @@ function MessageCenter() {
                 <option value="">Choose one person...</option>
                 {contacts.map((contact) => (
                   <option key={contact.id} value={contact.id}>
-                    {contact.full_name} — {contact.title || roleLabel(contact.role)}{contact.company_name ? ` (${contact.company_name})` : ""}
+                    {contact.full_name} — {contact.title || roleLabel(contact.role)}{contact.company_name ? ` (${contact.company_name})` : ""}{contact.is_online ? " • Online" : " • Offline"}
                   </option>
                 ))}
               </select>
 
-              <input
-                className="form-field mt-3 bg-white"
-                placeholder="Subject optional"
-                value={subject}
-                onChange={(event) => setSubject(event.target.value)}
-              />
-
-              <textarea
-                className="form-field mt-3 min-h-[100px] bg-white"
-                placeholder="Write your first message..."
-                value={messageBody}
-                onChange={(event) => setMessageBody(event.target.value)}
-              />
+              <input className="form-field mt-3 bg-white" placeholder="Subject optional" value={subject} onChange={(event) => setSubject(event.target.value)} />
+              <textarea className="form-field mt-3 min-h-[100px] bg-white" placeholder="Write your first message..." value={messageBody} onChange={(event) => setMessageBody(event.target.value)} />
 
               <button disabled={saving} className="mt-3 w-full rounded-full bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-md shadow-blue-500/25 transition hover:bg-blue-700 disabled:opacity-60">
                 {saving ? "Sending..." : "Send Message"}
@@ -472,23 +545,19 @@ function MessageCenter() {
                 const active = selected?.thread.id === thread.id;
 
                 return (
-                  <button
-                    key={thread.id}
-                    onClick={() => loadThreadDetails(thread.id)}
-                    className={`flex w-full gap-3 border-b border-slate-100 p-4 text-left transition ${active ? "bg-blue-50" : "bg-white hover:bg-slate-50"}`}
-                  >
-                    <div className="relative flex h-13 w-13 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-violet-600 text-sm font-black text-white shadow-md">
-                      {initials(other.name)}
-                      {Number(thread.unread_count || 0) > 0 && <span className="absolute -right-1 -top-1 h-4 w-4 rounded-full border-2 border-white bg-red-500" />}
-                    </div>
-
+                  <button key={thread.id} onClick={() => loadThreadDetails(thread.id)} className={`flex w-full gap-3 border-b border-slate-100 p-4 text-left transition ${active ? "bg-blue-50" : "bg-white hover:bg-slate-50"}`}>
+                    <ProfileAvatar person={other} size="md" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <p className="truncate font-black text-slate-950">{other.name}</p>
                         <span className="shrink-0 text-[11px] font-bold text-slate-400">{formatDate(thread.last_message_at)}</span>
                       </div>
-                      <p className="truncate text-xs font-semibold capitalize text-blue-600">{roleLabel(other.role)}</p>
-                      <p className="mt-1 truncate text-sm text-slate-500">{thread.last_message || thread.subject}</p>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <span className="truncate text-xs font-semibold capitalize text-blue-600">{roleLabel(other.role)}</span>
+                        <span className={`h-1.5 w-1.5 rounded-full ${other.is_online ? "bg-emerald-500" : "bg-slate-400"}`} />
+                        <span className={`text-[11px] font-bold ${other.is_online ? "text-emerald-600" : "text-slate-400"}`}>{other.is_online ? "Online" : "Offline"}</span>
+                      </div>
+                      <p className={`mt-1 truncate text-sm ${Number(thread.unread_count || 0) > 0 ? "font-black text-slate-900" : "text-slate-500"}`}>{thread.last_message || thread.subject}</p>
                     </div>
                   </button>
                 );
@@ -510,31 +579,25 @@ function MessageCenter() {
               <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <div className="flex min-w-0 items-center gap-3">
                   <button onClick={() => setSelected(null)} className="rounded-full p-2 text-xl font-black text-slate-500 hover:bg-slate-100 md:hidden">‹</button>
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-violet-600 text-sm font-black text-white">
-                    {initials(selectedOther.name)}
-                  </div>
+                  <ProfileAvatar person={selectedOther} size="lg" />
                   <div className="min-w-0">
                     <h2 className="truncate text-base font-black text-slate-950 md:text-lg">{selectedOther.name}</h2>
                     <p className="truncate text-xs font-bold capitalize text-slate-500">{roleLabel(selectedOther.role)}{selected.thread.company_name ? ` · ${selected.thread.company_name}` : ""}</p>
+                    <p className={`text-[11px] font-black ${selectedOther.is_online ? "text-emerald-600" : "text-slate-400"}`}>{getLastSeenLabel(selectedOther)}</p>
                   </div>
                 </div>
-
                 <div className="flex items-center gap-2">
-                  <button onClick={loadThreads} className="hidden rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-700 hover:bg-slate-200 md:inline-flex">Refresh</button>
+                  <button onClick={() => { loadThreads(); loadContacts(); }} className="hidden rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-700 hover:bg-slate-200 md:inline-flex">Refresh</button>
                   <button onClick={() => deleteThread(selected.thread.id)} className="rounded-full bg-red-50 px-4 py-2 text-xs font-black text-red-600 hover:bg-red-100">Delete</button>
                 </div>
               </div>
 
               <div className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_32%),linear-gradient(135deg,#eef5ff_0%,#f8fafc_42%,#eef2ff_100%)] px-4 py-5 md:px-8">
                 <div className="mx-auto max-w-3xl space-y-4">
-                  <div className="mx-auto w-fit rounded-full bg-white/80 px-4 py-1.5 text-xs font-bold text-slate-500 shadow-sm ring-1 ring-slate-200">
-                    {selected.thread.subject}
-                  </div>
-
+                  <div className="mx-auto w-fit rounded-full bg-white/80 px-4 py-1.5 text-xs font-bold text-slate-500 shadow-sm ring-1 ring-slate-200">{selected.thread.subject}</div>
                   {selected.messages.map((message) => {
                     const isMine = Number(message.sender_id) === Number(user.id);
                     const canDelete = isMine || isAdmin;
-
                     return (
                       <div key={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                         <div className={`group max-w-[82%] md:max-w-[68%] ${isMine ? "items-end" : "items-start"}`}>
@@ -545,14 +608,9 @@ function MessageCenter() {
                               {isMine && <span>✓✓</span>}
                             </div>
                           </div>
-
                           <div className={`mt-1 flex ${isMine ? "justify-end" : "justify-start"}`}>
                             <span className="text-[11px] font-semibold text-slate-400">{formatFullDate(message.created_at)}</span>
-                            {canDelete && (
-                              <button onClick={() => deleteMessage(message.id)} className="ml-2 text-[11px] font-black text-red-500 opacity-0 transition group-hover:opacity-100">
-                                Delete
-                              </button>
-                            )}
+                            {canDelete && <button onClick={() => deleteMessage(message.id)} className="ml-2 text-[11px] font-black text-red-500 opacity-0 transition group-hover:opacity-100">Delete</button>}
                           </div>
                         </div>
                       </div>
@@ -561,24 +619,11 @@ function MessageCenter() {
                 </div>
               </div>
 
-              <form onSubmit={sendReply} className="border-t border-slate-200 bg-white p-3 md:p-4">
+              <form onSubmit={sendReply} className="sticky bottom-0 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur md:p-4">
                 <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-[2rem] bg-slate-100 p-2 ring-1 ring-slate-200">
                   <button type="button" className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl text-slate-500 hover:bg-white md:flex">＋</button>
-                  <textarea
-                    className="max-h-36 min-h-[44px] flex-1 resize-none bg-transparent px-3 py-3 text-sm font-semibold outline-none placeholder:text-slate-400"
-                    placeholder="Message..."
-                    value={replyBody}
-                    onChange={(event) => setReplyBody(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        event.currentTarget.form?.requestSubmit();
-                      }
-                    }}
-                  />
-                  <button disabled={saving || !replyBody.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-lg font-black text-white shadow-md shadow-blue-500/25 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
-                    ➤
-                  </button>
+                  <textarea className="max-h-36 min-h-[44px] flex-1 resize-none bg-transparent px-3 py-3 text-sm font-semibold outline-none placeholder:text-slate-400" placeholder={`Message ${selectedOther.name}...`} value={replyBody} onChange={(event) => setReplyBody(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} />
+                  <button disabled={saving || !replyBody.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-lg font-black text-white shadow-md shadow-blue-500/25 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">➤</button>
                 </div>
               </form>
             </>
