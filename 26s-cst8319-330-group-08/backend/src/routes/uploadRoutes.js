@@ -9,12 +9,7 @@ const storage = multer.diskStorage({
     cb(null, "uploads/");
   },
   filename: (req, file, cb) => {
-    const uniqueName =
-      Date.now() +
-      "-" +
-      Math.round(Math.random() * 1e9) +
-      path.extname(file.originalname);
-
+    const uniqueName = Date.now() + "-" + Math.round(Math.random() * 1e9) + path.extname(file.originalname);
     cb(null, uniqueName);
   },
 });
@@ -37,6 +32,11 @@ const upload = multer({
   },
 });
 
+const getBaseUrl = (req) => {
+  if (process.env.PUBLIC_BACKEND_URL) return process.env.PUBLIC_BACKEND_URL.replace(/\/$/, "");
+  return `${req.protocol}://${req.get("host")}`;
+};
+
 router.post("/image", upload.single("image"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({
@@ -45,10 +45,13 @@ router.post("/image", upload.single("image"), (req, res) => {
     });
   }
 
+  const relativeUrl = `/uploads/${req.file.filename}`;
+
   res.status(201).json({
     status: "success",
     message: "Image uploaded successfully",
-    image_url: `/uploads/${req.file.filename}`,
+    image_url: `${getBaseUrl(req)}${relativeUrl}`,
+    relative_url: relativeUrl,
   });
 });
 
