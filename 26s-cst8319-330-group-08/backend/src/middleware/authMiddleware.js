@@ -20,7 +20,17 @@ const protect = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const [users] = await pool.query(
-      `SELECT id, full_name, email, role, team_id, partnership_id, is_active
+      `SELECT
+        id,
+        full_name,
+        email,
+        role,
+        team_id,
+        partnership_id,
+        phone,
+        job_title,
+        photo_url,
+        is_active
        FROM users
        WHERE id = ?
        LIMIT 1`,
