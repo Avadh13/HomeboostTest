@@ -52,42 +52,39 @@ function Navbar() {
     { to: "/resources", label: "Resources" },
     { to: "/employee/messages", label: "Messages" },
     { to: "/employee/appointments", label: "Appointments" },
+    { to: "/notifications", label: "Notifications" },
   ];
 
   const hbtAdminLinks: NavLinkItem[] = [
     { to: "/hbt/dashboard", label: "Dashboard" },
     { to: "/hbt/companies", label: "Companies" },
     { to: "/hbt/employees", label: "Employees" },
-    { to: "/hbt/team-members", label: "Team" },
-    { to: "/hbt/resources", label: "Resources" },
-    { to: "/hbt/events", label: "Events" },
+    { to: "/hbt/messages", label: "Messages" },
+    { to: "/notifications", label: "Notifications" },
   ];
 
   const hbtMemberLinks: NavLinkItem[] = [
     { to: "/hbt/member-dashboard", label: "Dashboard" },
+    { to: "/hbt/messages", label: "Messages" },
+    { to: "/notifications", label: "Notifications" },
     { to: "/hbt/appointments", label: "Appointments" },
     { to: "/hbt/availability", label: "Availability" },
-    { to: "/hbt/messages", label: "Messages" },
   ];
 
   const adminLinks: NavLinkItem[] = [
     { to: "/admin", label: "Admin" },
+    { to: "/admin/messages", label: "Messages" },
+    { to: "/notifications", label: "Notifications" },
     { to: "/admin/users", label: "Users" },
     { to: "/admin/hbts", label: "HBTs" },
-    { to: "/admin/resources", label: "Resources" },
   ];
 
   const getLinks = () => {
     if (!isLoggedIn) return publicLinks;
-
     if (user?.role === "employee") return employeeLinks;
     if (user?.role === "hbt_admin") return hbtAdminLinks;
     if (user?.role === "hbt_member") return hbtMemberLinks;
-
-    if (user?.role === "admin" || user?.role === "super_admin") {
-      return adminLinks;
-    }
-
+    if (user?.role === "admin" || user?.role === "super_admin") return adminLinks;
     return publicLinks;
   };
 
@@ -128,10 +125,7 @@ function Navbar() {
         <div className="hidden items-center gap-3 md:flex">
           {!isLoggedIn ? (
             <>
-              <Link
-                to="/login"
-                className="rounded-full px-5 py-2.5 font-black text-slate-700 transition hover:bg-slate-100 hover:text-blue-700"
-              >
+              <Link to="/login" className="rounded-full px-5 py-2.5 font-black text-slate-700 transition hover:bg-slate-100 hover:text-blue-700">
                 Login
               </Link>
 
@@ -143,9 +137,7 @@ function Navbar() {
             <>
               <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-2 text-right shadow-sm">
                 <p className="text-sm font-black text-slate-900">{user?.full_name}</p>
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                  {user?.role?.replace("_", " ")}
-                </p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{user?.role?.replace("_", " ")}</p>
               </div>
 
               <button onClick={handleLogout} className="btn-danger px-5 py-2.5">
@@ -155,10 +147,7 @@ function Navbar() {
           )}
         </div>
 
-        <button
-          onClick={() => setOpen(!open)}
-          className="rounded-full bg-slate-950 px-5 py-2.5 font-black text-white shadow-lg shadow-slate-900/20 md:hidden"
-        >
+        <button onClick={() => setOpen(!open)} className="rounded-full bg-slate-950 px-5 py-2.5 font-black text-white shadow-lg shadow-slate-900/20 md:hidden">
           {open ? "Close" : "Menu"}
         </button>
       </div>
@@ -179,19 +168,11 @@ function Navbar() {
 
             {!isLoggedIn ? (
               <>
-                <Link
-                  to="/login"
-                  onClick={() => setOpen(false)}
-                  className="block rounded-2xl px-4 py-3 font-black text-slate-700 hover:bg-blue-50"
-                >
+                <Link to="/login" onClick={() => setOpen(false)} className="block rounded-2xl px-4 py-3 font-black text-slate-700 hover:bg-blue-50">
                   Login
                 </Link>
 
-                <Link
-                  to="/partners"
-                  onClick={() => setOpen(false)}
-                  className="block rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-3 text-center font-black text-white"
-                >
+                <Link to="/partners" onClick={() => setOpen(false)} className="block rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-3 text-center font-black text-white">
                   Find Employer Portal
                 </Link>
               </>
