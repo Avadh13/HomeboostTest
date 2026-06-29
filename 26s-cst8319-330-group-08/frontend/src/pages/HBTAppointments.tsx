@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import API_BASE_URL from "../api/api";
+import { useToast } from "../components/ToastProvider";
 
 type Appointment = {
   id: number;
@@ -71,29 +72,20 @@ const getPreferredTimeStyle = (appointment: Appointment) => {
   const now = Date.now();
   const twentyFourHours = 24 * 60 * 60 * 1000;
 
-  if (activeStatus && preferredTime < now) {
-    return { className: "bg-red-50 text-red-700 border-red-200", label: "Past due" };
-  }
-
-  if (activeStatus && preferredTime - now <= twentyFourHours) {
-    return { className: "bg-amber-50 text-amber-800 border-amber-200", label: "Soon" };
-  }
-
-  if (appointment.status === "completed") {
-    return { className: "bg-emerald-50 text-emerald-800 border-emerald-200", label: "Resolved" };
-  }
-
+  if (activeStatus && preferredTime < now) return { className: "bg-red-50 text-red-700 border-red-200", label: "Past due" };
+  if (activeStatus && preferredTime - now <= twentyFourHours) return { className: "bg-amber-50 text-amber-800 border-amber-200", label: "Soon" };
+  if (appointment.status === "completed") return { className: "bg-emerald-50 text-emerald-800 border-emerald-200", label: "Resolved" };
   return { className: "bg-slate-100 text-slate-700 border-slate-200", label: "Scheduled" };
 };
 
 function HBTAppointments() {
+  const toast = useToast();
   const token = localStorage.getItem("token");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [drafts, setDrafts] = useState<Record<number, AdvisorDraft>>({});
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
-  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("newest");
@@ -105,7 +97,7 @@ function HBTAppointments() {
   const [availableTimes, setAvailableTimes] = useState<AvailableTime[]>([]);
   const [loadingTimes, setLoadingTimes] = useState(false);
 
-  const headers = { Authorization: `Bearer ${token}` };
+  const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   const syncDrafts = (items: Appointment[]) => {
     const nextDrafts: Record<number, AdvisorDraft> = {};
@@ -128,7 +120,7 @@ function HBTAppointments() {
       syncDrafts(items);
     } catch (error) {
       console.error("Failed to load HBT appointments:", error);
-      setNotice({ type: "error", message: "Could not load appointment requests." });
+      toast.error("Could not load appointment requests.");
     } finally {
       setLoading(false);
     }
@@ -161,7 +153,6 @@ function HBTAppointments() {
   };
 
   const updateAppointment = async (appointment: Appointment, status: string) => {
-    setNotice(null);
     const draft = drafts[appointment.id] || { advisor_note: "", meeting_link: "" };
 
     try {
@@ -175,15 +166,15 @@ function HBTAppointments() {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setNotice({ type: "error", message: data.message || "Appointment update failed." });
+        toast.error(data.message || "Appointment update failed.");
         return;
       }
 
-      setNotice({ type: "success", message: "Appointment updated. Employee can now see the advisor note and meeting link." });
+      toast.success("Appointment updated. Employee can now see the advisor note and meeting link.");
       await loadAppointments();
     } catch (error) {
       console.error("Appointment update failed:", error);
-      setNotice({ type: "error", message: "Could not update appointment." });
+      toast.error("Could not update appointment.");
     } finally {
       setUpdatingId(null);
     }
@@ -214,21 +205,18 @@ function HBTAppointments() {
 
     try {
       setLoadingTimes(true);
-      const response = await fetch(
-        `${API_BASE_URL}/appointments/available-times?team_member_id=${rescheduleAdvisorId}&date=${rescheduleDate}`,
-        { headers }
-      );
+      const response = await fetch(`${API_BASE_URL}/appointments/available-times?team_member_id=${rescheduleAdvisorId}&date=${rescheduleDate}`, { headers });
       const data = await response.json();
 
       if (!response.ok) {
-        setNotice({ type: "error", message: data.message || "Could not load available times." });
+        toast.error(data.message || "Could not load available times.");
         return;
       }
 
       setAvailableTimes(Array.isArray(data.available_times) ? data.available_times : []);
     } catch (error) {
       console.error("Load reschedule times failed:", error);
-      setNotice({ type: "error", message: "Could not load available times." });
+      toast.error("Could not load available times.");
     } finally {
       setLoadingTimes(false);
     }
@@ -242,7 +230,7 @@ function HBTAppointments() {
     if (!rescheduleTarget) return;
 
     if (!rescheduleAdvisorId || !reschedulePreferredDate) {
-      setNotice({ type: "error", message: "Select advisor and new available time." });
+      toast.warning("Select advisor and new available time.");
       return;
     }
 
@@ -264,17 +252,17 @@ function HBTAppointments() {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setNotice({ type: "error", message: data.message || "Reschedule failed." });
+        toast.error(data.message || "Reschedule failed.");
         await loadAvailableTimes();
         return;
       }
 
-      setNotice({ type: "success", message: "Appointment rescheduled and employee notified." });
+      toast.success("Appointment rescheduled and employee notified.");
       closeReschedule();
       await loadAppointments();
     } catch (error) {
       console.error("Reschedule failed:", error);
-      setNotice({ type: "error", message: "Could not reschedule appointment." });
+      toast.error("Could not reschedule appointment.");
     } finally {
       setUpdatingId(null);
     }
@@ -295,29 +283,27 @@ function HBTAppointments() {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setNotice({ type: "error", message: data.message || "Cancel failed." });
+        toast.error(data.message || "Cancel failed.");
         return;
       }
 
-      setNotice({ type: "success", message: "Appointment cancelled and employee notified." });
+      toast.success("Appointment cancelled and employee notified.");
       await loadAppointments();
     } catch (error) {
       console.error("Cancel failed:", error);
-      setNotice({ type: "error", message: "Could not cancel appointment." });
+      toast.error("Could not cancel appointment.");
     } finally {
       setUpdatingId(null);
     }
   };
 
-  const stats = useMemo(() => {
-    return {
-      total: appointments.length,
-      pending: appointments.filter((item) => item.status === "pending").length,
-      approved: appointments.filter((item) => item.status === "approved").length,
-      completed: appointments.filter((item) => item.status === "completed").length,
-      rejected: appointments.filter((item) => item.status === "rejected").length,
-    };
-  }, [appointments]);
+  const stats = useMemo(() => ({
+    total: appointments.length,
+    pending: appointments.filter((item) => item.status === "pending").length,
+    approved: appointments.filter((item) => item.status === "approved").length,
+    completed: appointments.filter((item) => item.status === "completed").length,
+    rejected: appointments.filter((item) => item.status === "rejected").length,
+  }), [appointments]);
 
   const filteredAppointments = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -330,7 +316,6 @@ function HBTAppointments() {
       })
       .filter((appointment) => {
         if (!normalizedSearch) return true;
-
         const searchable = [
           appointment.topic,
           appointment.employee_name,
@@ -342,11 +327,7 @@ function HBTAppointments() {
           appointment.advisor_note,
           appointment.meeting_link,
           appointment.status,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-
+        ].filter(Boolean).join(" ").toLowerCase();
         return searchable.includes(normalizedSearch);
       })
       .sort((a, b) => {
@@ -364,21 +345,15 @@ function HBTAppointments() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-8">
-      <div className="mx-auto max-w-7xl space-y-8">
-        <header className="rounded-[2rem] bg-gradient-to-br from-slate-950 to-blue-950 p-8 text-white shadow-xl">
-          <Link to="/hbt/dashboard" className="text-sm font-bold text-blue-200 hover:text-white">← Back to HBT dashboard</Link>
-          <h1 className="mt-4 text-4xl font-black">Appointment Requests</h1>
-          <p className="mt-3 max-w-2xl text-blue-100">Review, reschedule, cancel, and update employee appointments.</p>
+    <main className="theme-page min-h-screen px-4 py-6 md:px-6 md:py-8">
+      <div className="mx-auto max-w-7xl space-y-5">
+        <header className="theme-panel">
+          <Link to="/hbt/dashboard" className="text-sm font-black text-violet-200 hover:text-white">← Back to HBT dashboard</Link>
+          <h1 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">Appointment Requests</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-violet-100 md:text-base">Review, reschedule, cancel, and update employee appointments from one advisor queue.</p>
         </header>
 
-        {notice && (
-          <div className={`rounded-2xl border px-5 py-4 font-semibold ${notice.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}>
-            {notice.message}
-          </div>
-        )}
-
-        <section className="grid gap-5 md:grid-cols-5">
+        <section className="grid gap-4 md:grid-cols-5">
           {[
             ["Total", stats.total, "all"],
             ["Pending", stats.pending, "pending"],
@@ -386,138 +361,131 @@ function HBTAppointments() {
             ["Completed", stats.completed, "completed"],
             ["Rejected", stats.rejected, "rejected"],
           ].map(([label, value, filter]) => (
-            <button key={label} onClick={() => setStatusFilter(filter as StatusFilter)} className={`rounded-3xl bg-white p-6 text-left shadow transition hover:-translate-y-1 hover:shadow-lg ${statusFilter === filter ? "ring-4 ring-blue-100" : ""}`}>
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">{label}</p>
-              <h2 className="mt-2 text-4xl font-black text-slate-950">{value}</h2>
+            <button key={label} onClick={() => setStatusFilter(filter as StatusFilter)} className={`premium-card text-left ${statusFilter === filter ? "ring-4 ring-violet-100" : ""}`}>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
+              <h2 className="mt-2 text-3xl font-black text-slate-950">{value}</h2>
             </button>
           ))}
         </section>
 
-        <section className="rounded-[2rem] bg-white p-7 shadow-xl">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">Operations</p>
-              <h2 className="text-3xl font-black">Team appointment queue</h2>
-              <p className="mt-2 text-sm text-slate-500">Showing {filteredAppointments.length} of {appointments.length} appointment requests.</p>
+        <section className="premium-card overflow-hidden p-0">
+          <div className="border-b border-slate-100 p-4">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="eyebrow">Operations</p>
+                <h2 className="mt-1 text-2xl font-black text-slate-950">Team appointment queue</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">Showing {filteredAppointments.length} of {appointments.length} appointment requests.</p>
+              </div>
+              <button onClick={loadAppointments} className="btn-secondary">Refresh</button>
             </div>
-            <button onClick={loadAppointments} className="rounded-full bg-slate-100 px-5 py-2.5 font-bold text-slate-700 hover:bg-slate-200">Refresh</button>
-          </div>
 
-          <div className="mb-6 rounded-3xl border border-slate-100 bg-slate-50 p-5">
-            <div className="grid gap-4 lg:grid-cols-[1.1fr_0.7fr_0.7fr_auto]">
-              <label className="block">
-                <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">Search</span>
-                <input className="w-full rounded-2xl border border-slate-200 bg-white p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" placeholder="Search employee, email, company, topic, meeting link..." value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">Status</span>
-                <select className="w-full rounded-2xl border border-slate-200 bg-white p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
-                  <option value="active">Active only</option>
-                  <option value="all">All meetings</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="completed">Completed</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-500">Sort</span>
-                <select className="w-full rounded-2xl border border-slate-200 bg-white p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" value={sortBy} onChange={(event) => setSortBy(event.target.value as SortBy)}>
-                  <option value="newest">Newest created</option>
-                  <option value="oldest">Oldest created</option>
-                  <option value="preferred_soonest">Preferred soonest</option>
-                  <option value="preferred_latest">Preferred latest</option>
-                </select>
-              </label>
-              <div className="flex items-end"><button onClick={clearFilters} className="w-full rounded-2xl bg-slate-950 px-5 py-3 font-bold text-white hover:bg-blue-700 lg:w-auto">Reset</button></div>
+            <div className="grid gap-3 lg:grid-cols-[1fr_190px_210px_auto]">
+              <input className="form-field" placeholder="Search employee, email, company, topic, meeting link..." value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
+              <select className="form-field" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
+                <option value="active">Active only</option>
+                <option value="all">All meetings</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="completed">Completed</option>
+                <option value="rejected">Rejected</option>
+              </select>
+              <select className="form-field" value={sortBy} onChange={(event) => setSortBy(event.target.value as SortBy)}>
+                <option value="newest">Newest created</option>
+                <option value="oldest">Oldest created</option>
+                <option value="preferred_soonest">Preferred soonest</option>
+                <option value="preferred_latest">Preferred latest</option>
+              </select>
+              <button onClick={clearFilters} className="btn-dark whitespace-nowrap">Reset</button>
             </div>
           </div>
 
-          {loading ? (
-            <p className="text-slate-500">Loading appointment requests...</p>
-          ) : appointments.length === 0 ? (
-            <div className="rounded-2xl bg-slate-50 p-8 text-center text-slate-600">No appointment requests yet.</div>
-          ) : filteredAppointments.length === 0 ? (
-            <div className="rounded-2xl bg-slate-50 p-8 text-center text-slate-600">No appointments match the selected filters.</div>
-          ) : (
-            <div className="space-y-5">
-              {filteredAppointments.map((appointment) => {
-                const draft = drafts[appointment.id] || { advisor_note: "", meeting_link: "" };
-                const preferredTimeStyle = getPreferredTimeStyle(appointment);
-                const isClosed = appointment.status === "completed" || appointment.status === "rejected";
+          <div className="p-4 md:p-5">
+            {loading ? (
+              <p className="text-sm font-bold text-slate-500">Loading appointment requests...</p>
+            ) : appointments.length === 0 ? (
+              <div className="rounded-2xl bg-slate-50 p-8 text-center text-slate-600">No appointment requests yet.</div>
+            ) : filteredAppointments.length === 0 ? (
+              <div className="rounded-2xl bg-slate-50 p-8 text-center text-slate-600">No appointments match the selected filters.</div>
+            ) : (
+              <div className="space-y-4">
+                {filteredAppointments.map((appointment) => {
+                  const draft = drafts[appointment.id] || { advisor_note: "", meeting_link: "" };
+                  const preferredTimeStyle = getPreferredTimeStyle(appointment);
+                  const isClosed = appointment.status === "completed" || appointment.status === "rejected";
 
-                return (
-                  <article key={appointment.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-6">
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div>
-                        <h3 className="text-2xl font-black text-slate-950">{appointment.topic}</h3>
-                        <p className="mt-1 text-sm text-slate-500">{appointment.employee_name} · {appointment.employee_email}</p>
-                        <p className="mt-1 text-sm text-slate-500">{appointment.employer_name || "Employer"} / {appointment.partnership_slug || "partnership"}</p>
+                  return (
+                    <article key={appointment.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-4 md:p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                          <h3 className="text-xl font-black text-slate-950 md:text-2xl">{appointment.topic}</h3>
+                          <p className="mt-1 text-sm font-semibold text-slate-500">{appointment.employee_name} · {appointment.employee_email}</p>
+                          <p className="mt-1 text-sm text-slate-500">{appointment.employer_name || "Employer"} / {appointment.partnership_slug || "partnership"}</p>
+                        </div>
+                        <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${statusClasses[appointment.status] || statusClasses.pending}`}>{appointment.status}</span>
                       </div>
-                      <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${statusClasses[appointment.status] || statusClasses.pending}`}>{appointment.status}</span>
-                    </div>
 
-                    <div className="mt-4 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
-                      <p><strong>Requested expert:</strong> {appointment.team_member_name || "Any available team member"}</p>
-                      <div className={`rounded-2xl border px-4 py-3 font-bold ${preferredTimeStyle.className}`}>
-                        <p>Preferred time: {appointment.preferred_date ? new Date(appointment.preferred_date).toLocaleString() : "Not specified"}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.16em]">{preferredTimeStyle.label}</p>
+                      <div className="mt-4 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
+                        <p className="rounded-2xl bg-white px-4 py-3"><strong>Requested expert:</strong> {appointment.team_member_name || "Any available team member"}</p>
+                        <div className={`rounded-2xl border px-4 py-3 font-bold ${preferredTimeStyle.className}`}>
+                          <p>Preferred time: {appointment.preferred_date ? new Date(appointment.preferred_date).toLocaleString() : "Not specified"}</p>
+                          <p className="mt-1 text-xs uppercase tracking-[0.16em]">{preferredTimeStyle.label}</p>
+                        </div>
                       </div>
-                    </div>
 
-                    {appointment.message && <p className="mt-4 rounded-2xl bg-white p-4 text-sm leading-relaxed text-slate-600">{appointment.message}</p>}
+                      {appointment.message && <p className="mt-4 rounded-2xl bg-white p-4 text-sm leading-relaxed text-slate-600">{appointment.message}</p>}
 
-                    <div className="mt-5 rounded-3xl border border-blue-100 bg-white p-5">
-                      <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">Advisor response</p>
-                      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                        <label className="block">
-                          <span className="mb-2 block text-sm font-bold text-slate-700">Google Meet / Zoom link</span>
-                          <input className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" placeholder="https://meet.google.com/... or https://zoom.us/..." value={draft.meeting_link} onChange={(e) => updateDraft(appointment.id, "meeting_link", e.target.value)} />
-                        </label>
-                        <label className="block">
-                          <span className="mb-2 block text-sm font-bold text-slate-700">Message to employee</span>
-                          <textarea className="min-h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" placeholder="Example: Hi, here is the meeting link for our call." value={draft.advisor_note} onChange={(e) => updateDraft(appointment.id, "advisor_note", e.target.value)} />
-                        </label>
+                      <div className="mt-5 rounded-3xl border border-violet-100 bg-white p-4 md:p-5">
+                        <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">Advisor response</p>
+                        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                          <label className="block">
+                            <span className="mb-2 block text-sm font-bold text-slate-700">Google Meet / Zoom link</span>
+                            <input className="form-field" placeholder="https://meet.google.com/... or https://zoom.us/..." value={draft.meeting_link} onChange={(e) => updateDraft(appointment.id, "meeting_link", e.target.value)} />
+                          </label>
+                          <label className="block">
+                            <span className="mb-2 block text-sm font-bold text-slate-700">Message to employee</span>
+                            <textarea className="form-field min-h-24" placeholder="Example: Hi, here is the meeting link for our call." value={draft.advisor_note} onChange={(e) => updateDraft(appointment.id, "advisor_note", e.target.value)} />
+                          </label>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="mt-5 flex flex-wrap gap-3">
-                      <button disabled={updatingId === appointment.id} onClick={() => updateAppointment(appointment, appointment.status)} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
-                        {updatingId === appointment.id ? "Saving..." : "Save Note/Link"}
-                      </button>
-                      <button disabled={updatingId === appointment.id || isClosed} onClick={() => openReschedule(appointment)} className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
-                        Reschedule
-                      </button>
-                      <button disabled={updatingId === appointment.id || isClosed} onClick={() => cancelAppointment(appointment)} className="rounded-full bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
-                        Cancel
-                      </button>
-                      {[
-                        ["approved", "Approve"],
-                        ["rejected", "Reject"],
-                        ["completed", "Complete"],
-                        ["pending", "Reset Pending"],
-                      ].map(([status, label]) => (
-                        <button key={status} disabled={updatingId === appointment.id || appointment.status === status} onClick={() => updateAppointment(appointment, status)} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
-                          {updatingId === appointment.id ? "Updating..." : label}
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        <button disabled={updatingId === appointment.id} onClick={() => updateAppointment(appointment, appointment.status)} className="btn-primary disabled:cursor-not-allowed disabled:opacity-40">
+                          {updatingId === appointment.id ? "Saving..." : "Save Note/Link"}
                         </button>
-                      ))}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
+                        <button disabled={updatingId === appointment.id || isClosed} onClick={() => openReschedule(appointment)} className="rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-black text-white shadow-md disabled:cursor-not-allowed disabled:opacity-40">
+                          Reschedule
+                        </button>
+                        <button disabled={updatingId === appointment.id || isClosed} onClick={() => cancelAppointment(appointment)} className="btn-danger disabled:cursor-not-allowed disabled:opacity-40">
+                          Cancel
+                        </button>
+                        {[
+                          ["approved", "Approve"],
+                          ["rejected", "Reject"],
+                          ["completed", "Complete"],
+                          ["pending", "Reset Pending"],
+                        ].map(([status, label]) => (
+                          <button key={status} disabled={updatingId === appointment.id || appointment.status === status} onClick={() => updateAppointment(appointment, status)} className="btn-dark disabled:cursor-not-allowed disabled:opacity-40">
+                            {updatingId === appointment.id ? "Updating..." : label}
+                          </button>
+                        ))}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </section>
       </div>
 
       {rescheduleTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white p-7 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl md:p-7">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.2em] text-indigo-600">Reschedule appointment</p>
-                <h2 className="mt-2 text-3xl font-black text-slate-950">{rescheduleTarget.topic}</h2>
-                <p className="mt-1 text-slate-500">{rescheduleTarget.employee_name} · {rescheduleTarget.employee_email}</p>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600">Reschedule appointment</p>
+                <h2 className="mt-2 text-2xl font-black text-slate-950 md:text-3xl">{rescheduleTarget.topic}</h2>
+                <p className="mt-1 text-sm text-slate-500">{rescheduleTarget.employee_name} · {rescheduleTarget.employee_email}</p>
               </div>
               <button onClick={closeReschedule} className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">Close</button>
             </div>
@@ -525,17 +493,15 @@ function HBTAppointments() {
             <div className="mt-6 space-y-4">
               <label className="block">
                 <span className="mb-2 block text-sm font-bold text-slate-700">Advisor</span>
-                <select className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4" value={rescheduleAdvisorId} onChange={(e) => setRescheduleAdvisorId(e.target.value)}>
+                <select className="form-field" value={rescheduleAdvisorId} onChange={(e) => setRescheduleAdvisorId(e.target.value)}>
                   <option value="">Select advisor</option>
-                  {teamMembers.map((member) => (
-                    <option key={member.id} value={member.id}>{member.full_name} — {member.title || "Advisor"}</option>
-                  ))}
+                  {teamMembers.map((member) => <option key={member.id} value={member.id}>{member.full_name} — {member.title || "Advisor"}</option>)}
                 </select>
               </label>
 
               <label className="block">
                 <span className="mb-2 block text-sm font-bold text-slate-700">New date</span>
-                <input type="date" min={today} className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4" value={rescheduleDate} onChange={(e) => setRescheduleDate(e.target.value)} />
+                <input type="date" min={today} className="form-field" value={rescheduleDate} onChange={(e) => setRescheduleDate(e.target.value)} />
               </label>
 
               <div>
@@ -559,11 +525,11 @@ function HBTAppointments() {
 
               <label className="block">
                 <span className="mb-2 block text-sm font-bold text-slate-700">Message to employee</span>
-                <textarea className="min-h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 p-4" value={rescheduleNote} onChange={(e) => setRescheduleNote(e.target.value)} placeholder="Example: We moved your meeting to this new time." />
+                <textarea className="form-field min-h-24" value={rescheduleNote} onChange={(e) => setRescheduleNote(e.target.value)} placeholder="Example: We moved your meeting to this new time." />
               </label>
             </div>
 
-            <button disabled={updatingId === rescheduleTarget.id || loadingTimes} onClick={submitReschedule} className="mt-6 w-full rounded-full bg-indigo-600 px-6 py-3 font-black text-white hover:bg-indigo-700 disabled:opacity-50">
+            <button disabled={updatingId === rescheduleTarget.id || loadingTimes} onClick={submitReschedule} className="btn-primary mt-6 w-full disabled:opacity-50">
               {updatingId === rescheduleTarget.id ? "Rescheduling..." : "Confirm Reschedule"}
             </button>
           </div>
