@@ -1,12 +1,9 @@
 const fs = require("fs");
 const csv = require("csv-parser");
-const bcrypt = require("bcryptjs");
 const pool = require("../config/db");
 
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
-
 const normalizeName = (value) => String(value || "").trim();
-
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 const readCsvRows = (filePath) =>
@@ -25,22 +22,6 @@ const removeUploadedFile = (filePath) => {
   fs.unlink(filePath, () => {});
 };
 
-const generateEmployeePassword = (fullName) => {
-  const firstName = String(fullName || "")
-    .trim()
-    .split(" ")[0];
-
-  const firstFourLetters = firstName
-    .toLowerCase()
-    .replace(/[^a-z]/g, "")
-    .slice(0, 4)
-    .padEnd(4, "x");
-
-  const randomFiveNumbers = Math.floor(10000 + Math.random() * 90000);
-
-  return `${firstFourLetters}@${randomFiveNumbers}`;
-};
-
 exports.uploadEmployeesCsv = async (req, res) => {
   let connection;
 
@@ -49,37 +30,26 @@ exports.uploadEmployeesCsv = async (req, res) => {
     const { partnershipId } = req.params;
 
     if (!req.file) {
-      return res.status(400).json({
-        status: "error",
-        message: "CSV file is required",
-      });
+      return res.status(400).json({ status: "error", message: "CSV file is required" });
     }
 
     if (!user || user.role !== "hbt_admin") {
       removeUploadedFile(req.file.path);
-
-      return res.status(403).json({
-        status: "error",
-        message: "Only HBT admins can upload employees",
-      });
+      return res.status(403).json({ status: "error", message: "Only HBT admins can upload employees" });
     }
 
     const rows = await readCsvRows(req.file.path);
 
     if (rows.length === 0) {
       removeUploadedFile(req.file.path);
-
-      return res.status(400).json({
-        status: "error",
-        message: "CSV file is empty. Required headers: full_name,email",
-      });
+      return res.status(400).json({ status: "error", message: "CSV file is empty. Required headers: full_name,email" });
     }
 
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
     const [partnerships] = await connection.query(
-      `SELECT id, team_id
+      `SELECT id, team_id, slug
        FROM partnerships
        WHERE id = ? AND team_id = ? AND status = 'active'
        LIMIT 1`,
@@ -89,12 +59,10 @@ exports.uploadEmployeesCsv = async (req, res) => {
     if (partnerships.length === 0) {
       await connection.rollback();
       removeUploadedFile(req.file.path);
-
-      return res.status(403).json({
-        status: "error",
-        message: "Partnership not found or not assigned to your team",
-      });
+      return res.status(403).json({ status: "error", message: "Partnership not found or not assigned to your team" });
     }
+
+    const partnership = partnerships[0];
 
     const [batchResult] = await connection.query(
       `INSERT INTO enrollment_batches
@@ -104,87 +72,64 @@ exports.uploadEmployeesCsv = async (req, res) => {
     );
 
     const batchId = batchResult.insertId;
-
-    let created = 0;
+    let invited = 0;
     let skipped = 0;
     const errors = [];
     const seenEmails = new Set();
-    const createdEmployees = [];
+    const invitedEmployees = [];
 
     for (let index = 0; index < rows.length; index++) {
       const row = rows[index];
-
-      const fullName = normalizeName(
-        row.full_name || row.name || row.FullName || row["Full Name"]
-      );
-
+      const fullName = normalizeName(row.full_name || row.name || row.FullName || row["Full Name"]);
       const email = normalizeEmail(row.email || row.Email);
-
       const rowNumber = index + 2;
 
       if (!fullName || !email) {
         skipped++;
-        errors.push({
-          row_number: rowNumber,
-          email,
-          reason: "Missing full_name or email",
-        });
+        errors.push({ row_number: rowNumber, email, reason: "Missing full_name or email" });
         continue;
       }
 
       if (!isValidEmail(email)) {
         skipped++;
-        errors.push({
-          row_number: rowNumber,
-          email,
-          reason: "Invalid email format",
-        });
+        errors.push({ row_number: rowNumber, email, reason: "Invalid email format" });
         continue;
       }
 
       if (seenEmails.has(email)) {
         skipped++;
-        errors.push({
-          row_number: rowNumber,
-          email,
-          reason: "Duplicate email inside this CSV",
-        });
+        errors.push({ row_number: rowNumber, email, reason: "Duplicate email inside this CSV" });
         continue;
       }
 
       seenEmails.add(email);
 
-      const [existing] = await connection.query(
-        "SELECT id FROM users WHERE email = ? LIMIT 1",
-        [email]
-      );
+      const [existingUser] = await connection.query("SELECT id FROM users WHERE email = ? LIMIT 1", [email]);
 
-      if (existing.length > 0) {
+      if (existingUser.length > 0) {
         skipped++;
-        errors.push({
-          row_number: rowNumber,
-          email,
-          reason: "Email already exists",
-        });
+        errors.push({ row_number: rowNumber, email, reason: "Email already has an account" });
         continue;
       }
 
-      const temporaryPassword = generateEmployeePassword(fullName);
-      const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
-
       await connection.query(
-        `INSERT INTO users
-         (full_name, email, password, role, partnership_id, enrollment_batch_id, is_active)
-         VALUES (?, ?, ?, 'employee', ?, ?, 1)`,
-        [fullName, email, hashedPassword, partnershipId, batchId]
+        `INSERT INTO employee_invites
+         (partnership_id, enrollment_batch_id, invited_by_user_id, full_name, email, status)
+         VALUES (?, ?, ?, ?, ?, 'invited')
+         ON DUPLICATE KEY UPDATE
+           full_name = VALUES(full_name),
+           enrollment_batch_id = VALUES(enrollment_batch_id),
+           invited_by_user_id = VALUES(invited_by_user_id),
+           status = IF(status = 'registered', 'registered', 'invited'),
+           revoked_at = NULL`,
+        [partnershipId, batchId, user.id, fullName, email]
       );
 
-      created++;
-
-      createdEmployees.push({
+      invited++;
+      invitedEmployees.push({
         full_name: fullName,
         email,
-        temporary_password: temporaryPassword,
+        signup_url: `/signup?partnership=${partnership.slug}`,
       });
     }
 
@@ -192,7 +137,7 @@ exports.uploadEmployeesCsv = async (req, res) => {
       `UPDATE enrollment_batches
        SET created_count = ?, skipped_count = ?
        WHERE id = ?`,
-      [created, skipped, batchId]
+      [invited, skipped, batchId]
     );
 
     await connection.commit();
@@ -200,12 +145,13 @@ exports.uploadEmployeesCsv = async (req, res) => {
 
     return res.json({
       status: "success",
-      message: "CSV enrollment completed",
+      message: "CSV invite list completed",
       batch_id: batchId,
-      created,
+      invited,
+      created: invited,
       skipped,
-      password_rule: "first 4 letters of first name + @ + 5 random numbers",
-      created_employees: createdEmployees,
+      signup_rule: "Employees can register only when their email exists in the approved invite list for this partnership.",
+      invited_employees: invitedEmployees,
       errors,
     });
   } catch (error) {
@@ -214,7 +160,7 @@ exports.uploadEmployeesCsv = async (req, res) => {
 
     return res.status(500).json({
       status: "error",
-      message: "CSV enrollment failed",
+      message: "CSV invite upload failed",
       error: error.message,
     });
   } finally {
@@ -227,10 +173,7 @@ exports.getEnrollmentBatches = async (req, res) => {
     const user = req.user;
 
     if (!user || user.role !== "hbt_admin") {
-      return res.status(403).json({
-        status: "error",
-        message: "Only HBT admins can view enrollment batches",
-      });
+      return res.status(403).json({ status: "error", message: "Only HBT admins can view enrollment batches" });
     }
 
     const [batches] = await pool.query(
@@ -255,11 +198,7 @@ exports.getEnrollmentBatches = async (req, res) => {
 
     return res.json(batches);
   } catch (error) {
-    return res.status(500).json({
-      status: "error",
-      message: "Failed to load enrollment batches",
-      error: error.message,
-    });
+    return res.status(500).json({ status: "error", message: "Failed to load enrollment batches", error: error.message });
   }
 };
 
@@ -271,10 +210,7 @@ exports.revokeEnrollmentBatch = async (req, res) => {
     const { batchId } = req.params;
 
     if (!user || user.role !== "hbt_admin") {
-      return res.status(403).json({
-        status: "error",
-        message: "Only HBT admins can revoke enrollment batches",
-      });
+      return res.status(403).json({ status: "error", message: "Only HBT admins can revoke enrollment batches" });
     }
 
     connection = await pool.getConnection();
@@ -291,14 +227,23 @@ exports.revokeEnrollmentBatch = async (req, res) => {
 
     if (batches.length === 0) {
       await connection.rollback();
-
-      return res.status(404).json({
-        status: "error",
-        message: "Batch not found or not assigned to your team",
-      });
+      return res.status(404).json({ status: "error", message: "Batch not found or not assigned to your team" });
     }
 
-    const [deleteUsersResult] = await connection.query(
+    if (batches[0].status === "revoked") {
+      await connection.rollback();
+      return res.status(400).json({ status: "error", message: "Batch is already revoked" });
+    }
+
+    const [revokeInvitesResult] = await connection.query(
+      `UPDATE employee_invites
+       SET status = 'revoked', revoked_at = NOW()
+       WHERE enrollment_batch_id = ?
+       AND status = 'invited'`,
+      [batchId]
+    );
+
+    const [deleteOldUsersResult] = await connection.query(
       `DELETE FROM users
        WHERE enrollment_batch_id = ?
        AND role = 'employee'`,
@@ -306,7 +251,8 @@ exports.revokeEnrollmentBatch = async (req, res) => {
     );
 
     await connection.query(
-      `DELETE FROM enrollment_batches
+      `UPDATE enrollment_batches
+       SET status = 'revoked', revoked_at = NOW()
        WHERE id = ?`,
       [batchId]
     );
@@ -315,17 +261,13 @@ exports.revokeEnrollmentBatch = async (req, res) => {
 
     return res.json({
       status: "success",
-      message: "Enrollment batch deleted successfully",
-      deleted_employees: deleteUsersResult.affectedRows,
+      message: "Enrollment batch revoked successfully",
+      revoked_invites: revokeInvitesResult.affectedRows,
+      deleted_employees: deleteOldUsersResult.affectedRows,
     });
   } catch (error) {
     if (connection) await connection.rollback();
-
-    return res.status(500).json({
-      status: "error",
-      message: "Failed to delete enrollment batch",
-      error: error.message,
-    });
+    return res.status(500).json({ status: "error", message: "Failed to revoke enrollment batch", error: error.message });
   } finally {
     if (connection) connection.release();
   }
