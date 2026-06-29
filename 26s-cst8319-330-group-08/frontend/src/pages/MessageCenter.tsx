@@ -84,8 +84,7 @@ const roleLabel = (role?: string | null) => (role || "user").replace(/_/g, " ");
 
 const initials = (name?: string | null) => {
   const value = (name || "User").trim();
-  const parts = value.split(/\s+/).slice(0, 2);
-  return parts.map((part) => part[0]?.toUpperCase()).join("") || "U";
+  return value.charAt(0).toUpperCase() || "U";
 };
 
 const formatTime = (value?: string | null) => {
@@ -162,14 +161,18 @@ type AvatarProps = {
 };
 
 function ProfileAvatar({ person, size = "md", showStatus = true }: AvatarProps) {
-  const sizeClass = size === "lg" ? "h-14 w-14 text-base" : size === "sm" ? "h-10 w-10 text-xs" : "h-12 w-12 text-sm";
+  const sizeClass = size === "lg" ? "h-14 w-14" : size === "sm" ? "h-10 w-10" : "h-12 w-12";
+  const textClass = size === "lg" ? "text-2xl" : size === "sm" ? "text-base" : "text-xl";
+  const fallbackClass = person.photo_url
+    ? "bg-slate-100 text-white"
+    : "bg-blue-100 text-blue-700 ring-1 ring-blue-200";
 
   return (
-    <div className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 font-black text-white shadow-md`}>
+    <div className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full ${fallbackClass} font-black shadow-sm`}>
       {person.photo_url ? (
         <img src={person.photo_url} alt={person.name} className="h-full w-full object-cover" />
       ) : (
-        <span>{initials(person.name)}</span>
+        <span className={`${textClass} leading-none`}>{initials(person.name)}</span>
       )}
       {showStatus && (
         <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white ${person.is_online ? "bg-emerald-500" : "bg-slate-400"}`} />
