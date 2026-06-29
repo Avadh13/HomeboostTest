@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 import Navbar from "../components/Navbar";
+import { useToast } from "../components/ToastProvider";
 
 type Resource = {
   id: number;
@@ -15,81 +16,169 @@ type Resource = {
   image_url?: string;
 };
 
+const fallbackImages = [
+  "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=1200&q=80",
+];
+
 function Resources() {
+  const toast = useToast();
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+
+  const loadResources = async () => {
+    const token = localStorage.getItem("token");
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/resources`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.message || "Failed to load resources.");
+        setResources([]);
+        return;
+      }
+
+      setResources(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to load resources:", error);
+      toast.error("Failed to load resources.");
+      setResources([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-
-    fetch(`${API_BASE_URL}/resources`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setResources(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch(() => {
-        setLoading(false);
-        alert("Failed to load resources");
-      });
+    loadResources();
   }, []);
 
+  const categories = useMemo(() => [...new Set(resources.map((resource) => resource.category).filter(Boolean))].sort(), [resources]);
+  const types = useMemo(() => [...new Set(resources.map((resource) => resource.resource_type || resource.type).filter(Boolean))].sort(), [resources]);
+
+  const filteredResources = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return resources.filter((resource) => {
+      const resourceType = resource.resource_type || resource.type || "article";
+      const matchesSearch = !query || [resource.title, resource.description, resource.category, resourceType].filter(Boolean).join(" ").toLowerCase().includes(query);
+      const matchesCategory = categoryFilter === "all" || resource.category === categoryFilter;
+      const matchesType = typeFilter === "all" || resourceType === typeFilter;
+      return matchesSearch && matchesCategory && matchesType;
+    });
+  }, [categoryFilter, resources, search, typeFilter]);
+
   return (
-    <>
+    <main className="theme-page min-h-screen">
       <Navbar />
 
-      <main className="min-h-screen bg-gray-50 py-12 px-4">
-        <div className="max-w-6xl mx-auto">
-          <section className="text-center mb-12">
-            <p className="text-sm font-semibold tracking-wide text-gray-500 uppercase mb-3">Resource Library</p>
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">Resource Library</h1>
-            <p className="text-gray-600 max-w-2xl mx-auto">Explore helpful guides, checklists, articles, and tools assigned to your employee benefit program.</p>
+      <section className="relative px-4 py-10 md:px-6 md:py-14">
+        <div className="floating-orb -left-24 top-16 h-72 w-72 bg-blue-400" />
+        <div className="floating-orb right-0 top-36 h-80 w-80 bg-violet-400" />
+
+        <div className="section-container space-y-5">
+          <header className="theme-panel text-center">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-200">Employee Resource Library</p>
+            <h1 className="mx-auto mt-3 max-w-4xl text-4xl font-black tracking-tight md:text-6xl">Your home-buying guidance hub</h1>
+            <p className="mx-auto mt-4 max-w-3xl text-sm leading-relaxed text-violet-100 md:text-lg">
+              Explore guides, checklists, videos, articles, and tools assigned to your employer benefit program.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Link to="/quiz" className="rounded-full bg-white px-5 py-2.5 text-sm font-black text-violet-800 hover:bg-violet-50">Take readiness quiz</Link>
+              <Link to="/employee/messages" className="rounded-full border border-white/30 px-5 py-2.5 text-sm font-black text-white hover:bg-white/10">Ask an advisor</Link>
+            </div>
+          </header>
+
+          <section className="grid gap-4 md:grid-cols-4">
+            {[
+              ["Total", resources.length, "text-violet-700", "bg-violet-50"],
+              ["Categories", categories.length, "text-blue-700", "bg-blue-50"],
+              ["Types", types.length, "text-emerald-700", "bg-emerald-50"],
+              ["Showing", filteredResources.length, "text-amber-700", "bg-amber-50"],
+            ].map(([label, value, textTone, bgTone]) => (
+              <div key={label} className="metric-card">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
+                <h2 className={`mt-2 rounded-2xl px-3 py-2 text-3xl font-black ${textTone} ${bgTone}`}>{value}</h2>
+              </div>
+            ))}
+          </section>
+
+          <section className="premium-card p-4">
+            <div className="grid gap-3 md:grid-cols-[1fr_200px_180px_auto] md:items-center">
+              <input className="form-field" placeholder="Search resources, category, type..." value={search} onChange={(event) => setSearch(event.target.value)} />
+              <select className="form-field" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+                <option value="all">All categories</option>
+                {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+              <select className="form-field" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+                <option value="all">All types</option>
+                {types.map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
+              <button onClick={loadResources} className="btn-secondary whitespace-nowrap">Refresh</button>
+            </div>
           </section>
 
           {loading ? (
-            <div className="text-center text-gray-600">Loading resources...</div>
-          ) : resources.length === 0 ? (
-            <div className="bg-white rounded-xl shadow p-8 text-center">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">No Resources Found</h2>
-              <p className="text-gray-600">Resources assigned to your partnership will appear here.</p>
-            </div>
+            <section className="premium-card p-8 text-center">
+              <div className="mx-auto mb-5 h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
+              <p className="font-black text-slate-700">Loading resources...</p>
+            </section>
+          ) : filteredResources.length === 0 ? (
+            <section className="premium-card p-10 text-center">
+              <h2 className="text-2xl font-black text-slate-950">No resources found</h2>
+              <p className="mx-auto mt-2 max-w-xl text-slate-600">Resources assigned to your partnership will appear here. Try clearing filters or contact your advisor.</p>
+              <div className="mt-6 flex justify-center gap-3">
+                <button onClick={() => { setSearch(""); setCategoryFilter("all"); setTypeFilter("all"); }} className="btn-secondary">Clear filters</button>
+                <Link to="/employee/messages" className="btn-primary">Message advisor</Link>
+              </div>
+            </section>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {resources.map((resource) => (
-                <Link key={resource.id} to={`/resources/${resource.id}`} className="bg-white rounded-2xl shadow hover:shadow-lg transition overflow-hidden">
-                  {resource.image_url ? (
-                    <img src={resource.image_url} alt={resource.title} className="w-full h-48 object-cover" />
-                  ) : (
-                    <div className="w-full h-48 bg-gray-100 flex items-center justify-center text-gray-400">No Image</div>
-                  )}
-
-                  <div className="p-6">
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {resource.category && <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">{resource.category}</span>}
-                      {(resource.resource_type || resource.type) && <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">{resource.resource_type || resource.type}</span>}
+            <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {filteredResources.map((resource, index) => {
+                const resourceType = resource.resource_type || resource.type || "article";
+                return (
+                  <Link key={resource.id} to={`/resources/${resource.id}`} className="group overflow-hidden rounded-[1.75rem] border border-slate-100 bg-white shadow-lg shadow-slate-200/70 transition hover:-translate-y-1 hover:shadow-xl">
+                    <div className="relative h-48 bg-slate-100">
+                      <img src={resource.image_url || fallbackImages[index % fallbackImages.length]} alt={resource.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                      <div className="absolute inset-x-4 bottom-4 flex flex-wrap gap-2">
+                        {resource.category && <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-black uppercase text-blue-700 shadow-sm backdrop-blur">{resource.category}</span>}
+                        <span className="rounded-full bg-slate-950/85 px-3 py-1 text-xs font-black uppercase text-white backdrop-blur">{resourceType}</span>
+                      </div>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-3">{resource.title}</h2>
-                    <p className="text-gray-600 text-sm leading-6 line-clamp-3">{resource.description}</p>
-                    <div className="mt-5 text-blue-600 font-medium">View Details →</div>
-                  </div>
-                </Link>
-              ))}
-            </div>
+                    <div className="p-5">
+                      <h2 className="text-xl font-black text-slate-950">{resource.title}</h2>
+                      <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-600">{resource.description || "Open this resource for more guidance."}</p>
+                      <p className="mt-5 text-sm font-black text-violet-700">View details →</p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </section>
           )}
 
-          <section className="mt-14">
-            <div className="bg-black text-white rounded-2xl p-8 text-center shadow">
-              <p className="text-sm font-semibold tracking-wide text-gray-300 uppercase mb-3">Personalized Help</p>
-              <h2 className="text-3xl font-bold mb-4">Find the right resource faster</h2>
-              <p className="text-gray-300 max-w-2xl mx-auto mb-6">Take the Homeownership Readiness Quiz and discover which resources fit your current home buying, refinancing, or investing goals.</p>
-              <Link to="/quiz" className="inline-block bg-white text-black px-6 py-3 rounded-lg font-medium hover:bg-gray-100 transition">Take the Quiz</Link>
+          <section className="overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-xl">
+            <div className="grid gap-0 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div className="p-8 md:p-10">
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-200">Personalized help</p>
+                <h2 className="mt-3 text-3xl font-black md:text-4xl">Find the right resource faster</h2>
+                <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-300 md:text-base">Take the readiness quiz or message an advisor to connect your goals with the right guides, tools, and next steps.</p>
+              </div>
+              <div className="flex flex-wrap gap-3 px-8 pb-8 lg:px-10 lg:pb-0">
+                <Link to="/quiz" className="rounded-full bg-white px-5 py-2.5 text-sm font-black text-slate-950 hover:bg-slate-100">Take Quiz</Link>
+                <Link to="/employee/appointments" className="rounded-full border border-white/20 px-5 py-2.5 text-sm font-black text-white hover:bg-white/10">Book Appointment</Link>
+              </div>
             </div>
           </section>
         </div>
-      </main>
-    </>
+      </section>
+    </main>
   );
 }
 
