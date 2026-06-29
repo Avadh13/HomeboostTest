@@ -3,18 +3,9 @@ const jwt = require("jsonwebtoken");
 const pool = require("../config/db");
 
 const getRedirectPath = (role) => {
-  if (role === "admin" || role === "super_admin") {
-    return "/admin";
-  }
-
-  if (role === "hbt_admin") {
-    return "/hbt/dashboard";
-  }
-
-  if (role === "hbt_member") {
-    return "/hbt/member-dashboard";
-  }
-
+  if (role === "admin" || role === "super_admin") return "/admin";
+  if (role === "hbt_admin") return "/hbt/dashboard";
+  if (role === "hbt_member") return "/hbt/member-dashboard";
   return "/employee-portal";
 };
 
@@ -35,70 +26,111 @@ const signAccessToken = (user) => {
   );
 };
 
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const normalizeText = (value) => String(value || "").trim();
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
 exports.register = async (req, res) => {
+  let connection;
+
   try {
     const { full_name, email, password, partnership_slug } = req.body;
+    const cleanName = normalizeText(full_name);
+    const cleanEmail = normalizeEmail(email);
+    const cleanSlug = normalizeText(partnership_slug).toLowerCase();
 
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanName = full_name.trim();
-    const cleanSlug = partnership_slug.trim();
-
-    const [existingUsers] = await pool.query(
-      "SELECT id FROM users WHERE email = ?",
-      [cleanEmail]
-    );
-
-    if (existingUsers.length > 0) {
-      return res.status(409).json({
+    if (!cleanName || !cleanEmail || !password || !cleanSlug) {
+      return res.status(400).json({
         status: "error",
-        message: "Email already exists",
+        message: "Full name, email, password, and partnership slug are required",
       });
     }
 
-    const [partnerships] = await pool.query(
-      `SELECT id 
-       FROM partnerships 
-       WHERE slug = ? 
-       AND status = 'active' 
-       LIMIT 1`,
+    if (!isValidEmail(cleanEmail)) {
+      return res.status(400).json({ status: "error", message: "Please enter a valid email address" });
+    }
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [partnerships] = await connection.query(
+      `SELECT id FROM partnerships WHERE slug = ? AND status = 'active' LIMIT 1`,
       [cleanSlug]
     );
 
     if (partnerships.length === 0) {
-      return res.status(400).json({
+      await connection.rollback();
+      return res.status(400).json({ status: "error", message: "Invalid or inactive partnership" });
+    }
+
+    const partnershipId = partnerships[0].id;
+
+    const [existingUsers] = await connection.query("SELECT id FROM users WHERE email = ? LIMIT 1", [cleanEmail]);
+
+    if (existingUsers.length > 0) {
+      await connection.rollback();
+      return res.status(409).json({ status: "error", message: "Email already exists. Please login instead." });
+    }
+
+    const [invites] = await connection.query(
+      `SELECT id, status FROM employee_invites WHERE partnership_id = ? AND email = ? LIMIT 1`,
+      [partnershipId, cleanEmail]
+    );
+
+    if (invites.length === 0) {
+      await connection.rollback();
+      return res.status(403).json({
         status: "error",
-        message: "Invalid or inactive partnership",
+        message: "This email is not approved for this employer portal. Please contact your employer or HomeBoost support.",
       });
+    }
+
+    const invite = invites[0];
+
+    if (invite.status === "revoked") {
+      await connection.rollback();
+      return res.status(403).json({ status: "error", message: "This invite has been revoked." });
+    }
+
+    if (invite.status === "registered") {
+      await connection.rollback();
+      return res.status(409).json({ status: "error", message: "This invite was already used. Please login instead." });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const [result] = await pool.query(
-      `INSERT INTO users 
-       (full_name, email, password, role, partnership_id, is_active)
+    const [result] = await connection.query(
+      `INSERT INTO users (full_name, email, password, role, partnership_id, is_active)
        VALUES (?, ?, ?, 'employee', ?, 1)`,
-      [cleanName, cleanEmail, passwordHash, partnerships[0].id]
+      [cleanName, cleanEmail, passwordHash, partnershipId]
     );
+
+    await connection.query(
+      `UPDATE employee_invites SET status = 'registered', registered_user_id = ?, registered_at = NOW() WHERE id = ?`,
+      [result.insertId, invite.id]
+    );
+
+    await connection.commit();
 
     res.status(201).json({
       status: "success",
       message: "Employee account created successfully",
       user_id: result.insertId,
-      partnership_id: partnerships[0].id,
+      partnership_id: partnershipId,
     });
   } catch (error) {
+    if (connection) await connection.rollback();
     console.error("Registration failed", error);
-    res.status(500).json({
-      status: "error",
-      message: "Registration failed",
-    });
+    res.status(500).json({ status: "error", message: "Registration failed" });
+  } finally {
+    if (connection) connection.release();
   }
 };
 
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = normalizeEmail(email);
 
     const [users] = await pool.query(
       `SELECT 
@@ -123,28 +155,19 @@ exports.login = async (req, res) => {
     );
 
     if (users.length === 0) {
-      return res.status(401).json({
-        status: "error",
-        message: "Invalid email or password",
-      });
+      return res.status(401).json({ status: "error", message: "Invalid email or password" });
     }
 
     const user = users[0];
 
     if (Number(user.is_active) !== 1) {
-      return res.status(403).json({
-        status: "error",
-        message: "Account is disabled",
-      });
+      return res.status(403).json({ status: "error", message: "Account is disabled" });
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
 
     if (!isPasswordCorrect) {
-      return res.status(401).json({
-        status: "error",
-        message: "Invalid email or password",
-      });
+      return res.status(401).json({ status: "error", message: "Invalid email or password" });
     }
 
     const token = signAccessToken(user);
@@ -170,16 +193,10 @@ exports.login = async (req, res) => {
     });
   } catch (error) {
     console.error("Login failed", error);
-    res.status(500).json({
-      status: "error",
-      message: "Login failed",
-    });
+    res.status(500).json({ status: "error", message: "Login failed" });
   }
 };
 
 exports.me = async (req, res) => {
-  res.json({
-    status: "success",
-    user: req.user,
-  });
+  res.json({ status: "success", user: req.user });
 };
