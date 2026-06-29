@@ -14,6 +14,12 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
+const cleanColor = (value, fallback) => {
+  if (!value) return fallback;
+  const color = String(value).trim();
+  return /^#[0-9A-Fa-f]{6}$/.test(color) ? color : fallback;
+};
+
 // Get all partnerships
 router.get("/", protect, adminOnly, async (req, res) => {
   try {
@@ -29,6 +35,8 @@ router.get("/", protect, adminOnly, async (req, res) => {
         e.website,
         e.phone,
         e.contact_email,
+        COALESCE(e.brand_primary_color, '#2563eb') AS brand_primary_color,
+        COALESCE(e.brand_secondary_color, '#eff6ff') AS brand_secondary_color,
         h.id AS team_id,
         h.name AS hbt_name
        FROM partnerships p
@@ -58,6 +66,8 @@ router.post("/", protect, adminOnly, async (req, res) => {
       website,
       phone,
       contact_email,
+      brand_primary_color,
+      brand_secondary_color,
       team_id,
       status,
     } = req.body;
@@ -90,8 +100,8 @@ router.post("/", protect, adminOnly, async (req, res) => {
 
     const [employerResult] = await connection.query(
       `INSERT INTO employers
-       (name, slug, logo_url, website, phone, contact_email, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (name, slug, logo_url, website, phone, contact_email, brand_primary_color, brand_secondary_color, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         company_name,
         cleanSlug,
@@ -99,6 +109,8 @@ router.post("/", protect, adminOnly, async (req, res) => {
         website || null,
         phone || null,
         contact_email || null,
+        cleanColor(brand_primary_color, "#2563eb"),
+        cleanColor(brand_secondary_color, "#eff6ff"),
         status || "active",
       ]
     );
@@ -126,6 +138,74 @@ router.post("/", protect, adminOnly, async (req, res) => {
 
     res.status(500).json({
       message: "Failed to create employer partnership",
+      error: error.message,
+    });
+  } finally {
+    connection.release();
+  }
+});
+
+// Update partnership branding + company details
+router.put("/:id", protect, adminOnly, async (req, res) => {
+  const connection = await pool.getConnection();
+
+  try {
+    const { id } = req.params;
+    const {
+      company_name,
+      logo_url,
+      website,
+      phone,
+      contact_email,
+      brand_primary_color,
+      brand_secondary_color,
+      team_id,
+      status,
+    } = req.body;
+
+    await connection.beginTransaction();
+
+    const [partnershipRows] = await connection.query(
+      `SELECT employer_id FROM partnerships WHERE id = ? LIMIT 1`,
+      [id]
+    );
+
+    if (partnershipRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ message: "Partnership not found" });
+    }
+
+    const employerId = partnershipRows[0].employer_id;
+
+    await connection.query(
+      `UPDATE employers
+       SET name = ?, logo_url = ?, website = ?, phone = ?, contact_email = ?, brand_primary_color = ?, brand_secondary_color = ?, status = ?
+       WHERE id = ?`,
+      [
+        company_name,
+        logo_url || null,
+        website || null,
+        phone || null,
+        contact_email || null,
+        cleanColor(brand_primary_color, "#2563eb"),
+        cleanColor(brand_secondary_color, "#eff6ff"),
+        status || "active",
+        employerId,
+      ]
+    );
+
+    await connection.query(
+      `UPDATE partnerships SET team_id = ?, status = ? WHERE id = ?`,
+      [team_id, status || "active", id]
+    );
+
+    await connection.commit();
+
+    res.json({ message: "Partnership branding updated successfully" });
+  } catch (error) {
+    await connection.rollback();
+    res.status(500).json({
+      message: "Failed to update partnership branding",
       error: error.message,
     });
   } finally {
