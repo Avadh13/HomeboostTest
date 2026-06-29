@@ -71,7 +71,25 @@ const readUser = (): CurrentUser => {
   }
 };
 
-const formatDateTime = (value?: string | null) => {
+const roleLabel = (role?: string | null) => (role || "user").replace(/_/g, " ");
+
+const initials = (name?: string | null) => {
+  const value = (name || "User").trim();
+  const parts = value.split(/\s+/).slice(0, 2);
+  return parts.map((part) => part[0]?.toUpperCase()).join("") || "U";
+};
+
+const formatTime = (value?: string | null) => {
+  if (!value) return "";
+  return new Date(value).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+};
+
+const formatDate = (value?: string | null) => {
+  if (!value) return "No date";
+  return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+};
+
+const formatFullDate = (value?: string | null) => {
   if (!value) return "No date";
   return new Date(value).toLocaleString(undefined, {
     month: "short",
@@ -82,44 +100,42 @@ const formatDateTime = (value?: string | null) => {
   });
 };
 
-const roleLabel = (role?: string | null) => (role || "user").replace(/_/g, " ");
-
 const getRoleMeta = (role?: string) => {
   if (role === "employee") {
     return {
-      title: "Employee Messages",
-      subtitle: "One-to-one private conversations with your advisor, company contact, or HomeBoost support.",
+      title: "Messages",
+      subtitle: "Private chats with your advisor, company contact, or support.",
       homePath: "/employee-portal",
     };
   }
 
   if (role === "company_admin" || role === "company") {
     return {
-      title: "Company Messages",
-      subtitle: "One-to-one private conversations with employees, HBT contacts, or HomeBoost support.",
+      title: "Messages",
+      subtitle: "Private chats with employees, HBT contacts, or support.",
       homePath: "/company/dashboard",
     };
   }
 
   if (role === "hbt_member") {
     return {
-      title: "Advisor Messages",
-      subtitle: "One-to-one private conversations with clients, company managers, team members, or support.",
+      title: "Messages",
+      subtitle: "Private chats with clients, company managers, team members, or support.",
       homePath: "/hbt/member-dashboard",
     };
   }
 
   if (role === "hbt_admin") {
     return {
-      title: "HBT Admin Messages",
-      subtitle: "One-to-one private conversations only. Team-wide visibility is disabled.",
+      title: "Messages",
+      subtitle: "One-to-one private conversations only.",
       homePath: "/hbt/dashboard",
     };
   }
 
   return {
-    title: "Admin Messages",
-    subtitle: "One-to-one private platform support conversations.",
+    title: "Messages",
+    subtitle: "Private platform support conversations.",
     homePath: "/admin",
   };
 };
@@ -134,7 +150,7 @@ function MessageCenter() {
   const [messageBody, setMessageBody] = useState("");
   const [replyBody, setReplyBody] = useState("");
   const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [showNewChat, setShowNewChat] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -142,8 +158,7 @@ function MessageCenter() {
   const user = readUser();
   const meta = getRoleMeta(user.role);
   const isAdmin = user.role === "admin" || user.role === "super_admin";
-  const canManageStatus = user.role !== "employee";
-  const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
+  const authHeaders = useMemo<Record<string, string>>(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   const getOtherPerson = (thread: Thread): PersonPreview => {
     if (Number(thread.created_by) === Number(user.id)) {
@@ -160,6 +175,26 @@ function MessageCenter() {
       role: thread.created_by_role,
     };
   };
+
+  const selectedRecipient = contacts.find((contact) => String(contact.id) === selectedRecipientId);
+
+  const filteredThreads = useMemo(() => {
+    const search = searchText.toLowerCase().trim();
+
+    return threads.filter((thread) => {
+      const other = getOtherPerson(thread);
+      return (
+        !search ||
+        [thread.subject, other.name, other.email, thread.company_name, thread.hbt_team_name, thread.last_message]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(search)
+      );
+    });
+  }, [threads, searchText, user.id]);
+
+  const unreadTotal = threads.reduce((sum, thread) => sum + Number(thread.unread_count || 0), 0);
 
   const loadThreads = async () => {
     try {
@@ -203,6 +238,7 @@ function MessageCenter() {
       }
 
       setSelected(data);
+      setShowNewChat(false);
       await loadThreads();
     } catch {
       toast.error("Failed to load conversation.");
@@ -214,35 +250,6 @@ function MessageCenter() {
     loadContacts();
   }, []);
 
-  const selectedRecipient = contacts.find((contact) => String(contact.id) === selectedRecipientId);
-
-  const filteredThreads = useMemo(() => {
-    const search = searchText.toLowerCase().trim();
-
-    return threads.filter((thread) => {
-      const other = getOtherPerson(thread);
-      const matchesSearch =
-        !search ||
-        [thread.subject, other.name, other.email, thread.company_name, thread.hbt_team_name, thread.last_message]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(search);
-      const matchesStatus = statusFilter === "all" || thread.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [threads, searchText, statusFilter, user.id]);
-
-  const unreadTotal = threads.reduce((sum, thread) => sum + Number(thread.unread_count || 0), 0);
-  const openTotal = threads.filter((thread) => thread.status === "open").length;
-  const pendingTotal = threads.filter((thread) => thread.status === "pending").length;
-
-  const getStatusClass = (status: string) => {
-    if (status === "closed") return "bg-emerald-100 text-emerald-700";
-    if (status === "pending") return "bg-amber-100 text-amber-700";
-    return "bg-blue-100 text-blue-700";
-  };
-
   const createThread = async (event: FormEvent) => {
     event.preventDefault();
 
@@ -251,10 +258,12 @@ function MessageCenter() {
       return;
     }
 
-    if (!subject.trim() || !messageBody.trim()) {
-      toast.warning("Subject and message are required.");
+    if (!messageBody.trim()) {
+      toast.warning("Message is required.");
       return;
     }
+
+    const finalSubject = subject.trim() || `Chat with ${selectedRecipient.full_name}`;
 
     try {
       setSaving(true);
@@ -262,7 +271,7 @@ function MessageCenter() {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          subject: subject.trim(),
+          subject: finalSubject,
           message_body: messageBody.trim(),
           recipient_id: selectedRecipient.id,
         }),
@@ -277,9 +286,10 @@ function MessageCenter() {
       setSubject("");
       setMessageBody("");
       setSelectedRecipientId("");
+      setShowNewChat(false);
       await loadThreads();
       if (data.thread_id) await loadThreadDetails(data.thread_id);
-      toast.success("Private conversation started.");
+      toast.success("Private message sent.");
     } catch {
       toast.error("Failed to create conversation.");
     } finally {
@@ -300,7 +310,7 @@ function MessageCenter() {
       const response = await fetch(`${API_BASE_URL}/messages/threads/${selected.thread.id}/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message_body: replyBody }),
+        body: JSON.stringify({ message_body: replyBody.trim() }),
       });
       const data = await response.json();
 
@@ -311,33 +321,10 @@ function MessageCenter() {
 
       setReplyBody("");
       await loadThreadDetails(selected.thread.id);
-      toast.success("Reply sent.");
     } catch {
       toast.error("Failed to send reply.");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const updateStatus = async (threadId: number, status: string) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/messages/threads/${threadId}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        toast.error(data.message || "Failed to update status.");
-        return;
-      }
-
-      await loadThreads();
-      if (selected?.thread.id === threadId) await loadThreadDetails(threadId);
-      toast.success("Conversation status updated.");
-    } catch {
-      toast.error("Failed to update status.");
     }
   };
 
@@ -361,7 +348,7 @@ function MessageCenter() {
   };
 
   const deleteThread = async (threadId: number) => {
-    if (!confirm("Delete this full conversation? This removes all messages in this thread.")) return;
+    if (!confirm("Delete this full conversation?")) return;
 
     try {
       const response = await fetch(`${API_BASE_URL}/messages/threads/${threadId}`, { method: "DELETE", headers: authHeaders });
@@ -380,180 +367,222 @@ function MessageCenter() {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/login";
-  };
+  const selectedOther = selected ? getOtherPerson(selected.thread) : null;
 
   return (
-    <main className="theme-page min-h-screen">
+    <main className="min-h-screen bg-[#e8eef7] text-slate-950">
       <Navbar />
-      <section className="mx-auto max-w-7xl space-y-5 px-4 py-6 md:px-6 md:py-8">
-        <header className="theme-panel">
-          <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
-            <div>
-              <Link to={meta.homePath} className="text-sm font-black text-violet-200 hover:text-white">← Back to Dashboard</Link>
-              <p className="mt-5 text-xs font-black uppercase tracking-[0.22em] text-violet-200">Private Messaging</p>
-              <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">{meta.title}</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-violet-100 md:text-base">{meta.subtitle}</p>
+
+      <section className="mx-auto flex h-[calc(100vh-76px)] max-w-7xl overflow-hidden border-x border-white/70 bg-white shadow-2xl shadow-slate-300/60">
+        <aside className={`${selected ? "hidden md:flex" : "flex"} w-full flex-col border-r border-slate-200 bg-white md:w-[390px]`}>
+          <div className="border-b border-slate-200 bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Link to={meta.homePath} className="text-xs font-black text-blue-600 hover:text-blue-800">← Dashboard</Link>
+                <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">{meta.title}</h1>
+                <p className="text-xs font-semibold text-slate-500">{meta.subtitle}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setSelected(null);
+                  setShowNewChat(true);
+                }}
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-2xl font-black text-white shadow-lg shadow-blue-500/30 transition hover:-translate-y-0.5 hover:bg-blue-700"
+                title="New chat"
+              >
+                +
+              </button>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Link to="/notifications" className="rounded-full border border-white/30 px-4 py-2 text-sm font-black text-white hover:bg-white/10">Notifications</Link>
-              <button onClick={logout} className="rounded-full bg-red-600 px-4 py-2 text-sm font-black text-white hover:bg-red-700">Logout</button>
+
+            <div className="mt-4 flex items-center gap-2 rounded-full bg-slate-100 px-4 py-3">
+              <span className="text-slate-400">⌕</span>
+              <input
+                className="w-full bg-transparent text-sm font-semibold outline-none placeholder:text-slate-400"
+                placeholder="Search messages"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+              />
+            </div>
+
+            <div className="mt-3 flex items-center justify-between text-xs font-black uppercase tracking-wide text-slate-400">
+              <span>{threads.length} chats</span>
+              {unreadTotal > 0 && <span className="rounded-full bg-red-100 px-3 py-1 text-red-700">{unreadTotal} unread</span>}
             </div>
           </div>
-        </header>
 
-        <section className="grid gap-4 sm:grid-cols-4">
-          {[
-            ["Private Chats", threads.length, "text-violet-700", "bg-violet-50"],
-            ["Unread", unreadTotal, "text-red-700", "bg-red-50"],
-            ["Open", openTotal, "text-blue-700", "bg-blue-50"],
-            ["Pending", pendingTotal, "text-amber-700", "bg-amber-50"],
-          ].map(([label, value, textTone, bgTone]) => (
-            <div key={String(label)} className="metric-card">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
-              <h2 className={`mt-2 rounded-2xl px-3 py-2 text-3xl font-black ${textTone} ${bgTone}`}>{value}</h2>
-            </div>
-          ))}
-        </section>
+          {showNewChat && (
+            <form onSubmit={createThread} className="border-b border-slate-200 bg-blue-50/70 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="font-black text-slate-950">New private chat</h2>
+                <button type="button" onClick={() => setShowNewChat(false)} className="rounded-full px-3 py-1 text-sm font-black text-slate-500 hover:bg-white">Close</button>
+              </div>
 
-        <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
-          <form onSubmit={createThread} className="premium-card border-2 border-violet-100">
-            <p className="eyebrow">New private chat</p>
-            <h2 className="mt-1 text-2xl font-black text-slate-950">Message One Person</h2>
-            <p className="mt-2 text-sm leading-relaxed text-slate-500">Every conversation is one-to-one. Only you and the selected person can see it.</p>
-
-            <label className="mt-5 block">
-              <span className="mb-2 block text-sm font-bold text-slate-700">Select person</span>
-              <select className="form-field" value={selectedRecipientId} onChange={(event) => setSelectedRecipientId(event.target.value)}>
+              <select className="form-field bg-white" value={selectedRecipientId} onChange={(event) => setSelectedRecipientId(event.target.value)}>
                 <option value="">Choose one person...</option>
                 {contacts.map((contact) => (
                   <option key={contact.id} value={contact.id}>
-                    {contact.full_name} — {contact.title || roleLabel(contact.role)}{contact.company_name ? ` (${contact.company_name})` : ""}{contact.is_online ? " • Online" : ""}
+                    {contact.full_name} — {contact.title || roleLabel(contact.role)}{contact.company_name ? ` (${contact.company_name})` : ""}
                   </option>
                 ))}
               </select>
-            </label>
 
-            {contacts.length === 0 && <p className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-800">No available contacts found for this account.</p>}
+              <input
+                className="form-field mt-3 bg-white"
+                placeholder="Subject optional"
+                value={subject}
+                onChange={(event) => setSubject(event.target.value)}
+              />
 
-            <div className="mt-4 space-y-4 rounded-3xl border border-slate-200 bg-white p-4">
-              <input className="form-field" placeholder="Subject" value={subject} onChange={(event) => setSubject(event.target.value)} />
-              <textarea className="form-field min-h-[140px]" placeholder="Write your private message..." value={messageBody} onChange={(event) => setMessageBody(event.target.value)} />
-              <button disabled={saving} className="btn-primary disabled:opacity-60">{saving ? "Sending..." : "Send Private Message"}</button>
+              <textarea
+                className="form-field mt-3 min-h-[100px] bg-white"
+                placeholder="Write your first message..."
+                value={messageBody}
+                onChange={(event) => setMessageBody(event.target.value)}
+              />
+
+              <button disabled={saving} className="mt-3 w-full rounded-full bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-md shadow-blue-500/25 transition hover:bg-blue-700 disabled:opacity-60">
+                {saving ? "Sending..." : "Send Message"}
+              </button>
+            </form>
+          )}
+
+          <div className="flex-1 overflow-y-auto bg-white">
+            {loading ? (
+              <div className="space-y-3 p-4">
+                {[1, 2, 3, 4].map((item) => (
+                  <div key={item} className="flex gap-3 rounded-2xl p-3">
+                    <div className="h-12 w-12 rounded-full bg-slate-100" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-2/3 rounded bg-slate-100" />
+                      <div className="h-3 w-full rounded bg-slate-100" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredThreads.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center px-8 text-center">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl">💬</div>
+                <h2 className="text-xl font-black text-slate-950">No chats yet</h2>
+                <p className="mt-2 text-sm text-slate-500">Start a private one-to-one conversation.</p>
+                <button onClick={() => setShowNewChat(true)} className="mt-5 rounded-full bg-blue-600 px-5 py-3 text-sm font-black text-white">New chat</button>
+              </div>
+            ) : (
+              filteredThreads.map((thread) => {
+                const other = getOtherPerson(thread);
+                const active = selected?.thread.id === thread.id;
+
+                return (
+                  <button
+                    key={thread.id}
+                    onClick={() => loadThreadDetails(thread.id)}
+                    className={`flex w-full gap-3 border-b border-slate-100 p-4 text-left transition ${active ? "bg-blue-50" : "bg-white hover:bg-slate-50"}`}
+                  >
+                    <div className="relative flex h-13 w-13 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-violet-600 text-sm font-black text-white shadow-md">
+                      {initials(other.name)}
+                      {Number(thread.unread_count || 0) > 0 && <span className="absolute -right-1 -top-1 h-4 w-4 rounded-full border-2 border-white bg-red-500" />}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="truncate font-black text-slate-950">{other.name}</p>
+                        <span className="shrink-0 text-[11px] font-bold text-slate-400">{formatDate(thread.last_message_at)}</span>
+                      </div>
+                      <p className="truncate text-xs font-semibold capitalize text-blue-600">{roleLabel(other.role)}</p>
+                      <p className="mt-1 truncate text-sm text-slate-500">{thread.last_message || thread.subject}</p>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </aside>
+
+        <section className={`${selected ? "flex" : "hidden md:flex"} flex-1 flex-col bg-[#f5f8fc]`}>
+          {!selected || !selectedOther ? (
+            <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+              <div className="mb-5 flex h-24 w-24 items-center justify-center rounded-full bg-white text-5xl shadow-xl shadow-slate-200">💬</div>
+              <h2 className="text-3xl font-black text-slate-950">Select a chat</h2>
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-slate-500">Choose a private conversation from the left side, or start a new one-to-one message.</p>
+              <button onClick={() => setShowNewChat(true)} className="mt-6 rounded-full bg-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/25">Start new chat</button>
             </div>
-          </form>
-
-          <section className="premium-card overflow-hidden border-2 border-slate-100 p-0">
-            <div className="border-b border-slate-100 p-4">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="eyebrow">Private inbox</p>
-                  <h2 className="mt-1 text-2xl font-black text-slate-950">One-to-One Conversations</h2>
-                  <p className="mt-1 text-sm font-bold text-slate-500">Showing {filteredThreads.length} of {threads.length}</p>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <div className="flex min-w-0 items-center gap-3">
+                  <button onClick={() => setSelected(null)} className="rounded-full p-2 text-xl font-black text-slate-500 hover:bg-slate-100 md:hidden">‹</button>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-violet-600 text-sm font-black text-white">
+                    {initials(selectedOther.name)}
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="truncate text-base font-black text-slate-950 md:text-lg">{selectedOther.name}</h2>
+                    <p className="truncate text-xs font-bold capitalize text-slate-500">{roleLabel(selectedOther.role)}{selected.thread.company_name ? ` · ${selected.thread.company_name}` : ""}</p>
+                  </div>
                 </div>
-                <button onClick={loadThreads} className="btn-secondary">Refresh</button>
-              </div>
-              <div className="grid gap-3 md:grid-cols-[1fr_180px]">
-                <input className="form-field" placeholder="Search private chats..." value={searchText} onChange={(event) => setSearchText(event.target.value)} />
-                <select className="form-field" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                  <option value="all">All Status</option>
-                  <option value="open">Open</option>
-                  <option value="pending">Pending</option>
-                  <option value="closed">Closed</option>
-                </select>
-              </div>
-            </div>
 
-            <div className="grid min-h-[620px] xl:grid-cols-[0.92fr_1.08fr]">
-              <div className="max-h-[720px] overflow-y-auto border-b border-slate-100 xl:border-b-0 xl:border-r">
-                {loading ? (
-                  <p className="p-5 text-sm font-bold text-slate-500">Loading conversations...</p>
-                ) : filteredThreads.length === 0 ? (
-                  <div className="p-8 text-center text-slate-500">No private conversations found.</div>
-                ) : (
-                  filteredThreads.map((thread) => {
-                    const other = getOtherPerson(thread);
+                <div className="flex items-center gap-2">
+                  <button onClick={loadThreads} className="hidden rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-700 hover:bg-slate-200 md:inline-flex">Refresh</button>
+                  <button onClick={() => deleteThread(selected.thread.id)} className="rounded-full bg-red-50 px-4 py-2 text-xs font-black text-red-600 hover:bg-red-100">Delete</button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_32%),linear-gradient(135deg,#eef5ff_0%,#f8fafc_42%,#eef2ff_100%)] px-4 py-5 md:px-8">
+                <div className="mx-auto max-w-3xl space-y-4">
+                  <div className="mx-auto w-fit rounded-full bg-white/80 px-4 py-1.5 text-xs font-bold text-slate-500 shadow-sm ring-1 ring-slate-200">
+                    {selected.thread.subject}
+                  </div>
+
+                  {selected.messages.map((message) => {
+                    const isMine = Number(message.sender_id) === Number(user.id);
+                    const canDelete = isMine || isAdmin;
 
                     return (
-                      <button key={thread.id} onClick={() => loadThreadDetails(thread.id)} className={`block w-full border-b p-4 text-left transition hover:bg-violet-50/60 ${selected?.thread.id === thread.id ? "bg-violet-50" : "bg-white"}`}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-black text-slate-950">{thread.subject}</p>
-                            <p className="mt-1 text-sm text-slate-500">With {other.name} • {roleLabel(other.role)}</p>
-                            {thread.company_name && <p className="text-xs font-semibold text-slate-400">{thread.company_name}</p>}
-                          </div>
-                          <span className={`rounded-full px-3 py-1 text-xs font-black uppercase ${getStatusClass(thread.status)}`}>{thread.status}</span>
-                        </div>
-                        <p className="mt-3 line-clamp-2 text-sm text-slate-600">{thread.last_message || "No messages yet."}</p>
-                        <div className="mt-3 flex items-center justify-between text-xs text-slate-400"><span>{formatDateTime(thread.last_message_at)}</span>{Number(thread.unread_count || 0) > 0 && <span className="rounded-full bg-red-600 px-2 py-1 font-bold text-white">{thread.unread_count} unread</span>}</div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-
-              <div className="border-l border-slate-100 bg-slate-50 p-5">
-                {!selected ? (
-                  <div className="flex min-h-[500px] flex-col items-center justify-center text-center">
-                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-100 text-3xl font-black text-violet-700">✉</div>
-                    <h2 className="text-2xl font-black text-slate-950">Select a private chat</h2>
-                    <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500">Choose a thread from the list or start a new private message.</p>
-                  </div>
-                ) : (
-                  <div className="flex h-full min-h-[560px] flex-col rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="border-b border-slate-200 pb-4">
-                      <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
-                        <div>
-                          <h2 className="text-2xl font-black text-slate-950">{selected.thread.subject}</h2>
-                          <p className="mt-1 text-sm text-slate-500">Private chat with {getOtherPerson(selected.thread).name} • {roleLabel(getOtherPerson(selected.thread).role)}</p>
-                          {selected.thread.company_name && <p className="text-sm text-slate-500">Company: {selected.thread.company_name}</p>}
-                          {selected.thread.hbt_team_name && <p className="text-sm text-slate-500">HBT Team: {selected.thread.hbt_team_name}</p>}
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {canManageStatus && (
-                            <select className="rounded-xl border bg-white p-3 text-sm font-semibold" value={selected.thread.status} onChange={(event) => updateStatus(selected.thread.id, event.target.value)}>
-                              <option value="open">Open</option>
-                              <option value="pending">Pending</option>
-                              <option value="closed">Closed</option>
-                            </select>
-                          )}
-                          <button onClick={() => deleteThread(selected.thread.id)} className="rounded-xl bg-red-600 px-3 py-2 text-sm font-black text-white hover:bg-red-700">Delete chat</button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="my-5 max-h-[480px] space-y-4 overflow-y-auto rounded-3xl border border-slate-200 bg-slate-50 p-3 pr-2">
-                      {selected.messages.map((message) => {
-                        const isMine = Number(message.sender_id) === Number(user.id);
-                        const canDelete = isMine || isAdmin;
-
-                        return (
-                          <div key={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                            <div className={`max-w-[82%] rounded-2xl border p-4 shadow-sm ${isMine ? "border-blue-500 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-800"}`}>
-                              <div className="flex items-start justify-between gap-3">
-                                <p className="text-xs font-bold capitalize opacity-80">{message.sender_name} • {roleLabel(message.sender_role)}</p>
-                                {canDelete && <button onClick={() => deleteMessage(message.id)} className={`rounded-full px-2 py-0.5 text-[10px] font-black ${isMine ? "bg-white/20 text-white" : "bg-red-50 text-red-600"}`}>Delete</button>}
-                              </div>
-                              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{message.message_body}</p>
-                              <p className="mt-2 text-xs opacity-70">{formatDateTime(message.created_at)}</p>
+                      <div key={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                        <div className={`group max-w-[82%] md:max-w-[68%] ${isMine ? "items-end" : "items-start"}`}>
+                          <div className={`rounded-3xl px-4 py-3 shadow-sm ${isMine ? "rounded-br-md bg-blue-600 text-white" : "rounded-bl-md bg-white text-slate-900 ring-1 ring-slate-200"}`}>
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.message_body}</p>
+                            <div className={`mt-2 flex items-center gap-2 text-[11px] ${isMine ? "justify-end text-blue-100" : "justify-start text-slate-400"}`}>
+                              <span>{formatTime(message.created_at)}</span>
+                              {isMine && <span>✓✓</span>}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
 
-                    <form onSubmit={sendReply} className="mt-auto space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-3">
-                      <textarea className="form-field min-h-[110px] bg-white" placeholder="Write a private reply..." value={replyBody} onChange={(event) => setReplyBody(event.target.value)} />
-                      <button disabled={saving} className="btn-dark disabled:opacity-60">{saving ? "Sending..." : "Send Reply"}</button>
-                    </form>
-                  </div>
-                )}
+                          <div className={`mt-1 flex ${isMine ? "justify-end" : "justify-start"}`}>
+                            <span className="text-[11px] font-semibold text-slate-400">{formatFullDate(message.created_at)}</span>
+                            {canDelete && (
+                              <button onClick={() => deleteMessage(message.id)} className="ml-2 text-[11px] font-black text-red-500 opacity-0 transition group-hover:opacity-100">
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          </section>
+
+              <form onSubmit={sendReply} className="border-t border-slate-200 bg-white p-3 md:p-4">
+                <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-[2rem] bg-slate-100 p-2 ring-1 ring-slate-200">
+                  <button type="button" className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl text-slate-500 hover:bg-white md:flex">＋</button>
+                  <textarea
+                    className="max-h-36 min-h-[44px] flex-1 resize-none bg-transparent px-3 py-3 text-sm font-semibold outline-none placeholder:text-slate-400"
+                    placeholder="Message..."
+                    value={replyBody}
+                    onChange={(event) => setReplyBody(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        event.currentTarget.form?.requestSubmit();
+                      }
+                    }}
+                  />
+                  <button disabled={saving || !replyBody.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-lg font-black text-white shadow-md shadow-blue-500/25 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+                    ➤
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
         </section>
       </section>
     </main>
