@@ -39,7 +39,7 @@ const threadSelectSql = `
     creator.email AS created_by_email,
     creator.role AS created_by_role,
     creator.last_seen_at AS created_by_last_seen_at,
-    creator_tm.photo_url AS created_by_photo_url,
+    COALESCE(creator.photo_url, creator_tm.photo_url) AS created_by_photo_url,
     CASE
       WHEN creator.last_seen_at IS NOT NULL
       AND creator.last_seen_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
@@ -51,7 +51,7 @@ const threadSelectSql = `
     recipient.email AS recipient_email,
     recipient.role AS recipient_role,
     recipient.last_seen_at AS recipient_last_seen_at,
-    recipient_tm.photo_url AS recipient_photo_url,
+    COALESCE(recipient.photo_url, recipient_tm.photo_url) AS recipient_photo_url,
     CASE
       WHEN recipient.last_seen_at IS NOT NULL
       AND recipient.last_seen_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
@@ -122,18 +122,12 @@ const getCompanyPartnership = async (partnershipId) => {
   return partnership || null;
 };
 
-const getThreadAccessWhere = () => ({
-  where: "WHERE (mt.created_by = ? OR mt.recipient_id = ?)",
-});
+const getThreadAccessWhere = () => ({ where: "WHERE (mt.created_by = ? OR mt.recipient_id = ?)" });
 
 const getThreadForAccess = async (threadId, user) => {
   const access = getThreadAccessWhere();
   const [rows] = await pool.query(
-    `SELECT mt.*
-     FROM message_threads mt
-     ${access.where}
-     AND mt.id = ?
-     LIMIT 1`,
+    `SELECT mt.* FROM message_threads mt ${access.where} AND mt.id = ? LIMIT 1`,
     [user.id, user.id, threadId]
   );
 
@@ -171,7 +165,7 @@ const baseContactSelect = `
     u.last_seen_at,
     ${isRecentlyOnlineSql} AS is_online_now,
     tm.title,
-    tm.photo_url,
+    COALESCE(u.photo_url, tm.photo_url) AS photo_url,
     h.name AS hbt_team_name,
     e.name AS company_name,
     p.slug AS partnership_slug
@@ -189,7 +183,6 @@ const getContacts = async (req, res) => {
 
     if (user.role === "employee") {
       if (!user.partnership_id) return res.json(normalizeContacts(contacts));
-
       const partnership = await getCompanyPartnership(user.partnership_id);
       if (!partnership) return res.json(normalizeContacts(contacts));
 
@@ -197,15 +190,10 @@ const getContacts = async (req, res) => {
         `${baseContactSelect}
          WHERE u.is_active = 1
          AND u.id != ?
-         AND (
-           (u.team_id = ? AND u.role IN ('hbt_admin', 'hbt_member'))
-           OR (u.partnership_id = ? AND u.role IN ('company_admin', 'company'))
-           OR u.role IN ('admin', 'super_admin')
-         )
+         AND ((u.team_id = ? AND u.role IN ('hbt_admin', 'hbt_member')) OR (u.partnership_id = ? AND u.role IN ('company_admin', 'company')) OR u.role IN ('admin', 'super_admin'))
          ORDER BY is_online_now DESC, FIELD(u.role, 'hbt_member', 'hbt_admin', 'company_admin', 'company', 'admin', 'super_admin'), u.full_name ASC`,
         [user.id, partnership.team_id, user.partnership_id]
       );
-
       contacts.users = users;
       return res.json(normalizeContacts(contacts));
     }
@@ -215,15 +203,10 @@ const getContacts = async (req, res) => {
         `${baseContactSelect}
          WHERE u.id != ?
          AND u.is_active = 1
-         AND (
-           (u.team_id = ? AND u.role IN ('hbt_admin', 'hbt_member'))
-           OR (p.team_id = ? AND u.role IN ('employee', 'company_admin', 'company'))
-           OR u.role IN ('admin', 'super_admin')
-         )
+         AND ((u.team_id = ? AND u.role IN ('hbt_admin', 'hbt_member')) OR (p.team_id = ? AND u.role IN ('employee', 'company_admin', 'company')) OR u.role IN ('admin', 'super_admin'))
          ORDER BY is_online_now DESC, FIELD(u.role, 'employee', 'company_admin', 'company', 'hbt_member', 'hbt_admin', 'admin', 'super_admin'), u.full_name ASC`,
         [user.id, user.team_id, user.team_id]
       );
-
       contacts.users = users;
       return res.json(normalizeContacts(contacts));
     }
@@ -236,15 +219,10 @@ const getContacts = async (req, res) => {
         `${baseContactSelect}
          WHERE u.is_active = 1
          AND u.id != ?
-         AND (
-           (u.role IN ('hbt_admin', 'hbt_member') AND u.team_id = ?)
-           OR (u.role = 'employee' AND u.partnership_id = ?)
-           OR u.role IN ('admin', 'super_admin')
-         )
+         AND ((u.role IN ('hbt_admin', 'hbt_member') AND u.team_id = ?) OR (u.role = 'employee' AND u.partnership_id = ?) OR u.role IN ('admin', 'super_admin'))
          ORDER BY is_online_now DESC, FIELD(u.role, 'hbt_admin', 'hbt_member', 'employee', 'admin', 'super_admin'), u.full_name ASC`,
         [user.id, partnership.team_id, user.partnership_id]
       );
-
       contacts.users = users;
       return res.json(normalizeContacts(contacts));
     }
@@ -257,7 +235,6 @@ const getContacts = async (req, res) => {
          ORDER BY is_online_now DESC, u.role ASC, u.full_name ASC`,
         [user.id]
       );
-
       contacts.users = users;
       return res.json(normalizeContacts(contacts));
     }
@@ -273,12 +250,9 @@ const getThreads = async (req, res) => {
     const user = req.user;
     const access = getThreadAccessWhere();
     const [threads] = await pool.query(
-      `${threadSelectSql}
-       ${access.where}
-       ORDER BY COALESCE(last_message_at, mt.updated_at) DESC, mt.id DESC`,
+      `${threadSelectSql} ${access.where} ORDER BY COALESCE(last_message_at, mt.updated_at) DESC, mt.id DESC`,
       [user.id, user.id, user.id]
     );
-
     return res.json(threads);
   } catch (error) {
     return res.status(500).json({ status: "error", message: "Failed to load message threads", error: error.message });
@@ -291,23 +265,11 @@ const getThreadDetails = async (req, res) => {
     const { id } = req.params;
     const thread = await getThreadForAccess(id, user);
 
-    if (!thread) {
-      return res.status(404).json({ status: "error", message: "Thread not found or access denied" });
-    }
+    if (!thread) return res.status(404).json({ status: "error", message: "Thread not found or access denied" });
 
-    await pool.query(
-      `UPDATE messages
-       SET is_read = 1
-       WHERE thread_id = ?
-       AND sender_id != ?`,
-      [id, user.id]
-    );
+    await pool.query(`UPDATE messages SET is_read = 1 WHERE thread_id = ? AND sender_id != ?`, [id, user.id]);
 
-    const [[threadDetails]] = await pool.query(
-      `${threadSelectSql}
-       WHERE mt.id = ?`,
-      [user.id, id]
-    );
+    const [[threadDetails]] = await pool.query(`${threadSelectSql} WHERE mt.id = ?`, [user.id, id]);
 
     const [messages] = await pool.query(
       `SELECT m.id, m.thread_id, m.sender_id, m.message_body, m.is_read, m.created_at,
@@ -329,13 +291,9 @@ const getThreadDetails = async (req, res) => {
 
 const getRecipient = async (recipientId) => {
   const [[recipient]] = await pool.query(
-    `SELECT id, full_name, email, role, team_id, partnership_id
-     FROM users
-     WHERE id = ? AND is_active = 1
-     LIMIT 1`,
+    `SELECT id, full_name, email, role, team_id, partnership_id FROM users WHERE id = ? AND is_active = 1 LIMIT 1`,
     [recipientId]
   );
-
   return recipient || null;
 };
 
@@ -346,7 +304,6 @@ const canMessageRecipient = async (sender, recipient) => {
   if (sender.role === "employee") {
     const partnership = await getCompanyPartnership(sender.partnership_id);
     if (!partnership) return { allowed: false, message: "Employee is not linked to a partnership" };
-
     if (isHbtUser(recipient) && Number(recipient.team_id) === Number(partnership.team_id)) return { allowed: true };
     if (isCompanyManager(recipient) && Number(recipient.partnership_id) === Number(sender.partnership_id)) return { allowed: true };
     return { allowed: false, message: "Recipient is not connected to your employer partnership" };
@@ -355,7 +312,6 @@ const canMessageRecipient = async (sender, recipient) => {
   if (isCompanyManager(sender)) {
     const partnership = await getCompanyPartnership(sender.partnership_id);
     if (!partnership) return { allowed: false, message: "Company account is not linked to a partnership" };
-
     if (recipient.role === "employee" && Number(recipient.partnership_id) === Number(sender.partnership_id)) return { allowed: true };
     if (isHbtUser(recipient) && Number(recipient.team_id) === Number(partnership.team_id)) return { allowed: true };
     return { allowed: false, message: "Recipient is not connected to your company partnership" };
@@ -363,17 +319,14 @@ const canMessageRecipient = async (sender, recipient) => {
 
   if (isHbtUser(sender)) {
     if (isHbtUser(recipient) && Number(recipient.team_id) === Number(sender.team_id)) return { allowed: true };
-
     if (recipient.role === "employee") {
       const partnership = await getCompanyPartnership(recipient.partnership_id);
       if (partnership && Number(partnership.team_id) === Number(sender.team_id)) return { allowed: true };
     }
-
     if (isCompanyManager(recipient)) {
       const partnership = await getCompanyPartnership(recipient.partnership_id);
       if (partnership && Number(partnership.team_id) === Number(sender.team_id)) return { allowed: true };
     }
-
     return { allowed: false, message: "Recipient is not connected to your HBT team" };
   }
 
@@ -390,77 +343,51 @@ const buildThreadMetadata = async (sender, recipient) => {
     employeeId = sender.id;
     partnershipId = sender.partnership_id;
   }
-
   if (recipient.role === "employee") {
     employeeId = recipient.id;
     partnershipId = recipient.partnership_id;
   }
-
   if (isCompanyManager(sender)) partnershipId = sender.partnership_id;
   if (isCompanyManager(recipient)) partnershipId = recipient.partnership_id;
-
   if (isHbtUser(sender)) {
     hbtTeamId = sender.team_id;
     assignedMemberId = sender.id;
   }
-
   if (isHbtUser(recipient)) {
     hbtTeamId = recipient.team_id;
     assignedMemberId = recipient.id;
   }
-
   if (!hbtTeamId && partnershipId) {
     const partnership = await getCompanyPartnership(partnershipId);
     hbtTeamId = partnership?.team_id || null;
   }
-
   if (isAdmin(sender) || isAdmin(recipient)) {
     hbtTeamId = null;
     assignedMemberId = isHbtUser(sender) ? sender.id : isHbtUser(recipient) ? recipient.id : null;
   }
-
   return { employeeId, partnershipId, hbtTeamId, assignedMemberId };
 };
 
 const createThread = async (req, res) => {
   const connection = await pool.getConnection();
-
   try {
     const user = req.user;
     const { subject, message_body, recipient_id } = req.body;
-
-    if (!subject || !message_body || !recipient_id) {
-      return res.status(400).json({ status: "error", message: "Subject, message, and recipient are required for one-to-one conversations" });
-    }
+    if (!subject || !message_body || !recipient_id) return res.status(400).json({ status: "error", message: "Subject, message, and recipient are required for one-to-one conversations" });
 
     const recipient = await getRecipient(recipient_id);
     const access = await canMessageRecipient(user, recipient);
-
-    if (!access.allowed) {
-      return res.status(403).json({ status: "error", message: access.message || "You cannot message this recipient" });
-    }
+    if (!access.allowed) return res.status(403).json({ status: "error", message: access.message || "You cannot message this recipient" });
 
     const metadata = await buildThreadMetadata(user, recipient);
-
     await connection.beginTransaction();
-
     const [threadResult] = await connection.query(
-      `INSERT INTO message_threads
-       (subject, employee_id, hbt_team_id, partnership_id, assigned_member_id, recipient_id, status, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
+      `INSERT INTO message_threads (subject, employee_id, hbt_team_id, partnership_id, assigned_member_id, recipient_id, status, created_by) VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
       [subject.trim(), metadata.employeeId, metadata.hbtTeamId, metadata.partnershipId, metadata.assignedMemberId, recipient.id, user.id]
     );
-
     const threadId = threadResult.insertId;
-
-    await connection.query(
-      `INSERT INTO messages (thread_id, sender_id, message_body, is_read)
-       VALUES (?, ?, ?, 0)`,
-      [threadId, user.id, message_body.trim()]
-    );
-
+    await connection.query(`INSERT INTO messages (thread_id, sender_id, message_body, is_read) VALUES (?, ?, ?, 0)`, [threadId, user.id, message_body.trim()]);
     await connection.commit();
-
     return res.status(201).json({ status: "success", message: "Message thread created successfully", thread_id: threadId });
   } catch (error) {
     await connection.rollback();
@@ -475,24 +402,11 @@ const replyToThread = async (req, res) => {
     const { id } = req.params;
     const { message_body } = req.body;
     const user = req.user;
-
-    if (!message_body || !message_body.trim()) {
-      return res.status(400).json({ status: "error", message: "Message body is required" });
-    }
-
+    if (!message_body || !message_body.trim()) return res.status(400).json({ status: "error", message: "Message body is required" });
     const thread = await getThreadForAccess(id, user);
-    if (!thread) {
-      return res.status(404).json({ status: "error", message: "Thread not found or access denied" });
-    }
-
-    await pool.query(
-      `INSERT INTO messages (thread_id, sender_id, message_body, is_read)
-       VALUES (?, ?, ?, 0)`,
-      [id, user.id, message_body.trim()]
-    );
-
+    if (!thread) return res.status(404).json({ status: "error", message: "Thread not found or access denied" });
+    await pool.query(`INSERT INTO messages (thread_id, sender_id, message_body, is_read) VALUES (?, ?, ?, 0)`, [id, user.id, message_body.trim()]);
     await pool.query(`UPDATE message_threads SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [id]);
-
     return res.status(201).json({ status: "success", message: "Reply sent successfully" });
   } catch (error) {
     return res.status(500).json({ status: "error", message: "Failed to send reply", error: error.message });
@@ -505,18 +419,10 @@ const updateThreadStatus = async (req, res) => {
     const { status } = req.body;
     const user = req.user;
     const allowedStatuses = ["open", "pending", "closed"];
-
-    if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({ status: "error", message: "Invalid status" });
-    }
-
+    if (!allowedStatuses.includes(status)) return res.status(400).json({ status: "error", message: "Invalid status" });
     const thread = await getThreadForAccess(id, user);
-    if (!thread) {
-      return res.status(404).json({ status: "error", message: "Thread not found or access denied" });
-    }
-
+    if (!thread) return res.status(404).json({ status: "error", message: "Thread not found or access denied" });
     await pool.query(`UPDATE message_threads SET status = ? WHERE id = ?`, [status, id]);
-
     return res.json({ status: "success", message: "Thread status updated successfully" });
   } catch (error) {
     return res.status(500).json({ status: "error", message: "Failed to update thread status", error: error.message });
@@ -527,29 +433,13 @@ const deleteMessage = async (req, res) => {
   try {
     const { messageId } = req.params;
     const user = req.user;
-
-    const [[message]] = await pool.query(
-      `SELECT m.id, m.thread_id, m.sender_id
-       FROM messages m
-       WHERE m.id = ?
-       LIMIT 1`,
-      [messageId]
-    );
-
-    if (!message) {
-      return res.status(404).json({ status: "error", message: "Message not found" });
-    }
-
+    const [[message]] = await pool.query(`SELECT m.id, m.thread_id, m.sender_id FROM messages m WHERE m.id = ? LIMIT 1`, [messageId]);
+    if (!message) return res.status(404).json({ status: "error", message: "Message not found" });
     const thread = await getThreadForAccess(message.thread_id, user);
     const canDelete = thread && (Number(message.sender_id) === Number(user.id) || isAdmin(user));
-
-    if (!canDelete) {
-      return res.status(403).json({ status: "error", message: "You cannot delete this message" });
-    }
-
+    if (!canDelete) return res.status(403).json({ status: "error", message: "You cannot delete this message" });
     await pool.query(`DELETE FROM messages WHERE id = ?`, [messageId]);
     await pool.query(`UPDATE message_threads SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [message.thread_id]);
-
     return res.json({ status: "success", message: "Message deleted" });
   } catch (error) {
     return res.status(500).json({ status: "error", message: "Failed to delete message", error: error.message });
@@ -558,27 +448,17 @@ const deleteMessage = async (req, res) => {
 
 const deleteThread = async (req, res) => {
   const connection = await pool.getConnection();
-
   try {
     const { id } = req.params;
     const user = req.user;
     const thread = await getThreadForAccess(id, user);
-
-    if (!thread) {
-      return res.status(404).json({ status: "error", message: "Thread not found or access denied" });
-    }
-
+    if (!thread) return res.status(404).json({ status: "error", message: "Thread not found or access denied" });
     const canDelete = Number(thread.created_by) === Number(user.id) || isAdmin(user);
-
-    if (!canDelete) {
-      return res.status(403).json({ status: "error", message: "Only the conversation creator can delete the full conversation" });
-    }
-
+    if (!canDelete) return res.status(403).json({ status: "error", message: "Only the conversation creator can delete the full conversation" });
     await connection.beginTransaction();
     await connection.query(`DELETE FROM messages WHERE thread_id = ?`, [id]);
     await connection.query(`DELETE FROM message_threads WHERE id = ?`, [id]);
     await connection.commit();
-
     return res.json({ status: "success", message: "Conversation deleted" });
   } catch (error) {
     await connection.rollback();
