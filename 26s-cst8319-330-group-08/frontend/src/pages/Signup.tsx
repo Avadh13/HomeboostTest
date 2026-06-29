@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 import Navbar from "../components/Navbar";
@@ -24,6 +24,7 @@ function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [partnershipSlug, setPartnershipSlug] = useState(searchParams.get("partnership") || "");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<{ type: "error" | "success"; message: string } | null>(null);
@@ -31,6 +32,14 @@ function Signup() {
   useEffect(() => {
     setPartnershipSlug(searchParams.get("partnership") || "");
   }, [searchParams]);
+
+  const passwordChecks = useMemo(() => {
+    return [
+      ["At least 8 characters", password.length >= 8],
+      ["Passwords match", password.length > 0 && password === confirmPassword],
+      ["Partnership slug present", partnershipSlug.trim().length > 0],
+    ] as const;
+  }, [confirmPassword, partnershipSlug, password]);
 
   const handleEmployeeSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,57 +92,84 @@ function Signup() {
   };
 
   return (
-    <main className="theme-page">
+    <main className="theme-page min-h-screen">
       <Navbar />
-      <section className="relative px-6 py-14">
+      <section className="relative px-4 py-10 md:px-6 md:py-14">
         <div className="floating-orb -left-24 top-20 h-80 w-80 bg-blue-400" />
         <div className="floating-orb right-0 top-40 h-96 w-96 bg-violet-400" />
 
-        <div className="section-container premium-surface grid lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="relative hidden lg:block">
-            <img src={signupImage} alt="Home exterior" className="h-full min-h-[720px] w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-indigo-950/45 to-transparent" />
-            <div className="absolute bottom-8 left-8 right-8 rounded-[2rem] border border-white/15 bg-white/15 p-6 text-white backdrop-blur-xl">
-              <p className="text-sm font-black uppercase tracking-[0.22em] text-violet-100">Employer benefit</p>
-              <h2 className="mt-2 text-4xl font-black tracking-tight">Join your home-buying portal.</h2>
-              <p className="mt-3 text-violet-50">Your signup connects you to the correct employer branding and Home Buying Team content.</p>
+        <div className="section-container premium-surface overflow-hidden p-0">
+          <div className="grid lg:grid-cols-[0.95fr_1.05fr]">
+            <div className="relative hidden lg:block">
+              <img src={signupImage} alt="Home exterior" className="h-full min-h-[760px] w-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-indigo-950/45 to-transparent" />
+              <div className="absolute bottom-8 left-8 right-8 rounded-[2rem] border border-white/15 bg-white/15 p-6 text-white backdrop-blur-xl">
+                <p className="text-sm font-black uppercase tracking-[0.22em] text-violet-100">Employer benefit</p>
+                <h2 className="mt-2 text-4xl font-black tracking-tight">Join your home-buying portal.</h2>
+                <p className="mt-3 text-violet-50">Your signup connects you to the correct employer branding, resources, quizzes, appointments, messages, and Home Buying Team support.</p>
+              </div>
             </div>
+
+            <form onSubmit={handleEmployeeSignup} className="p-6 md:p-10 lg:p-12">
+              <p className="eyebrow">Employee signup</p>
+              <h1 className="mt-3 text-4xl font-black tracking-tight md:text-6xl">Create your portal account</h1>
+              <p className="mt-4 max-w-2xl text-sm leading-relaxed text-slate-600 md:text-base">Use your employer partnership slug to unlock your branded home-buying benefit portal.</p>
+
+              {notice && (
+                <div className={`mt-6 whitespace-pre-line rounded-2xl border px-4 py-3 text-sm font-semibold ${notice.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}>
+                  {notice.message}
+                </div>
+              )}
+
+              <div className="mt-8 grid gap-4">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold text-slate-700">Full name</span>
+                  <input className="form-field" type="text" placeholder="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold text-slate-700">Email</span>
+                  <input className="form-field" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                </label>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-bold text-slate-700">Create password</span>
+                    <div className="relative">
+                      <input className="form-field pr-24" type={showPassword ? "text" : "password"} placeholder="Create Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                      <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-200">{showPassword ? "Hide" : "Show"}</button>
+                    </div>
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-bold text-slate-700">Confirm password</span>
+                    <input className="form-field" type={showPassword ? "text" : "password"} placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+                  </label>
+                </div>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold text-slate-700">Partnership slug</span>
+                  <input className="rounded-2xl border border-violet-200 bg-violet-50/90 p-3.5 font-semibold text-violet-950 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100" type="text" placeholder="companyslug" value={partnershipSlug} onChange={(e) => setPartnershipSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} required />
+                </label>
+              </div>
+
+              <div className="mt-5 grid gap-2 rounded-2xl bg-slate-50 p-4">
+                {passwordChecks.map(([label, valid]) => (
+                  <p key={label} className={`text-sm font-bold ${valid ? "text-emerald-700" : "text-slate-500"}`}>{valid ? "✓" : "○"} {label}</p>
+                ))}
+              </div>
+
+              <button disabled={loading} className="btn-primary mt-7 w-full justify-center disabled:opacity-60">
+                {loading ? "Creating Account..." : "Create Employee Account"}
+              </button>
+
+              <div className="mt-6 rounded-2xl border border-violet-100 bg-violet-50/70 p-5 text-sm text-slate-600">
+                <p className="font-black text-slate-900">Employer enrollment</p>
+                <p className="mt-2">Use the partnership slug provided by your employer, or start from your employer portal page.</p>
+                <Link to="/partners" className="mt-3 inline-flex font-black text-violet-700">Find employer portal →</Link>
+              </div>
+
+              <p className="mt-6 text-center text-sm text-slate-600">
+                Already have an account? <Link to="/login" className="font-black text-violet-700">Login</Link>
+              </p>
+            </form>
           </div>
-
-          <form onSubmit={handleEmployeeSignup} className="p-8 md:p-12">
-            <p className="eyebrow">Employee signup</p>
-            <h1 className="mt-3 text-4xl font-black tracking-tight md:text-6xl">Create your portal account</h1>
-            <p className="mt-4 max-w-2xl text-slate-600">Use your employer partnership slug to unlock your branded home-buying benefit portal.</p>
-
-            {notice && (
-              <div className={`mt-6 whitespace-pre-line rounded-2xl border px-4 py-3 text-sm font-semibold ${notice.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}>
-                {notice.message}
-              </div>
-            )}
-
-            <div className="mt-8 grid gap-4">
-              <input className="form-field p-4" type="text" placeholder="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-              <input className="form-field p-4" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              <div className="grid gap-4 md:grid-cols-2">
-                <input className="form-field p-4" type="password" placeholder="Create Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-                <input className="form-field p-4" type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
-              </div>
-              <input className="rounded-2xl border border-violet-200 bg-violet-50/90 p-4 font-semibold text-violet-950 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100" type="text" placeholder="Partnership Slug" value={partnershipSlug} onChange={(e) => setPartnershipSlug(e.target.value)} required />
-            </div>
-
-            <button disabled={loading} className="btn-primary mt-7 w-full disabled:opacity-60">
-              {loading ? "Creating Account..." : "Create Employee Account"}
-            </button>
-
-            <div className="mt-6 rounded-2xl border border-violet-100 bg-violet-50/70 p-5 text-sm text-slate-600">
-              <p className="font-black text-slate-900">Employer enrollment</p>
-              <p className="mt-2">Use the partnership slug provided by your employer, or start from your employer portal page.</p>
-            </div>
-
-            <p className="mt-6 text-center text-sm text-slate-600">
-              Already have an account? <Link to="/login" className="font-black text-violet-700">Login</Link>
-            </p>
-          </form>
         </div>
       </section>
     </main>
