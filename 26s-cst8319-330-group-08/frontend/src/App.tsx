@@ -47,6 +47,7 @@ import AdminBuilder from "./admin/pages/AdminBuilder";
 import AdminAppointments from "./admin/pages/AdminAppointments";
 
 import AdminProtectedRoute from "./admin/components/AdminProtectedRoute";
+import AdminLayout from "./admin/components/AdminLayout";
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
 import ScrollToTop from "./components/ScrollToTop";
 
@@ -104,7 +105,7 @@ function App() {
         <Route path="/admin/quizzes" element={<AdminProtectedRoute><ManageQuizzes /></AdminProtectedRoute>} />
         <Route path="/admin/quizzes/:quizId/questions" element={<AdminProtectedRoute><ManageQuizQuestions /></AdminProtectedRoute>} />
         <Route path="/admin/quiz-submissions" element={<AdminProtectedRoute><QuizSubmissions /></AdminProtectedRoute>} />
-        <Route path="/admin/messages" element={<AdminProtectedRoute><MessageCenter /></AdminProtectedRoute>} />
+        <Route path="/admin/messages" element={<AdminProtectedRoute><AdminLayout title="Communication Center"><MessageCenter embedded /></AdminLayout></AdminProtectedRoute>} />
 
         <Route path="/:slug" element={<PartnershipLanding />} />
         <Route path="*" element={<NotFound />} />
