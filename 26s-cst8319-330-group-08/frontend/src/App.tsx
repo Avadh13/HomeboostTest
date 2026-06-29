@@ -15,6 +15,7 @@ import Quiz from "./pages/Quiz";
 import Partners from "./pages/Partners";
 import NotFound from "./pages/NotFound";
 import MessageCenter from "./pages/MessageCenter";
+import ProfilePage from "./pages/Profile";
 import CompanyDashboard from "./pages/CompanyDashboard";
 
 import HBTDashboard from "./pages/HBTDashboard";
@@ -63,6 +64,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/partners" element={<Partners />} />
 
+        <Route path="/profile" element={<RoleProtectedRoute allowedRoles={["admin", "super_admin", "hbt_admin", "hbt_member", "employee", "company_admin", "company"]}><ProfilePage /></RoleProtectedRoute>} />
         <Route path="/notifications" element={<RoleProtectedRoute allowedRoles={["admin", "super_admin", "hbt_admin", "hbt_member", "employee", "company_admin", "company"]}><NotificationCenter /></RoleProtectedRoute>} />
 
         <Route path="/employee-portal" element={<RoleProtectedRoute allowedRoles={["employee"]}><EmployeePortal /></RoleProtectedRoute>} />
@@ -107,6 +109,7 @@ function App() {
         <Route path="/admin/quiz-submissions" element={<AdminProtectedRoute><QuizSubmissions /></AdminProtectedRoute>} />
         <Route path="/admin/messages" element={<AdminProtectedRoute><AdminLayout title="Communication Center"><MessageCenter embedded /></AdminLayout></AdminProtectedRoute>} />
         <Route path="/admin/notifications" element={<AdminProtectedRoute><AdminLayout title="Alerts Center"><NotificationCenter embedded /></AdminLayout></AdminProtectedRoute>} />
+        <Route path="/admin/profile" element={<AdminProtectedRoute><AdminLayout title="My Profile"><ProfilePage embedded /></AdminLayout></AdminProtectedRoute>} />
 
         <Route path="/:slug" element={<PartnershipLanding />} />
         <Route path="*" element={<NotFound />} />
