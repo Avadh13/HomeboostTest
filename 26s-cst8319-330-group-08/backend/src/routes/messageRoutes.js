@@ -26,23 +26,7 @@ const getThreadForAccess = async (threadId, user) => {
   return rows[0] || null;
 };
 
-router.post("/presence", protect, messageController.updatePresence);
-
-router.get("/contacts", protect, messageController.getContacts);
-
-router.get("/threads", protect, messageController.getThreads);
-
-router.get("/threads/:id", protect, messageController.getThreadDetails);
-
-router.post("/threads", protect, messageController.createThread);
-
-router.post("/threads/:id/reply", protect, messageController.replyToThread);
-
-router.put("/threads/:id/status", protect, messageController.updateThreadStatus);
-
-router.put("/threads/:id/assign", protect, messageController.assignThread);
-
-router.delete("/messages/:messageId", protect, async (req, res) => {
+const deleteMessage = async (req, res) => {
   try {
     const { messageId } = req.params;
     const user = req.user;
@@ -73,11 +57,32 @@ router.delete("/messages/:messageId", protect, async (req, res) => {
     await pool.query(`DELETE FROM messages WHERE id = ?`, [messageId]);
     await pool.query(`UPDATE message_threads SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [message.thread_id]);
 
-    res.json({ status: "success", message: "Message deleted" });
+    return res.json({ status: "success", message: "Message deleted" });
   } catch (error) {
-    res.status(500).json({ status: "error", message: "Failed to delete message", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to delete message", error: error.message });
   }
-});
+};
+
+router.post("/presence", protect, messageController.updatePresence);
+
+router.get("/contacts", protect, messageController.getContacts);
+
+router.get("/threads", protect, messageController.getThreads);
+
+router.get("/threads/:id", protect, messageController.getThreadDetails);
+
+router.post("/threads", protect, messageController.createThread);
+
+router.post("/threads/:id/reply", protect, messageController.replyToThread);
+
+router.put("/threads/:id/status", protect, messageController.updateThreadStatus);
+
+router.put("/threads/:id/assign", protect, messageController.assignThread);
+
+router.delete("/:messageId", protect, deleteMessage);
+
+// Backward compatibility for the previous /api/messages/messages/:messageId URL.
+router.delete("/messages/:messageId", protect, deleteMessage);
 
 router.delete("/threads/:id", protect, async (req, res) => {
   const connection = await pool.getConnection();
@@ -106,10 +111,10 @@ router.delete("/threads/:id", protect, async (req, res) => {
     await connection.query(`DELETE FROM message_threads WHERE id = ?`, [id]);
     await connection.commit();
 
-    res.json({ status: "success", message: "Conversation deleted" });
+    return res.json({ status: "success", message: "Conversation deleted" });
   } catch (error) {
     await connection.rollback();
-    res.status(500).json({ status: "error", message: "Failed to delete conversation", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to delete conversation", error: error.message });
   } finally {
     connection.release();
   }
