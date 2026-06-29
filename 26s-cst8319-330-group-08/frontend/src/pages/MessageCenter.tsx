@@ -11,7 +11,6 @@ type Thread = {
   employee_email?: string | null;
   company_name?: string | null;
   hbt_team_name?: string | null;
-  assigned_member_name?: string | null;
   recipient_id?: number | null;
   recipient_name?: string | null;
   recipient_email?: string | null;
@@ -58,6 +57,12 @@ type CurrentUser = {
   role?: string;
 };
 
+type PersonPreview = {
+  name: string;
+  email?: string | null;
+  role?: string | null;
+};
+
 const readUser = (): CurrentUser => {
   try {
     return JSON.parse(localStorage.getItem("user") || "{}");
@@ -77,7 +82,7 @@ const formatDateTime = (value?: string | null) => {
   });
 };
 
-const roleLabel = (role?: string) => (role || "user").replace(/_/g, " ");
+const roleLabel = (role?: string | null) => (role || "user").replace(/_/g, " ");
 
 const getRoleMeta = (role?: string) => {
   if (role === "employee") {
@@ -138,8 +143,23 @@ function MessageCenter() {
   const meta = getRoleMeta(user.role);
   const isAdmin = user.role === "admin" || user.role === "super_admin";
   const canManageStatus = user.role !== "employee";
-
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
+
+  const getOtherPerson = (thread: Thread): PersonPreview => {
+    if (Number(thread.created_by) === Number(user.id)) {
+      return {
+        name: thread.recipient_name || "Recipient",
+        email: thread.recipient_email,
+        role: thread.recipient_role,
+      };
+    }
+
+    return {
+      name: thread.created_by_name || "Sender",
+      email: thread.created_by_email,
+      role: thread.created_by_role,
+    };
+  };
 
   const loadThreads = async () => {
     try {
@@ -195,22 +215,6 @@ function MessageCenter() {
   }, []);
 
   const selectedRecipient = contacts.find((contact) => String(contact.id) === selectedRecipientId);
-
-  const getOtherPerson = (thread: Thread) => {
-    if (Number(thread.created_by) === Number(user.id)) {
-      return {
-        name: thread.recipient_name || "Recipient",
-        email: thread.recipient_email,
-        role: thread.recipient_role,
-      };
-    }
-
-    return {
-      name: thread.created_by_name || "Sender",
-      email: thread.created_by_email,
-      role: thread.created_by_role,
-    };
-  };
 
   const filteredThreads = useMemo(() => {
     const search = searchText.toLowerCase().trim();
