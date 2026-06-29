@@ -12,6 +12,14 @@ type Thread = {
   company_name?: string | null;
   hbt_team_name?: string | null;
   assigned_member_name?: string | null;
+  recipient_id?: number | null;
+  recipient_name?: string | null;
+  recipient_email?: string | null;
+  recipient_role?: string | null;
+  created_by?: number;
+  created_by_name?: string | null;
+  created_by_email?: string | null;
+  created_by_role?: string | null;
   status: string;
   last_message?: string | null;
   last_message_at?: string | null;
@@ -41,14 +49,6 @@ type ContactUser = {
   partnership_slug?: string | null;
   title?: string | null;
   is_online?: boolean;
-};
-
-type QuickAction = {
-  type: string;
-  label: string;
-  description: string;
-  partnership_id?: number | null;
-  hbt_team_id?: number | null;
 };
 
 type CurrentUser = {
@@ -82,39 +82,39 @@ const roleLabel = (role?: string) => (role || "user").replace(/_/g, " ");
 const getRoleMeta = (role?: string) => {
   if (role === "employee") {
     return {
-      title: "Employee Communication Center",
-      subtitle: "Message your HBT advisor, company contact, and HomeBoost support.",
+      title: "Employee Messages",
+      subtitle: "One-to-one private conversations with your advisor, company contact, or HomeBoost support.",
       homePath: "/employee-portal",
     };
   }
 
   if (role === "company_admin" || role === "company") {
     return {
-      title: "Company Communication Center",
-      subtitle: "Talk with your assigned HBT team, employees, and HomeBoost admin support.",
+      title: "Company Messages",
+      subtitle: "One-to-one private conversations with employees, HBT contacts, or HomeBoost support.",
       homePath: "/company/dashboard",
     };
   }
 
   if (role === "hbt_member") {
     return {
-      title: "HBT Member Communication Center",
-      subtitle: "Talk with assigned clients, company managers, your HBT team, and admin support.",
+      title: "Advisor Messages",
+      subtitle: "One-to-one private conversations with clients, company managers, team members, or support.",
       homePath: "/hbt/member-dashboard",
     };
   }
 
   if (role === "hbt_admin") {
     return {
-      title: "HBT Admin Communication Center",
-      subtitle: "Manage conversations across employees, company managers, team members, and admin support.",
+      title: "HBT Admin Messages",
+      subtitle: "One-to-one private conversations only. Team-wide visibility is disabled.",
       homePath: "/hbt/dashboard",
     };
   }
 
   return {
-    title: "Admin Communication Center",
-    subtitle: "Platform-wide end-to-end communication across every role.",
+    title: "Admin Messages",
+    subtitle: "One-to-one private platform support conversations.",
     homePath: "/admin",
   };
 };
@@ -124,9 +124,7 @@ function MessageCenter() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selected, setSelected] = useState<ThreadDetails | null>(null);
   const [contacts, setContacts] = useState<ContactUser[]>([]);
-  const [quickActions, setQuickActions] = useState<QuickAction[]>([]);
   const [selectedRecipientId, setSelectedRecipientId] = useState("");
-  const [selectedQuickAction, setSelectedQuickAction] = useState("");
   const [subject, setSubject] = useState("");
   const [messageBody, setMessageBody] = useState("");
   const [replyBody, setReplyBody] = useState("");
@@ -139,9 +137,7 @@ function MessageCenter() {
   const user = readUser();
   const meta = getRoleMeta(user.role);
   const isAdmin = user.role === "admin" || user.role === "super_admin";
-  const isHbtUser = user.role === "hbt_admin" || user.role === "hbt_member";
-  const isCompany = user.role === "company_admin" || user.role === "company";
-  const canManageStatus = isAdmin || isHbtUser || isCompany;
+  const canManageStatus = user.role !== "employee";
 
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
@@ -170,14 +166,9 @@ function MessageCenter() {
     try {
       const response = await fetch(`${API_BASE_URL}/messages/contacts`, { headers: authHeaders });
       const data = await response.json();
-      const actions = Array.isArray(data.quick_actions) ? data.quick_actions : [];
-
       setContacts(Array.isArray(data.users) ? data.users : []);
-      setQuickActions(actions);
-      setSelectedQuickAction(actions[0]?.type || "");
     } catch {
       setContacts([]);
-      setQuickActions([]);
     }
   };
 
@@ -204,15 +195,31 @@ function MessageCenter() {
   }, []);
 
   const selectedRecipient = contacts.find((contact) => String(contact.id) === selectedRecipientId);
-  const selectedAction = quickActions.find((action) => action.type === selectedQuickAction);
+
+  const getOtherPerson = (thread: Thread) => {
+    if (Number(thread.created_by) === Number(user.id)) {
+      return {
+        name: thread.recipient_name || "Recipient",
+        email: thread.recipient_email,
+        role: thread.recipient_role,
+      };
+    }
+
+    return {
+      name: thread.created_by_name || "Sender",
+      email: thread.created_by_email,
+      role: thread.created_by_role,
+    };
+  };
 
   const filteredThreads = useMemo(() => {
     const search = searchText.toLowerCase().trim();
 
     return threads.filter((thread) => {
+      const other = getOtherPerson(thread);
       const matchesSearch =
         !search ||
-        [thread.subject, thread.employee_name, thread.employee_email, thread.company_name, thread.hbt_team_name, thread.assigned_member_name, thread.last_message]
+        [thread.subject, other.name, other.email, thread.company_name, thread.hbt_team_name, thread.last_message]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
@@ -220,7 +227,7 @@ function MessageCenter() {
       const matchesStatus = statusFilter === "all" || thread.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [threads, searchText, statusFilter]);
+  }, [threads, searchText, statusFilter, user.id]);
 
   const unreadTotal = threads.reduce((sum, thread) => sum + Number(thread.unread_count || 0), 0);
   const openTotal = threads.filter((thread) => thread.status === "open").length;
@@ -235,31 +242,14 @@ function MessageCenter() {
   const createThread = async (event: FormEvent) => {
     event.preventDefault();
 
-    if (!subject.trim() || !messageBody.trim()) {
-      toast.warning("Subject and message are required.");
+    if (!selectedRecipient) {
+      toast.warning("Please select one person to message.");
       return;
     }
 
-    const bodyData: Record<string, unknown> = {
-      subject: subject.trim(),
-      message_body: messageBody.trim(),
-    };
-
-    if (selectedRecipient) {
-      bodyData.recipient_id = selectedRecipient.id;
-
-      if (selectedRecipient.role === "employee") {
-        bodyData.employee_id = selectedRecipient.id;
-        bodyData.partnership_id = selectedRecipient.partnership_id || null;
-      }
-
-      if (selectedRecipient.role === "hbt_member" || selectedRecipient.role === "hbt_admin") {
-        bodyData.assigned_member_id = selectedRecipient.id;
-      }
-    } else if (selectedAction) {
-      bodyData.contact_type = selectedAction.type;
-      if (selectedAction.partnership_id) bodyData.partnership_id = selectedAction.partnership_id;
-      if (selectedAction.hbt_team_id) bodyData.hbt_team_id = selectedAction.hbt_team_id;
+    if (!subject.trim() || !messageBody.trim()) {
+      toast.warning("Subject and message are required.");
+      return;
     }
 
     try {
@@ -267,7 +257,11 @@ function MessageCenter() {
       const response = await fetch(`${API_BASE_URL}/messages/threads`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(bodyData),
+        body: JSON.stringify({
+          subject: subject.trim(),
+          message_body: messageBody.trim(),
+          recipient_id: selectedRecipient.id,
+        }),
       });
       const data = await response.json();
 
@@ -281,7 +275,7 @@ function MessageCenter() {
       setSelectedRecipientId("");
       await loadThreads();
       if (data.thread_id) await loadThreadDetails(data.thread_id);
-      toast.success("Conversation started successfully.");
+      toast.success("Private conversation started.");
     } catch {
       toast.error("Failed to create conversation.");
     } finally {
@@ -396,7 +390,7 @@ function MessageCenter() {
           <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
               <Link to={meta.homePath} className="text-sm font-black text-violet-200 hover:text-white">← Back to Dashboard</Link>
-              <p className="mt-5 text-xs font-black uppercase tracking-[0.22em] text-violet-200">Secure Communication</p>
+              <p className="mt-5 text-xs font-black uppercase tracking-[0.22em] text-violet-200">Private Messaging</p>
               <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">{meta.title}</h1>
               <p className="mt-3 max-w-3xl text-sm leading-relaxed text-violet-100 md:text-base">{meta.subtitle}</p>
             </div>
@@ -409,7 +403,7 @@ function MessageCenter() {
 
         <section className="grid gap-4 sm:grid-cols-4">
           {[
-            ["Threads", threads.length, "text-violet-700", "bg-violet-50"],
+            ["Private Chats", threads.length, "text-violet-700", "bg-violet-50"],
             ["Unread", unreadTotal, "text-red-700", "bg-red-50"],
             ["Open", openTotal, "text-blue-700", "bg-blue-50"],
             ["Pending", pendingTotal, "text-amber-700", "bg-amber-50"],
@@ -423,38 +417,28 @@ function MessageCenter() {
 
         <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
           <form onSubmit={createThread} className="premium-card border-2 border-violet-100">
-            <p className="eyebrow">New conversation</p>
-            <h2 className="mt-1 text-2xl font-black text-slate-950">Start Message</h2>
-            <p className="mt-2 text-sm leading-relaxed text-slate-500">Choose a quick route or specific contact. The backend enforces role and partnership access.</p>
+            <p className="eyebrow">New private chat</p>
+            <h2 className="mt-1 text-2xl font-black text-slate-950">Message One Person</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500">Every conversation is one-to-one. Only you and the selected person can see it.</p>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <label className="block">
-                <span className="mb-2 block text-sm font-bold text-slate-700">Quick route</span>
-                <select className="form-field" value={selectedQuickAction} onChange={(event) => { setSelectedQuickAction(event.target.value); setSelectedRecipientId(""); }}>
-                  {quickActions.length === 0 && <option value="">No quick routes</option>}
-                  {quickActions.map((action) => <option key={action.type} value={action.type}>{action.label}</option>)}
-                </select>
-              </label>
+            <label className="mt-5 block">
+              <span className="mb-2 block text-sm font-bold text-slate-700">Select person</span>
+              <select className="form-field" value={selectedRecipientId} onChange={(event) => setSelectedRecipientId(event.target.value)}>
+                <option value="">Choose one person...</option>
+                {contacts.map((contact) => (
+                  <option key={contact.id} value={contact.id}>
+                    {contact.full_name} — {contact.title || roleLabel(contact.role)}{contact.company_name ? ` (${contact.company_name})` : ""}{contact.is_online ? " • Online" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-              <label className="block">
-                <span className="mb-2 block text-sm font-bold text-slate-700">Specific contact</span>
-                <select className="form-field" value={selectedRecipientId} onChange={(event) => { setSelectedRecipientId(event.target.value); setSelectedQuickAction(""); }}>
-                  <option value="">Use quick route / no specific contact</option>
-                  {contacts.map((contact) => (
-                    <option key={contact.id} value={contact.id}>
-                      {contact.full_name} — {contact.title || roleLabel(contact.role)}{contact.company_name ? ` (${contact.company_name})` : ""}{contact.is_online ? " • Online" : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            {contacts.length === 0 && <p className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-800">No assigned contacts found yet. Use quick route to message the assigned team or support.</p>}
+            {contacts.length === 0 && <p className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-800">No available contacts found for this account.</p>}
 
             <div className="mt-4 space-y-4 rounded-3xl border border-slate-200 bg-white p-4">
               <input className="form-field" placeholder="Subject" value={subject} onChange={(event) => setSubject(event.target.value)} />
-              <textarea className="form-field min-h-[140px]" placeholder="Write your message..." value={messageBody} onChange={(event) => setMessageBody(event.target.value)} />
-              <button disabled={saving} className="btn-primary disabled:opacity-60">{saving ? "Sending..." : "Send Message"}</button>
+              <textarea className="form-field min-h-[140px]" placeholder="Write your private message..." value={messageBody} onChange={(event) => setMessageBody(event.target.value)} />
+              <button disabled={saving} className="btn-primary disabled:opacity-60">{saving ? "Sending..." : "Send Private Message"}</button>
             </div>
           </form>
 
@@ -462,14 +446,14 @@ function MessageCenter() {
             <div className="border-b border-slate-100 p-4">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="eyebrow">Inbox</p>
-                  <h2 className="mt-1 text-2xl font-black text-slate-950">Conversations</h2>
+                  <p className="eyebrow">Private inbox</p>
+                  <h2 className="mt-1 text-2xl font-black text-slate-950">One-to-One Conversations</h2>
                   <p className="mt-1 text-sm font-bold text-slate-500">Showing {filteredThreads.length} of {threads.length}</p>
                 </div>
                 <button onClick={loadThreads} className="btn-secondary">Refresh</button>
               </div>
               <div className="grid gap-3 md:grid-cols-[1fr_180px]">
-                <input className="form-field" placeholder="Search conversations..." value={searchText} onChange={(event) => setSearchText(event.target.value)} />
+                <input className="form-field" placeholder="Search private chats..." value={searchText} onChange={(event) => setSearchText(event.target.value)} />
                 <select className="form-field" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                   <option value="all">All Status</option>
                   <option value="open">Open</option>
@@ -484,25 +468,26 @@ function MessageCenter() {
                 {loading ? (
                   <p className="p-5 text-sm font-bold text-slate-500">Loading conversations...</p>
                 ) : filteredThreads.length === 0 ? (
-                  <div className="p-8 text-center text-slate-500">No conversations found.</div>
+                  <div className="p-8 text-center text-slate-500">No private conversations found.</div>
                 ) : (
-                  filteredThreads.map((thread) => (
-                    <button key={thread.id} onClick={() => loadThreadDetails(thread.id)} className={`block w-full border-b p-4 text-left transition hover:bg-violet-50/60 ${selected?.thread.id === thread.id ? "bg-violet-50" : "bg-white"}`}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-black text-slate-950">{thread.subject}</p>
-                          <p className="mt-1 text-sm text-slate-500">
-                            {thread.employee_name || thread.company_name || thread.hbt_team_name || "Conversation"}
-                            {thread.company_name && thread.employee_name ? ` • ${thread.company_name}` : ""}
-                            {thread.assigned_member_name ? ` • Advisor: ${thread.assigned_member_name}` : ""}
-                          </p>
+                  filteredThreads.map((thread) => {
+                    const other = getOtherPerson(thread);
+
+                    return (
+                      <button key={thread.id} onClick={() => loadThreadDetails(thread.id)} className={`block w-full border-b p-4 text-left transition hover:bg-violet-50/60 ${selected?.thread.id === thread.id ? "bg-violet-50" : "bg-white"}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-black text-slate-950">{thread.subject}</p>
+                            <p className="mt-1 text-sm text-slate-500">With {other.name} • {roleLabel(other.role)}</p>
+                            {thread.company_name && <p className="text-xs font-semibold text-slate-400">{thread.company_name}</p>}
+                          </div>
+                          <span className={`rounded-full px-3 py-1 text-xs font-black uppercase ${getStatusClass(thread.status)}`}>{thread.status}</span>
                         </div>
-                        <span className={`rounded-full px-3 py-1 text-xs font-black uppercase ${getStatusClass(thread.status)}`}>{thread.status}</span>
-                      </div>
-                      <p className="mt-3 line-clamp-2 text-sm text-slate-600">{thread.last_message || "No messages yet."}</p>
-                      <div className="mt-3 flex items-center justify-between text-xs text-slate-400"><span>{formatDateTime(thread.last_message_at)}</span>{Number(thread.unread_count || 0) > 0 && <span className="rounded-full bg-red-600 px-2 py-1 font-bold text-white">{thread.unread_count} unread</span>}</div>
-                    </button>
-                  ))
+                        <p className="mt-3 line-clamp-2 text-sm text-slate-600">{thread.last_message || "No messages yet."}</p>
+                        <div className="mt-3 flex items-center justify-between text-xs text-slate-400"><span>{formatDateTime(thread.last_message_at)}</span>{Number(thread.unread_count || 0) > 0 && <span className="rounded-full bg-red-600 px-2 py-1 font-bold text-white">{thread.unread_count} unread</span>}</div>
+                      </button>
+                    );
+                  })
                 )}
               </div>
 
@@ -510,8 +495,8 @@ function MessageCenter() {
                 {!selected ? (
                   <div className="flex min-h-[500px] flex-col items-center justify-center text-center">
                     <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-100 text-3xl font-black text-violet-700">✉</div>
-                    <h2 className="text-2xl font-black text-slate-950">Select a conversation</h2>
-                    <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500">Choose a thread from the list or start a new message using the form.</p>
+                    <h2 className="text-2xl font-black text-slate-950">Select a private chat</h2>
+                    <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500">Choose a thread from the list or start a new private message.</p>
                   </div>
                 ) : (
                   <div className="flex h-full min-h-[560px] flex-col rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -519,10 +504,9 @@ function MessageCenter() {
                       <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
                         <div>
                           <h2 className="text-2xl font-black text-slate-950">{selected.thread.subject}</h2>
-                          <p className="mt-1 text-sm text-slate-500">Employee: {selected.thread.employee_name || "N/A"} {selected.thread.employee_email && `(${selected.thread.employee_email})`}</p>
-                          <p className="text-sm text-slate-500">Company: {selected.thread.company_name || "N/A"}</p>
+                          <p className="mt-1 text-sm text-slate-500">Private chat with {getOtherPerson(selected.thread).name} • {roleLabel(getOtherPerson(selected.thread).role)}</p>
+                          {selected.thread.company_name && <p className="text-sm text-slate-500">Company: {selected.thread.company_name}</p>}
                           {selected.thread.hbt_team_name && <p className="text-sm text-slate-500">HBT Team: {selected.thread.hbt_team_name}</p>}
-                          {selected.thread.assigned_member_name && <p className="text-sm text-slate-500">Advisor: {selected.thread.assigned_member_name}</p>}
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {canManageStatus && (
@@ -540,7 +524,7 @@ function MessageCenter() {
                     <div className="my-5 max-h-[480px] space-y-4 overflow-y-auto rounded-3xl border border-slate-200 bg-slate-50 p-3 pr-2">
                       {selected.messages.map((message) => {
                         const isMine = Number(message.sender_id) === Number(user.id);
-                        const canDelete = isMine || isAdmin || user.role === "hbt_admin";
+                        const canDelete = isMine || isAdmin;
 
                         return (
                           <div key={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
@@ -558,7 +542,7 @@ function MessageCenter() {
                     </div>
 
                     <form onSubmit={sendReply} className="mt-auto space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-3">
-                      <textarea className="form-field min-h-[110px] bg-white" placeholder="Write a reply..." value={replyBody} onChange={(event) => setReplyBody(event.target.value)} />
+                      <textarea className="form-field min-h-[110px] bg-white" placeholder="Write a private reply..." value={replyBody} onChange={(event) => setReplyBody(event.target.value)} />
                       <button disabled={saving} className="btn-dark disabled:opacity-60">{saving ? "Sending..." : "Send Reply"}</button>
                     </form>
                   </div>
