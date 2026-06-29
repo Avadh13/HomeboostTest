@@ -167,6 +167,55 @@ router.get("/dashboard", protect, requireCompanyManager, async (req, res) => {
   }
 });
 
+router.post("/invites", protect, requireCompanyManager, async (req, res) => {
+  try {
+    const partnershipId = req.user.partnership_id;
+    const fullName = normalizeName(req.body.full_name || req.body.name);
+    const email = normalizeEmail(req.body.email);
+
+    if (!fullName || !email) {
+      return res.status(400).json({ status: "error", message: "Full name and email are required" });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ status: "error", message: "Please enter a valid email address" });
+    }
+
+    const [existingUser] = await pool.query("SELECT id FROM users WHERE email = ? LIMIT 1", [email]);
+    if (existingUser.length > 0) {
+      return res.status(409).json({ status: "error", message: "This email already has an account" });
+    }
+
+    await pool.query(
+      `INSERT INTO employee_invites
+       (partnership_id, invited_by_user_id, full_name, email, status)
+       VALUES (?, ?, ?, ?, 'invited')
+       ON DUPLICATE KEY UPDATE
+         full_name = VALUES(full_name),
+         invited_by_user_id = VALUES(invited_by_user_id),
+         status = IF(status = 'registered', 'registered', 'invited'),
+         revoked_at = NULL`,
+      [partnershipId, req.user.id, fullName, email]
+    );
+
+    const [[invite]] = await pool.query(
+      `SELECT id, full_name, email, status, created_at, registered_at, revoked_at
+       FROM employee_invites
+       WHERE partnership_id = ? AND email = ?
+       LIMIT 1`,
+      [partnershipId, email]
+    );
+
+    return res.status(201).json({
+      status: "success",
+      message: invite.status === "registered" ? "Employee is already registered" : "Employee invite added successfully",
+      invite,
+    });
+  } catch (error) {
+    return res.status(500).json({ status: "error", message: "Failed to add employee invite", error: error.message });
+  }
+});
+
 router.post("/invites/upload", protect, requireCompanyManager, upload.single("file"), async (req, res) => {
   let connection;
 
