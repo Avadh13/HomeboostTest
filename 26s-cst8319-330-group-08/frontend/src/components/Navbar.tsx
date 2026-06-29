@@ -59,6 +59,7 @@ function Navbar() {
   const companyLinks: NavLinkItem[] = [
     { to: "/company/dashboard", label: "Dashboard", shortLabel: "Dash" },
     { to: "/company/dashboard", label: "Employees" },
+    { to: "/company/messages", label: "Messages" },
     { to: "/notifications", label: "Notifications", shortLabel: "Alerts" },
   ];
 
