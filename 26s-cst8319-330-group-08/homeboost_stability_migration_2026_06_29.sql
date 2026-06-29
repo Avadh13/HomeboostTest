@@ -18,6 +18,33 @@ ALTER TABLE users
     'employee'
   ) NOT NULL DEFAULT 'employee';
 
+-- Presence fields used by the communication center.
+SET @has_user_last_seen := (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'last_seen_at'
+);
+SET @sql_user_last_seen := IF(
+  @has_user_last_seen = 0,
+  'ALTER TABLE users ADD COLUMN last_seen_at DATETIME NULL',
+  'SELECT ''users.last_seen_at already exists'' AS status'
+);
+PREPARE stmt FROM @sql_user_last_seen;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_user_is_online := (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'is_online'
+);
+SET @sql_user_is_online := IF(
+  @has_user_is_online = 0,
+  'ALTER TABLE users ADD COLUMN is_online TINYINT(1) DEFAULT 0',
+  'SELECT ''users.is_online already exists'' AS status'
+);
+PREPARE stmt FROM @sql_user_is_online;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- 2) Employer branding/contact columns used by public landing and company dashboard.
 SET @has_employer_contact_email := (
   SELECT COUNT(*) FROM information_schema.columns
@@ -235,9 +262,48 @@ PREPARE stmt FROM @sql_team_member_user_fk;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
--- 7) Verification output.
+-- 7) End-to-end role communication tables.
+CREATE TABLE IF NOT EXISTS message_threads (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  subject VARCHAR(255) NOT NULL,
+  employee_id INT NULL,
+  hbt_team_id INT NULL,
+  partnership_id INT NULL,
+  assigned_member_id INT NULL,
+  status ENUM('open', 'pending', 'closed') DEFAULT 'open',
+  created_by INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_message_threads_employee (employee_id),
+  INDEX idx_message_threads_hbt_team (hbt_team_id),
+  INDEX idx_message_threads_partnership (partnership_id),
+  INDEX idx_message_threads_assigned_member (assigned_member_id),
+  INDEX idx_message_threads_created_by (created_by),
+  CONSTRAINT fk_message_threads_employee FOREIGN KEY (employee_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_message_threads_hbt_team FOREIGN KEY (hbt_team_id) REFERENCES home_buying_teams(id) ON DELETE SET NULL,
+  CONSTRAINT fk_message_threads_partnership FOREIGN KEY (partnership_id) REFERENCES partnerships(id) ON DELETE SET NULL,
+  CONSTRAINT fk_message_threads_assigned_member FOREIGN KEY (assigned_member_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_message_threads_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  thread_id INT NOT NULL,
+  sender_id INT NOT NULL,
+  message_body TEXT NOT NULL,
+  is_read TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_messages_thread (thread_id),
+  INDEX idx_messages_sender (sender_id),
+  CONSTRAINT fk_messages_thread FOREIGN KEY (thread_id) REFERENCES message_threads(id) ON DELETE CASCADE,
+  CONSTRAINT fk_messages_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 8) Verification output.
 SELECT 'HomeBoost stability migration complete' AS status;
 SHOW TABLES LIKE 'employee_invites';
 SHOW TABLES LIKE 'enrollment_batches';
 SHOW TABLES LIKE 'employee_lead_assignments';
 SHOW TABLES LIKE 'employee_lead_todos';
+SHOW TABLES LIKE 'message_threads';
+SHOW TABLES LIKE 'messages';
