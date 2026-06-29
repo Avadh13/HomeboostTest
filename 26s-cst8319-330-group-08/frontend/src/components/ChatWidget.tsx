@@ -18,6 +18,8 @@ function ChatWidget() {
       ? "/employee/messages"
       : user.role === "admin" || user.role === "super_admin"
       ? "/admin/messages"
+      : user.role === "company_admin" || user.role === "company"
+      ? "/company/dashboard"
       : "/hbt/messages";
 
   const sendAdminSupport = async (event: React.FormEvent) => {
@@ -119,9 +121,9 @@ function ChatWidget() {
 
             <div className="mt-5 rounded-2xl bg-slate-50 p-4">
               <p className="text-sm font-bold text-slate-950">Need employee/advisor communication?</p>
-              <p className="mt-1 text-sm text-slate-600">Use the Communication Center for all regular conversations with employees, HBT members, or advisors.</p>
+              <p className="mt-1 text-sm text-slate-600">Use the Communication Center when available. Employer managers can review employee process from the dashboard.</p>
               <Link to={messagesPath} onClick={() => setOpen(false)} className="btn-dark mt-3 text-xs">
-                Open Communication Center
+                Open Workspace
               </Link>
             </div>
           </div>
