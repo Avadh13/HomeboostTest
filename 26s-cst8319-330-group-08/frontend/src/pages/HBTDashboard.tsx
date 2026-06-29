@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 import ChatWidget from "../components/ChatWidget";
+
 const dashboardImage =
   "https://images.unsplash.com/photo-1556761175-4b46a572b786?auto=format&fit=crop&w=1400&q=80";
 
@@ -35,7 +36,6 @@ type Appointment = {
 };
 
 const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
 const toTime = (value?: string) => (value ? value.slice(0, 5) : "--:--");
 
 function HBTDashboard() {
@@ -82,6 +82,7 @@ function HBTDashboard() {
 
   const appointmentStats = useMemo(() => {
     return {
+      total: appointments.length,
       pending: appointments.filter((item) => item.status === "pending").length,
       approved: appointments.filter((item) => item.status === "approved").length,
       completed: appointments.filter((item) => item.status === "completed").length,
@@ -89,7 +90,7 @@ function HBTDashboard() {
   }, [appointments]);
 
   const workTimePreview = useMemo(() => {
-    return teamMembers.slice(0, 3).map((member) => {
+    return teamMembers.slice(0, 4).map((member) => {
       const rows = availability
         .filter((row) => Number(row.team_member_id) === Number(member.id) && Boolean(row.is_available))
         .sort((a, b) => Number(a.day_of_week) - Number(b.day_of_week));
@@ -108,7 +109,7 @@ function HBTDashboard() {
     });
   }, [availability, teamMembers]);
 
-  const latestAppointments = appointments.slice(0, 3);
+  const latestAppointments = appointments.slice(0, 4);
 
   const cards = [
     { title: "Employer Partnerships", icon: "🏢", description: "View employer branded pages assigned to your Home Buying Team.", link: "/hbt/companies", accent: "from-blue-500 to-cyan-500" },
@@ -123,96 +124,92 @@ function HBTDashboard() {
   ];
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-8">
-      <div className="mx-auto max-w-7xl space-y-8">
-        <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-950 p-8 text-white shadow-2xl md:p-10">
-          <img src={dashboardImage} alt="Team meeting" className="absolute inset-0 h-full w-full object-cover opacity-25" />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/90 to-blue-950/50" />
-          <div className="relative flex flex-col justify-between gap-8 md:flex-row md:items-center">
+    <main className="theme-page min-h-screen px-4 py-6 md:px-6 md:py-8">
+      <div className="mx-auto max-w-7xl space-y-5">
+        <section className="theme-panel relative overflow-hidden">
+          <img src={dashboardImage} alt="Team meeting" className="absolute inset-0 h-full w-full object-cover opacity-20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-indigo-950/95 to-violet-950/70" />
+          <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-300">Home Buying Team Control Center</p>
-              <h1 className="mt-3 text-4xl font-black tracking-tight md:text-6xl">HBT Dashboard</h1>
-              <p className="mt-4 max-w-2xl text-lg text-slate-300">
-                Welcome, <strong className="text-white">{user.full_name || "HBT Member"}</strong>. Manage partnerships, employee engagement, appointment requests, availability, resources, events, and notifications from one command center.
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-200">Home Buying Team Control Center</p>
+              <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">HBT Dashboard</h1>
+              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-violet-100 md:text-base">
+                Welcome, <strong className="text-white">{user.full_name || "HBT Member"}</strong>. Manage partnerships, employees, appointments, availability, resources, events, and notifications from one command center.
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Link to="/notifications" className="relative rounded-full bg-blue-600 px-7 py-3 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-blue-700">
+            <div className="flex flex-wrap gap-2">
+              <Link to="/notifications" className="relative rounded-full bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-md transition hover:-translate-y-0.5 hover:bg-blue-700">
                 Notifications
                 {unreadCount > 0 && <span className="absolute -right-2 -top-2 rounded-full bg-red-600 px-2 py-0.5 text-xs font-black text-white">{unreadCount}</span>}
               </Link>
-              <button onClick={handleLogout} className="rounded-full bg-red-600 px-7 py-3 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-red-700">
-                Logout
-              </button>
+              <Link to="/hbt/appointments" className="rounded-full border border-white/30 px-4 py-2 text-sm font-black text-white hover:bg-white/10">Appointments</Link>
+              <button onClick={handleLogout} className="rounded-full bg-red-600 px-4 py-2 text-sm font-black text-white shadow-md transition hover:-translate-y-0.5 hover:bg-red-700">Logout</button>
             </div>
           </div>
         </section>
 
-        <section className="grid gap-5 md:grid-cols-3">
+        <section className="grid gap-4 md:grid-cols-4">
           {[
-            ["Pending Appts", String(appointmentStats.pending)],
-            ["Approved Appts", String(appointmentStats.approved)],
-            ["Unread Updates", String(unreadCount)],
-          ].map(([label, value]) => (
+            ["Total Appts", String(appointmentStats.total), "text-violet-700"],
+            ["Pending", String(appointmentStats.pending), "text-amber-700"],
+            ["Approved", String(appointmentStats.approved), "text-blue-700"],
+            ["Unread Updates", String(unreadCount), "text-red-700"],
+          ].map(([label, value, tone]) => (
             <div key={label} className="metric-card">
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">{label}</p>
-              <h2 className="mt-2 text-3xl font-black text-slate-950">{value}</h2>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
+              <h2 className={`mt-2 text-3xl font-black ${tone}`}>{value}</h2>
             </div>
           ))}
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-[2rem] bg-white p-7 shadow-xl">
+        <section className="grid gap-5 lg:grid-cols-2">
+          <div className="premium-card">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">Work Time</p>
-                <h2 className="text-3xl font-black text-slate-950">Advisor work hours</h2>
+                <p className="eyebrow">Work Time</p>
+                <h2 className="mt-1 text-2xl font-black text-slate-950">Advisor work hours</h2>
               </div>
-              <Link to="/hbt/availability" className="rounded-full bg-blue-600 px-5 py-2.5 text-sm font-black text-white hover:bg-blue-700">Manage hours</Link>
+              <Link to="/hbt/availability" className="btn-primary">Manage hours</Link>
             </div>
 
             <div className="space-y-3">
               {workTimePreview.length === 0 ? (
-                <p className="rounded-2xl bg-slate-50 p-4 text-slate-500">No advisors found. Add team members first.</p>
+                <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No advisors found. Add team members first.</p>
               ) : (
                 workTimePreview.map((item) => (
                   <div key={item.member.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                    <p className="font-black text-slate-950">{item.member.full_name}</p>
-                    <p className="text-sm text-slate-500">{item.member.title || "Advisor"}</p>
-                    <p className="mt-2 font-bold text-blue-700">{item.label}</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-black text-slate-950">{item.member.full_name}</p>
+                        <p className="text-sm text-slate-500">{item.member.title || "Advisor"}</p>
+                      </div>
+                      <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700">{item.days} days</span>
+                    </div>
+                    <p className="mt-2 text-sm font-black text-blue-700">{item.label}</p>
                   </div>
                 ))
               )}
             </div>
           </div>
 
-          <div className="rounded-[2rem] bg-white p-7 shadow-xl">
+          <div className="premium-card">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.2em] text-emerald-600">Appointment Time</p>
-                <h2 className="text-3xl font-black text-slate-950">Upcoming requests</h2>
+                <p className="eyebrow">Appointment Time</p>
+                <h2 className="mt-1 text-2xl font-black text-slate-950">Upcoming requests</h2>
               </div>
-              <Link to="/hbt/appointments" className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-black text-white hover:bg-blue-700">Open queue</Link>
+              <Link to="/hbt/appointments" className="btn-dark">Open queue</Link>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl bg-amber-50 p-4 text-center">
-                <p className="text-3xl font-black text-amber-700">{appointmentStats.pending}</p>
-                <p className="text-xs font-black uppercase text-amber-700">Pending</p>
-              </div>
-              <div className="rounded-2xl bg-blue-50 p-4 text-center">
-                <p className="text-3xl font-black text-blue-700">{appointmentStats.approved}</p>
-                <p className="text-xs font-black uppercase text-blue-700">Approved</p>
-              </div>
-              <div className="rounded-2xl bg-emerald-50 p-4 text-center">
-                <p className="text-3xl font-black text-emerald-700">{appointmentStats.completed}</p>
-                <p className="text-xs font-black uppercase text-emerald-700">Completed</p>
-              </div>
+            <div className="mb-5 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-amber-50 p-4 text-center"><p className="text-2xl font-black text-amber-700">{appointmentStats.pending}</p><p className="text-xs font-black uppercase text-amber-700">Pending</p></div>
+              <div className="rounded-2xl bg-blue-50 p-4 text-center"><p className="text-2xl font-black text-blue-700">{appointmentStats.approved}</p><p className="text-xs font-black uppercase text-blue-700">Approved</p></div>
+              <div className="rounded-2xl bg-emerald-50 p-4 text-center"><p className="text-2xl font-black text-emerald-700">{appointmentStats.completed}</p><p className="text-xs font-black uppercase text-emerald-700">Completed</p></div>
             </div>
 
-            <div className="mt-5 space-y-3">
+            <div className="space-y-3">
               {latestAppointments.length === 0 ? (
-                <p className="rounded-2xl bg-slate-50 p-4 text-slate-500">No appointment requests yet.</p>
+                <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No appointment requests yet.</p>
               ) : (
                 latestAppointments.map((appointment) => (
                   <div key={appointment.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
@@ -229,17 +226,15 @@ function HBTDashboard() {
           </div>
         </section>
 
-        <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {cards.map((card) => (
-            <Link key={card.title} to={card.link} className="group overflow-hidden rounded-[2rem] bg-white shadow-xl shadow-slate-200/70 transition hover:-translate-y-2 hover:shadow-2xl">
-              <div className={`h-2 bg-gradient-to-r ${card.accent}`} />
-              <div className="p-7">
-                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-3xl transition group-hover:scale-110">
-                  {card.icon}
-                </div>
-                <h2 className="text-2xl font-black text-slate-950">{card.title}</h2>
-                <p className="mt-4 leading-relaxed text-slate-600">{card.description}</p>
-                <p className="mt-6 font-black text-blue-700">Open module →</p>
+            <Link key={card.title} to={card.link} className="group overflow-hidden rounded-[1.75rem] bg-white shadow-lg shadow-slate-200/70 transition hover:-translate-y-1 hover:shadow-xl">
+              <div className={`h-1.5 bg-gradient-to-r ${card.accent}`} />
+              <div className="p-5">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-2xl transition group-hover:scale-110">{card.icon}</div>
+                <h2 className="text-xl font-black text-slate-950">{card.title}</h2>
+                <p className="mt-3 min-h-[54px] text-sm leading-relaxed text-slate-600">{card.description}</p>
+                <p className="mt-4 text-sm font-black text-violet-700">Open module →</p>
               </div>
             </Link>
           ))}
