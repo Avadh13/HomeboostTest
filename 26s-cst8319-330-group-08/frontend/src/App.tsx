@@ -15,6 +15,7 @@ import Quiz from "./pages/Quiz";
 import Partners from "./pages/Partners";
 import NotFound from "./pages/NotFound";
 import MessageCenter from "./pages/MessageCenter";
+import CompanyDashboard from "./pages/CompanyDashboard";
 
 import HBTDashboard from "./pages/HBTDashboard";
 import HBTMemberDashboard from "./pages/HBTMemberDashboard";
@@ -59,14 +60,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/partners" element={<Partners />} />
 
-        <Route
-          path="/notifications"
-          element={
-            <RoleProtectedRoute allowedRoles={["admin", "super_admin", "hbt_admin", "hbt_member", "employee"]}>
-              <NotificationCenter />
-            </RoleProtectedRoute>
-          }
-        />
+        <Route path="/notifications" element={<RoleProtectedRoute allowedRoles={["admin", "super_admin", "hbt_admin", "hbt_member", "employee", "company_admin", "company"]}><NotificationCenter /></RoleProtectedRoute>} />
 
         <Route path="/employee-portal" element={<RoleProtectedRoute allowedRoles={["employee"]}><EmployeePortal /></RoleProtectedRoute>} />
         <Route path="/employee/appointments" element={<RoleProtectedRoute allowedRoles={["employee"]}><EmployeeAppointments /></RoleProtectedRoute>} />
@@ -75,6 +69,8 @@ function App() {
         <Route path="/quiz" element={<RoleProtectedRoute allowedRoles={["employee"]}><Quiz /></RoleProtectedRoute>} />
         <Route path="/quiz/:quizId" element={<RoleProtectedRoute allowedRoles={["employee"]}><Quiz /></RoleProtectedRoute>} />
         <Route path="/employee/messages" element={<RoleProtectedRoute allowedRoles={["employee"]}><MessageCenter /></RoleProtectedRoute>} />
+
+        <Route path="/company/dashboard" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><CompanyDashboard /></RoleProtectedRoute>} />
 
         <Route path="/hbt/dashboard" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTDashboard /></RoleProtectedRoute>} />
         <Route path="/hbt/companies" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTCompanies /></RoleProtectedRoute>} />
