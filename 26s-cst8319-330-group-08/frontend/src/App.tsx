@@ -106,6 +106,7 @@ function App() {
         <Route path="/admin/quizzes/:quizId/questions" element={<AdminProtectedRoute><ManageQuizQuestions /></AdminProtectedRoute>} />
         <Route path="/admin/quiz-submissions" element={<AdminProtectedRoute><QuizSubmissions /></AdminProtectedRoute>} />
         <Route path="/admin/messages" element={<AdminProtectedRoute><AdminLayout title="Communication Center"><MessageCenter embedded /></AdminLayout></AdminProtectedRoute>} />
+        <Route path="/admin/notifications" element={<AdminProtectedRoute><AdminLayout title="Alerts Center"><NotificationCenter embedded /></AdminLayout></AdminProtectedRoute>} />
 
         <Route path="/:slug" element={<PartnershipLanding />} />
         <Route path="*" element={<NotFound />} />
