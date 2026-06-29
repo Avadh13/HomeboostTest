@@ -57,6 +57,8 @@ exports.updateUserRole = async (req, res) => {
       "admin",
       "hbt_admin",
       "hbt_member",
+      "company_admin",
+      "company",
       "employee",
     ];
 
