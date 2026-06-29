@@ -72,6 +72,10 @@ type PersonPreview = {
   last_seen_at?: string | null;
 };
 
+type MessageCenterProps = {
+  embedded?: boolean;
+};
+
 const readUser = (): CurrentUser => {
   try {
     return JSON.parse(localStorage.getItem("user") || "{}");
@@ -181,7 +185,7 @@ function ProfileAvatar({ person, size = "md", showStatus = true }: AvatarProps) 
   );
 }
 
-function MessageCenter() {
+function MessageCenter({ embedded = false }: MessageCenterProps) {
   const toast = useToast();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selected, setSelected] = useState<ThreadDetails | null>(null);
@@ -455,17 +459,21 @@ function MessageCenter() {
   };
 
   const selectedOther = selected ? getOtherPerson(selected.thread) : null;
+  const pageClass = embedded ? "text-slate-950" : "min-h-screen bg-[#e8eef7] text-slate-950";
+  const shellClass = embedded
+    ? "h-[calc(100dvh-190px)] rounded-[1.5rem] border border-slate-200"
+    : "h-[calc(100dvh-76px)] border-x border-white/70";
 
   return (
-    <main className="min-h-screen bg-[#e8eef7] text-slate-950">
-      <Navbar />
+    <main className={pageClass}>
+      {!embedded && <Navbar />}
 
-      <section className="mx-auto flex h-[calc(100dvh-76px)] max-w-7xl overflow-hidden border-x border-white/70 bg-white shadow-2xl shadow-slate-300/60">
+      <section className={`mx-auto flex ${shellClass} max-w-7xl overflow-hidden bg-white shadow-2xl shadow-slate-300/60`}>
         <aside className={`${selected ? "hidden md:flex" : "flex"} w-full flex-col border-r border-slate-200 bg-white md:w-[390px]`}>
           <div className="border-b border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <Link to={meta.homePath} className="text-xs font-black text-blue-600 hover:text-blue-800">← Dashboard</Link>
+                {!embedded && <Link to={meta.homePath} className="text-xs font-black text-blue-600 hover:text-blue-800">← Dashboard</Link>}
                 <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">{meta.title}</h1>
                 <p className="truncate text-xs font-semibold text-slate-500">{meta.subtitle}</p>
               </div>
