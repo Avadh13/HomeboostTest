@@ -62,7 +62,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
 
   const navLinks: NavItem[] = [
     { path: "/admin", label: "Dashboard", icon: "⌂", group: "Core" },
-    { path: "/notifications", label: "Notifications", icon: "◉", group: "Core" },
+    { path: "/admin/notifications", label: "Notifications", icon: "◉", group: "Core" },
     { path: "/admin/builder", label: "Builder Mode", icon: "▣", group: "Core" },
     { path: "/admin/hbts", label: "Home Buying Teams", icon: "◈", group: "Operations" },
     { path: "/admin/partnerships", label: "Partnerships", icon: "◇", group: "Operations" },
@@ -95,7 +95,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
     { path: "/admin/resources", label: "Assets", icon: "▤" },
     { path: "/admin/sections", label: "Builder", icon: "▥" },
     { path: "/admin/messages", label: "Messages", icon: "✉" },
-    { path: "/notifications", label: "Alerts", icon: "◉" },
+    { path: "/admin/notifications", label: "Alerts", icon: "◉" },
   ];
 
   return (
