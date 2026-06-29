@@ -38,10 +38,26 @@ const threadSelectSql = `
     creator.full_name AS created_by_name,
     creator.email AS created_by_email,
     creator.role AS created_by_role,
+    creator.last_seen_at AS created_by_last_seen_at,
+    creator_tm.photo_url AS created_by_photo_url,
+    CASE
+      WHEN creator.last_seen_at IS NOT NULL
+      AND creator.last_seen_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+      THEN 1
+      ELSE 0
+    END AS created_by_is_online,
 
     recipient.full_name AS recipient_name,
     recipient.email AS recipient_email,
     recipient.role AS recipient_role,
+    recipient.last_seen_at AS recipient_last_seen_at,
+    recipient_tm.photo_url AS recipient_photo_url,
+    CASE
+      WHEN recipient.last_seen_at IS NOT NULL
+      AND recipient.last_seen_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+      THEN 1
+      ELSE 0
+    END AS recipient_is_online,
 
     assigned.full_name AS assigned_member_name,
     assigned.email AS assigned_member_email,
@@ -78,6 +94,8 @@ const threadSelectSql = `
   LEFT JOIN users creator ON mt.created_by = creator.id
   LEFT JOIN users recipient ON mt.recipient_id = recipient.id
   LEFT JOIN users assigned ON mt.assigned_member_id = assigned.id
+  LEFT JOIN team_members creator_tm ON creator_tm.user_id = creator.id
+  LEFT JOIN team_members recipient_tm ON recipient_tm.user_id = recipient.id
   LEFT JOIN home_buying_teams h ON mt.hbt_team_id = h.id
   LEFT JOIN partnerships p ON mt.partnership_id = p.id
   LEFT JOIN employers e ON p.employer_id = e.id
@@ -132,6 +150,7 @@ const normalizeContacts = (contacts) => ({
     team_id: contact.team_id,
     partnership_id: contact.partnership_id,
     title: contact.title,
+    photo_url: contact.photo_url,
     hbt_team_name: contact.hbt_team_name,
     company_name: contact.company_name,
     partnership_slug: contact.partnership_slug,
@@ -140,6 +159,28 @@ const normalizeContacts = (contacts) => ({
     last_seen_at: contact.last_seen_at,
   })),
 });
+
+const baseContactSelect = `
+  SELECT
+    u.id,
+    u.full_name,
+    u.email,
+    u.role,
+    u.team_id,
+    u.partnership_id,
+    u.last_seen_at,
+    ${isRecentlyOnlineSql} AS is_online_now,
+    tm.title,
+    tm.photo_url,
+    h.name AS hbt_team_name,
+    e.name AS company_name,
+    p.slug AS partnership_slug
+  FROM users u
+  LEFT JOIN team_members tm ON tm.user_id = u.id
+  LEFT JOIN home_buying_teams h ON u.team_id = h.id
+  LEFT JOIN partnerships p ON u.partnership_id = p.id
+  LEFT JOIN employers e ON p.employer_id = e.id
+`;
 
 const getContacts = async (req, res) => {
   try {
@@ -153,15 +194,7 @@ const getContacts = async (req, res) => {
       if (!partnership) return res.json(normalizeContacts(contacts));
 
       const [users] = await pool.query(
-        `SELECT u.id, u.full_name, u.email, u.role, u.team_id, u.partnership_id, u.last_seen_at,
-          ${isRecentlyOnlineSql} AS is_online_now,
-          tm.title,
-          e.name AS company_name,
-          p.slug AS partnership_slug
-         FROM users u
-         LEFT JOIN team_members tm ON tm.user_id = u.id
-         LEFT JOIN partnerships p ON u.partnership_id = p.id
-         LEFT JOIN employers e ON p.employer_id = e.id
+        `${baseContactSelect}
          WHERE u.is_active = 1
          AND u.id != ?
          AND (
@@ -179,13 +212,7 @@ const getContacts = async (req, res) => {
 
     if (isHbtUser(user)) {
       const [users] = await pool.query(
-        `SELECT u.id, u.full_name, u.email, u.role, u.team_id, u.partnership_id, u.last_seen_at,
-          ${isRecentlyOnlineSql} AS is_online_now,
-          e.name AS company_name,
-          p.slug AS partnership_slug
-         FROM users u
-         LEFT JOIN partnerships p ON u.partnership_id = p.id
-         LEFT JOIN employers e ON p.employer_id = e.id
+        `${baseContactSelect}
          WHERE u.id != ?
          AND u.is_active = 1
          AND (
@@ -206,15 +233,7 @@ const getContacts = async (req, res) => {
       if (!partnership) return res.json(normalizeContacts(contacts));
 
       const [users] = await pool.query(
-        `SELECT u.id, u.full_name, u.email, u.role, u.team_id, u.partnership_id, u.last_seen_at,
-          ${isRecentlyOnlineSql} AS is_online_now,
-          tm.title,
-          e.name AS company_name,
-          p.slug AS partnership_slug
-         FROM users u
-         LEFT JOIN team_members tm ON tm.user_id = u.id
-         LEFT JOIN partnerships p ON u.partnership_id = p.id
-         LEFT JOIN employers e ON p.employer_id = e.id
+        `${baseContactSelect}
          WHERE u.is_active = 1
          AND u.id != ?
          AND (
@@ -232,15 +251,7 @@ const getContacts = async (req, res) => {
 
     if (isAdmin(user)) {
       const [users] = await pool.query(
-        `SELECT u.id, u.full_name, u.email, u.role, u.team_id, u.partnership_id, u.last_seen_at,
-          ${isRecentlyOnlineSql} AS is_online_now,
-          h.name AS hbt_team_name,
-          e.name AS company_name,
-          p.slug AS partnership_slug
-         FROM users u
-         LEFT JOIN home_buying_teams h ON u.team_id = h.id
-         LEFT JOIN partnerships p ON u.partnership_id = p.id
-         LEFT JOIN employers e ON p.employer_id = e.id
+        `${baseContactSelect}
          WHERE u.id != ?
          AND u.is_active = 1
          ORDER BY is_online_now DESC, u.role ASC, u.full_name ASC`,
@@ -437,15 +448,7 @@ const createThread = async (req, res) => {
       `INSERT INTO message_threads
        (subject, employee_id, hbt_team_id, partnership_id, assigned_member_id, recipient_id, status, created_by)
        VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
-      [
-        subject.trim(),
-        metadata.employeeId,
-        metadata.hbtTeamId,
-        metadata.partnershipId,
-        metadata.assignedMemberId,
-        recipient.id,
-        user.id,
-      ]
+      [subject.trim(), metadata.employeeId, metadata.hbtTeamId, metadata.partnershipId, metadata.assignedMemberId, recipient.id, user.id]
     );
 
     const threadId = threadResult.insertId;
