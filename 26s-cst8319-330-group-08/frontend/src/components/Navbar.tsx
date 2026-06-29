@@ -56,6 +56,12 @@ function Navbar() {
     { to: "/notifications", label: "Notifications", shortLabel: "Alerts" },
   ];
 
+  const companyLinks: NavLinkItem[] = [
+    { to: "/company/dashboard", label: "Dashboard", shortLabel: "Dash" },
+    { to: "/company/dashboard", label: "Employees" },
+    { to: "/notifications", label: "Notifications", shortLabel: "Alerts" },
+  ];
+
   const hbtAdminLinks: NavLinkItem[] = [
     { to: "/hbt/dashboard", label: "Dashboard", shortLabel: "Dash" },
     { to: "/hbt/companies", label: "Companies" },
@@ -83,6 +89,7 @@ function Navbar() {
   const getLinks = () => {
     if (!isLoggedIn) return publicLinks;
     if (user?.role === "employee") return employeeLinks;
+    if (user?.role === "company_admin" || user?.role === "company") return companyLinks;
     if (user?.role === "hbt_admin") return hbtAdminLinks;
     if (user?.role === "hbt_member") return hbtMemberLinks;
     if (user?.role === "admin" || user?.role === "super_admin") return adminLinks;
@@ -114,7 +121,7 @@ function Navbar() {
         <div className="hide-scrollbar hidden max-w-[46vw] items-center gap-1 overflow-x-auto rounded-full border border-slate-200 bg-white/70 p-1 text-xs font-bold text-slate-700 shadow-sm lg:flex xl:max-w-none xl:text-sm">
           {links.map((link) => (
             <Link
-              key={link.to}
+              key={`${link.to}-${link.label}`}
               to={link.to}
               title={link.label}
               className={`whitespace-nowrap rounded-full px-3 py-2 transition xl:px-4 ${isActive(link.to) ? "bg-blue-50 text-blue-700 shadow-sm" : "hover:bg-slate-50 hover:text-blue-700"}`}
@@ -128,14 +135,8 @@ function Navbar() {
         <div className="hidden shrink-0 items-center gap-2 lg:flex xl:gap-3">
           {!isLoggedIn ? (
             <>
-              <Link to="/login" className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100 hover:text-blue-700 xl:px-5 xl:py-2.5">
-                Login
-              </Link>
-
-              <Link to="/partners" className="btn-primary px-4 py-2.5 text-sm xl:px-6">
-                <span className="xl:hidden">Portals</span>
-                <span className="hidden xl:inline">Find Employer Portal</span>
-              </Link>
+              <Link to="/login" className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100 hover:text-blue-700 xl:px-5 xl:py-2.5">Login</Link>
+              <Link to="/partners" className="btn-primary px-4 py-2.5 text-sm xl:px-6"><span className="xl:hidden">Portals</span><span className="hidden xl:inline">Find Employer Portal</span></Link>
             </>
           ) : (
             <>
@@ -143,10 +144,7 @@ function Navbar() {
                 <p className="truncate text-sm font-black text-slate-900">{user?.full_name}</p>
                 <p className="truncate text-[11px] font-bold uppercase tracking-wide text-slate-500">{user?.role?.replace("_", " ")}</p>
               </div>
-
-              <button onClick={handleLogout} className="btn-danger px-4 py-2.5 text-sm xl:px-5">
-                Logout
-              </button>
+              <button onClick={handleLogout} className="btn-danger px-4 py-2.5 text-sm xl:px-5">Logout</button>
             </>
           )}
         </div>
@@ -158,40 +156,15 @@ function Navbar() {
 
       {open && (
         <div className="max-h-[calc(100vh-72px)] overflow-y-auto border-t border-slate-100 bg-white/95 px-4 py-4 shadow-xl backdrop-blur-xl lg:hidden">
-          {isLoggedIn && (
-            <div className="mb-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <p className="font-black text-slate-950">{user?.full_name}</p>
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{user?.role?.replace("_", " ")}</p>
-            </div>
-          )}
-
+          {isLoggedIn && <div className="mb-3 rounded-2xl border border-slate-100 bg-slate-50 p-4"><p className="font-black text-slate-950">{user?.full_name}</p><p className="text-xs font-bold uppercase tracking-wide text-slate-500">{user?.role?.replace("_", " ")}</p></div>}
           <div className="grid gap-2">
-            {links.map((link) => (
-              <Link
-                key={link.to}
-                to={link.to}
-                onClick={() => setOpen(false)}
-                className={`block rounded-2xl px-4 py-3 font-black transition ${isActive(link.to) ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}
-              >
-                {link.label}
-              </Link>
-            ))}
-
+            {links.map((link) => <Link key={`${link.to}-${link.label}`} to={link.to} onClick={() => setOpen(false)} className={`block rounded-2xl px-4 py-3 font-black transition ${isActive(link.to) ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>{link.label}</Link>)}
             {!isLoggedIn ? (
               <>
-                <Link to="/login" onClick={() => setOpen(false)} className="block rounded-2xl px-4 py-3 font-black text-slate-700 hover:bg-blue-50">
-                  Login
-                </Link>
-
-                <Link to="/partners" onClick={() => setOpen(false)} className="block rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-3 text-center font-black text-white">
-                  Find Employer Portal
-                </Link>
+                <Link to="/login" onClick={() => setOpen(false)} className="block rounded-2xl px-4 py-3 font-black text-slate-700 hover:bg-blue-50">Login</Link>
+                <Link to="/partners" onClick={() => setOpen(false)} className="block rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-3 text-center font-black text-white">Find Employer Portal</Link>
               </>
-            ) : (
-              <button onClick={handleLogout} className="block w-full rounded-2xl bg-red-600 px-4 py-3 text-center font-black text-white">
-                Logout
-              </button>
-            )}
+            ) : <button onClick={handleLogout} className="block w-full rounded-2xl bg-red-600 px-4 py-3 text-center font-black text-white">Logout</button>}
           </div>
         </div>
       )}
