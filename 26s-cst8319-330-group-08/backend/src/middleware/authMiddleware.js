@@ -27,9 +27,6 @@ const protect = async (req, res, next) => {
         role,
         team_id,
         partnership_id,
-        phone,
-        job_title,
-        photo_url,
         is_active
        FROM users
        WHERE id = ?
