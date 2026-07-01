@@ -2,6 +2,7 @@ import { useLocation } from "react-router-dom";
 import MortgageServicesSection from "./MortgageServicesSection";
 import EmployeeMortgageRequestsPanel from "./EmployeeMortgageRequestsPanel";
 import AdvisorRequestsPanel from "./AdvisorRequestsPanel";
+import CompanyBenefitSummaryPanel from "./CompanyBenefitSummaryPanel";
 
 const publicPaths = ["/", "/pricing", "/contact", "/partners"];
 
@@ -23,8 +24,12 @@ function MortgageServicesShell() {
     );
   }
 
-  if (location.pathname === "/hbt/member-dashboard") {
+  if (location.pathname === "/hbt/member-dashboard" || location.pathname === "/hbt/dashboard") {
     return <AdvisorRequestsPanel />;
+  }
+
+  if (location.pathname === "/company/dashboard") {
+    return <CompanyBenefitSummaryPanel />;
   }
 
   if (!publicPaths.includes(location.pathname)) return null;
