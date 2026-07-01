@@ -1,5 +1,18 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import API_BASE_URL from "../api/api";
 import { BRAND, MORTGAGE_SERVICES } from "../config/brand";
+
+type MortgageService = {
+  id?: number;
+  service_key?: string;
+  key?: string;
+  title: string;
+  short_title?: string | null;
+  description?: string | null;
+  icon?: string | null;
+  color_class?: string | null;
+};
 
 type MortgageServicesSectionProps = {
   compact?: boolean;
@@ -9,14 +22,42 @@ type MortgageServicesSectionProps = {
   className?: string;
 };
 
+const serviceKey = (service: MortgageService) => service.service_key || service.key || String(service.id || service.title);
+const serviceIcon = (service: MortgageService) => service.icon || "🏡";
+
 function MortgageServicesSection({
   compact = false,
   showHeroCopy = true,
-  ctaHref = "/login",
+  ctaHref = "/mortgage-request",
   secondaryHref = "/contact",
   className = "",
 }: MortgageServicesSectionProps) {
-  const visibleServices = compact ? MORTGAGE_SERVICES.slice(0, 6) : MORTGAGE_SERVICES;
+  const [apiServices, setApiServices] = useState<MortgageService[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetch(`${API_BASE_URL}/mortgage-services`)
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((data) => {
+        if (!mounted) return;
+        setApiServices(Array.isArray(data.services) ? data.services : []);
+      })
+      .catch(() => {
+        if (mounted) setApiServices([]);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const services = useMemo<MortgageService[]>(() => {
+    const base = apiServices.length > 0 ? apiServices : MORTGAGE_SERVICES;
+    return compact ? base.slice(0, 6) : base;
+  }, [apiServices, compact]);
+
+  const getRequestLink = (service: MortgageService) => `${ctaHref}${ctaHref.includes("?") ? "&" : "?"}service=${encodeURIComponent(serviceKey(service))}`;
 
   return (
     <section className={`px-4 py-12 md:px-6 lg:py-16 ${className}`}>
@@ -48,14 +89,14 @@ function MortgageServicesSection({
             )}
 
             <div className={`grid gap-4 p-5 md:p-7 ${showHeroCopy ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
-              {visibleServices.map((service) => (
+              {services.map((service) => (
                 <Link
-                  key={service.key}
-                  to={ctaHref}
+                  key={serviceKey(service)}
+                  to={getRequestLink(service)}
                   className="group rounded-[1.5rem] border border-slate-100 bg-slate-50 p-4 transition hover:-translate-y-1 hover:bg-white hover:shadow-xl md:p-5"
                 >
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-violet-100 text-2xl transition group-hover:scale-110">{service.icon}</span>
+                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-violet-100 text-2xl transition group-hover:scale-110">{serviceIcon(service)}</span>
                     <span className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">Service</span>
                   </div>
                   <h3 className="text-lg font-black tracking-tight text-slate-950 md:text-xl">{service.title}</h3>
