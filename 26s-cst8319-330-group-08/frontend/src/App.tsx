@@ -16,6 +16,7 @@ import Partners from "./pages/Partners";
 import NotFound from "./pages/NotFound";
 import MessageCenter from "./pages/MessageCenter";
 import ProfilePage from "./pages/Profile";
+import MortgageRequest from "./pages/MortgageRequest";
 import CompanyDashboard from "./pages/CompanyDashboard";
 
 import HBTDashboard from "./pages/HBTDashboard";
@@ -47,6 +48,8 @@ import AdminPartnerships from "./admin/pages/AdminPartnerships";
 import AdminBuilder from "./admin/pages/AdminBuilder";
 import AdminAppointments from "./admin/pages/AdminAppointments";
 import ManageFooter from "./admin/pages/ManageFooter";
+import ManageMortgageServices from "./admin/pages/ManageMortgageServices";
+import ManageServiceRequests from "./admin/pages/ManageServiceRequests";
 
 import AdminProtectedRoute from "./admin/components/AdminProtectedRoute";
 import AdminLayout from "./admin/components/AdminLayout";
@@ -66,6 +69,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/partners" element={<Partners />} />
+        <Route path="/mortgage-request" element={<MortgageRequest />} />
 
         <Route path="/profile" element={<RoleProtectedRoute allowedRoles={["admin", "super_admin", "hbt_admin", "hbt_member", "employee", "company_admin", "company"]}><ProfilePage /></RoleProtectedRoute>} />
         <Route path="/notifications" element={<RoleProtectedRoute allowedRoles={["admin", "super_admin", "hbt_admin", "hbt_member", "employee", "company_admin", "company"]}><NotificationCenter /></RoleProtectedRoute>} />
@@ -106,6 +110,8 @@ function App() {
         <Route path="/admin/cards" element={<AdminProtectedRoute><ManageCards /></AdminProtectedRoute>} />
         <Route path="/admin/pricing" element={<AdminProtectedRoute><ManagePricing /></AdminProtectedRoute>} />
         <Route path="/admin/footer" element={<AdminProtectedRoute><ManageFooter /></AdminProtectedRoute>} />
+        <Route path="/admin/mortgage-services" element={<AdminProtectedRoute><ManageMortgageServices /></AdminProtectedRoute>} />
+        <Route path="/admin/service-requests" element={<AdminProtectedRoute><ManageServiceRequests /></AdminProtectedRoute>} />
         <Route path="/admin/contact-messages" element={<AdminProtectedRoute><ContactMessages /></AdminProtectedRoute>} />
         <Route path="/admin/faqs" element={<AdminProtectedRoute><ManageFAQs /></AdminProtectedRoute>} />
         <Route path="/admin/quizzes" element={<AdminProtectedRoute><ManageQuizzes /></AdminProtectedRoute>} />
