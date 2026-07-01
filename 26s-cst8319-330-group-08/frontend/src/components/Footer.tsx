@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import API_BASE_URL from "../api/api";
+import BrandLogo from "./BrandLogo";
 
 type FooterSettings = {
   is_enabled: number;
@@ -142,9 +143,7 @@ function Footer() {
           <div className="grid gap-8 lg:grid-cols-[1.1fr_1.4fr]">
             <div>
               <div className="flex items-center gap-3">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 text-sm font-black text-white shadow-lg shadow-blue-500/20">
-                  {settings.logo_text || "HB"}
-                </span>
+                <BrandLogo variant="icon" iconClassName="h-14 w-14 rounded-2xl shadow-lg shadow-blue-500/20" />
                 <div>
                   <h2 className="text-xl font-black tracking-tight">{settings.brand_name || "HomeBoost Employee Benefit"}</h2>
                   {settings.tagline && <p className={`mt-0.5 text-sm font-semibold ${mutedClasses[backgroundMode]}`}>{settings.tagline}</p>}
