@@ -37,6 +37,7 @@ const appointmentRoutes = require("./routes/appointmentRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const advisorAvailabilityRoutes = require("./routes/advisorAvailabilityRoutes");
 const companyManagerRoutes = require("./routes/companyManagerRoutes");
+const companyMortgageRoutes = require("./routes/companyMortgageRoutes");
 const leadProgressRoutes = require("./routes/leadProgressRoutes");
 
 const app = express();
@@ -118,6 +119,7 @@ app.use("/api/appointments", appointmentRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/advisor-availability", advisorAvailabilityRoutes);
 app.use("/api/company-manager", companyManagerRoutes);
+app.use("/api/company-mortgage", companyMortgageRoutes);
 app.use("/api/lead-progress", leadProgressRoutes);
 
 app.use((req, res) => {
