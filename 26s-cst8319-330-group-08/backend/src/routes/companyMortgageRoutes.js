@@ -16,6 +16,11 @@ const emptySummary = {
   recent_activity: [],
 };
 
+const requestTableExists = async () => {
+  const [rows] = await pool.query(`SHOW TABLES LIKE 'mortgage_service_requests'`);
+  return rows.length > 0;
+};
+
 router.get("/summary", protect, async (req, res) => {
   try {
     if (!isCompanyUser(req.user)) {
@@ -23,7 +28,7 @@ router.get("/summary", protect, async (req, res) => {
     }
 
     const partnershipId = Number(req.user.partnership_id || 0);
-    if (!partnershipId) {
+    if (!partnershipId || !(await requestTableExists())) {
       return res.json({ status: "success", summary: emptySummary });
     }
 
