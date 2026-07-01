@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="620" height="150" viewBox="0 0 620 150" role="img" aria-label="HomeBoost Employee Benefit logo">
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="150" viewBox="0 0 700 150" role="img" aria-label="HomeBoost Mortgage and Home Buying Benefit Program logo">
   <defs>
     <linearGradient id="hbLogoGradient" x1="18" y1="22" x2="126" y2="126" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#2563EB"/>
@@ -19,7 +19,7 @@
       <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#312E81" flood-opacity="0.18"/>
     </filter>
   </defs>
-  <rect width="620" height="150" rx="24" fill="none"/>
+  <rect width="700" height="150" rx="24" fill="none"/>
   <g filter="url(#hbShadow)">
     <path d="M25 70 75 28l50 42" fill="none" stroke="url(#hbLogoGradient)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M39 65v52h72V65" fill="none" stroke="url(#hbLogoGradient)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
@@ -29,5 +29,5 @@
   <path d="M151 35v80" stroke="#CBD5E1" stroke-width="3" stroke-linecap="round"/>
   <text x="182" y="80" font-family="Inter, Arial, sans-serif" font-size="50" font-weight="900" letter-spacing="-2.5" fill="#111827">Home</text>
   <text x="329" y="80" font-family="Inter, Arial, sans-serif" font-size="50" font-weight="900" letter-spacing="-2.5" fill="url(#hbWordGradient)">Boost</text>
-  <text x="184" y="112" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="800" letter-spacing="8" fill="#94A3B8">EMPLOYEE BENEFIT PROGRAM</text>
+  <text x="184" y="112" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800" letter-spacing="5" fill="#94A3B8">MORTGAGE &amp; HOME BUYING BENEFIT PROGRAM</text>
 </svg>
