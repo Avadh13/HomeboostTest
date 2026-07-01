@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS mortgage_service_requests (
   partnership_id INT NULL,
   hbt_team_id INT NULL,
   assigned_member_id INT NULL,
+  message_thread_id INT NULL,
   source VARCHAR(80) DEFAULT 'website',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -50,7 +51,11 @@ CREATE TABLE IF NOT EXISTS mortgage_service_requests (
   INDEX idx_msr_partnership (partnership_id),
   INDEX idx_msr_hbt_team (hbt_team_id),
   INDEX idx_msr_assigned_member (assigned_member_id),
+  INDEX idx_msr_message_thread (message_thread_id),
   CONSTRAINT fk_msr_service FOREIGN KEY (service_id) REFERENCES mortgage_services(id) ON DELETE SET NULL
 );
+
+-- If the table already existed from an earlier batch, add the message thread link manually if needed:
+-- ALTER TABLE mortgage_service_requests ADD COLUMN message_thread_id INT NULL AFTER assigned_member_id;
 
 SELECT * FROM mortgage_services ORDER BY display_order;
