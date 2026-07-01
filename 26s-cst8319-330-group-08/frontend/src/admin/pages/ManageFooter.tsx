@@ -45,13 +45,13 @@ const defaultSettings: FooterSettings = {
 
 const newLinkDefault = { label: "", href: "", column_key: "left" as FooterLink["column_key"], is_active: 1, opens_new_tab: 0 };
 const columns: FooterLink["column_key"][] = ["left", "center", "right", "bottom"];
-const columnTitle = { left: "Left", center: "Center", right: "Right", bottom: "Bottom" };
-const previewTheme = {
+const columnTitle: Record<FooterLink["column_key"], string> = { left: "Left", center: "Center", right: "Right", bottom: "Bottom" };
+const previewTheme: Record<FooterSettings["background_mode"], string> = {
   dark: "border-slate-800 bg-[#050b16] text-white",
   light: "border-slate-200 bg-white text-slate-950",
   soft: "border-blue-100 bg-gradient-to-br from-white via-blue-50 to-pink-50 text-slate-950",
 };
-const previewMuted = { dark: "text-slate-400", light: "text-slate-500", soft: "text-slate-500" };
+const previewMuted: Record<FooterSettings["background_mode"], string> = { dark: "text-slate-400", light: "text-slate-500", soft: "text-slate-500" };
 
 function normalizeSettings(raw: Partial<FooterSettings>): FooterSettings {
   return { ...defaultSettings, ...raw, is_enabled: Number(raw.is_enabled ?? 1) };
@@ -134,8 +134,8 @@ function ManageFooter() {
 
   useEffect(() => { loadFooter(); }, []);
 
-  const updateSettings = (field: keyof FooterSettings, value: string | number) => setSettings((prev) => ({ ...prev, [field]: value }));
-  const updateLink = (id: number, field: keyof FooterLink, value: string | number) => setLinks((prev) => prev.map((link) => link.id === id ? { ...link, [field]: value } : link));
+  const updateSettings = (field: keyof FooterSettings, value: string | number) => setSettings((prev) => ({ ...prev, [field]: value } as FooterSettings));
+  const updateLink = (id: number, field: keyof FooterLink, value: string | number) => setLinks((prev) => prev.map((link) => link.id === id ? ({ ...link, [field]: value } as FooterLink) : link));
 
   const saveSettings = async (event: FormEvent) => {
     event.preventDefault();
