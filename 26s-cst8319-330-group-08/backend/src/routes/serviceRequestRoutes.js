@@ -96,7 +96,7 @@ const optionalUser = async (req, res, next) => {
 
     const decoded = jwt.verify(authHeader.split(" ")[1], process.env.JWT_SECRET);
     const [users] = await pool.query(
-      `SELECT id, full_name, email, role, team_id, partnership_id, phone, is_active FROM users WHERE id = ? LIMIT 1`,
+      `SELECT id, full_name, email, role, team_id, partnership_id, is_active FROM users WHERE id = ? LIMIT 1`,
       [decoded.id]
     );
 
@@ -252,7 +252,7 @@ router.post("/", optionalUser, async (req, res) => {
 
     const fullName = normalizeText(req.body.full_name || req.user?.full_name, 255);
     const email = normalizeEmail(req.body.email || req.user?.email);
-    const phone = normalizeText(req.body.phone || req.user?.phone, 50) || null;
+    const phone = normalizeText(req.body.phone, 50) || null;
     const preferredContactMethod = contactMethods.includes(req.body.preferred_contact_method) ? req.body.preferred_contact_method : "no_preference";
     const preferredTime = normalizeText(req.body.preferred_time, 120) || null;
     const message = normalizeText(req.body.message, 3000) || null;
