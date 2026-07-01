@@ -2,23 +2,24 @@ import { Link, useLocation } from "react-router-dom";
 
 const hiddenPrefixes = ["/admin", "/hbt/messages", "/employee/messages", "/company/messages", "/login", "/signup", "/mortgage-request"];
 const publicPaths = ["/", "/pricing", "/contact", "/partners", "/employee-portal"];
+const reserved = ["admin", "hbt", "employee", "company", "resources", "quiz", "profile", "notifications", "login", "signup", "partners", "pricing", "contact", "mortgage-request"];
 
-const isPartnershipSlug = (pathname: string) => {
+const getPartnershipSlug = (pathname: string) => {
   const parts = pathname.split("/").filter(Boolean);
-  if (parts.length !== 1) return false;
-  const first = parts[0];
-  return !["admin", "hbt", "employee", "company", "resources", "quiz", "profile", "notifications", "login", "signup", "partners", "pricing", "contact", "mortgage-request"].includes(first);
+  if (parts.length !== 1) return "";
+  return reserved.includes(parts[0]) ? "" : parts[0];
 };
 
 function MobileStickyCTA() {
   const location = useLocation();
   const pathname = location.pathname;
+  const partnershipSlug = getPartnershipSlug(pathname);
 
   if (hiddenPrefixes.some((prefix) => pathname.startsWith(prefix))) return null;
-  if (!publicPaths.includes(pathname) && !isPartnershipSlug(pathname)) return null;
+  if (!publicPaths.includes(pathname) && !partnershipSlug) return null;
 
   const isEmployee = pathname === "/employee-portal";
-  const primaryHref = "/mortgage-request";
+  const primaryHref = partnershipSlug ? `/mortgage-request?partnership=${encodeURIComponent(partnershipSlug)}` : "/mortgage-request";
   const callHref = isEmployee ? "/employee/appointments" : "/contact";
 
   return (
