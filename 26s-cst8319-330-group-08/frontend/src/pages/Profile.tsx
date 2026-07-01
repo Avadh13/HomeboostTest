@@ -2,6 +2,7 @@ import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from "
 import { Link } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 import Navbar from "../components/Navbar";
+import { type ThemePreference, useTheme } from "../components/ThemeProvider";
 import { useToast } from "../components/ToastProvider";
 
 type Profile = {
@@ -26,6 +27,13 @@ type ProfilePageProps = {
   embedded?: boolean;
 };
 
+const themeOptions: Array<{ value: ThemePreference; label: string; icon: string; helper: string }> = [
+  { value: "auto", label: "Auto", icon: "◐", helper: "Use system setting" },
+  { value: "light", label: "Light", icon: "☀", helper: "Clean minimal" },
+  { value: "dark", label: "Dark", icon: "☾", helper: "Modern dark mode" },
+  { value: "soft", label: "Soft", icon: "◆", helper: "Public soft UI" },
+];
+
 const readUser = () => {
   try {
     return JSON.parse(localStorage.getItem("user") || "{}");
@@ -47,6 +55,7 @@ const initials = (name?: string | null) => (name || "User").trim().charAt(0).toU
 
 function ProfilePage({ embedded = false }: ProfilePageProps) {
   const toast = useToast();
+  const { preference, resolvedTheme, setPreference } = useTheme();
   const user = readUser();
   const token = localStorage.getItem("token");
   const apiOrigin = useMemo(() => API_BASE_URL.replace(/\/api\/?$/, ""), []);
@@ -197,12 +206,13 @@ function ProfilePage({ embedded = false }: ProfilePageProps) {
               <p className="text-xs font-black uppercase tracking-[0.24em] text-blue-200">Account Settings</p>
               <h1 className="mt-2 text-3xl font-black md:text-5xl">Profile & personal details</h1>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-blue-100 md:text-base">
-                Keep your name, contact details, role title, address, bio, and profile photo up to date across HomeBoost dashboards and messages.
+                Keep your name, contact details, role title, address, bio, profile photo, and theme preference up to date across HomeBoost dashboards and messages.
               </p>
             </div>
             <div className="rounded-3xl bg-white/10 p-4 text-sm font-bold text-blue-100 backdrop-blur">
               <p className="text-white">{profile?.email || user.email}</p>
               <p className="mt-1 capitalize">{roleLabel(profile?.role || user.role)}</p>
+              <p className="mt-1 capitalize text-blue-200">Theme: {preference === "auto" ? `Auto → ${resolvedTheme}` : resolvedTheme}</p>
             </div>
           </div>
         </header>
@@ -236,6 +246,35 @@ function ProfilePage({ embedded = false }: ProfilePageProps) {
                 <button type="button" onClick={() => updateField("photo_url", "")} className="mt-3 text-sm font-black text-red-600 hover:text-red-700">
                   Remove photo
                 </button>
+              </div>
+
+              <div className="mt-8 rounded-[1.5rem] border border-slate-100 bg-slate-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Theme Preference</p>
+                <p className="mt-1 text-sm font-semibold text-slate-500">Auto follows your computer or phone dark mode setting.</p>
+                <div className="mt-4 grid gap-2">
+                  {themeOptions.map((option) => {
+                    const active = preference === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setPreference(option.value)}
+                        className={`flex items-center justify-between rounded-2xl border px-3 py-3 text-left transition ${
+                          active ? "border-blue-500 bg-white text-blue-700 shadow-sm" : "border-slate-200 bg-white/70 text-slate-700 hover:border-blue-200 hover:bg-white"
+                        }`}
+                      >
+                        <span className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-lg font-black text-blue-700">{option.icon}</span>
+                          <span>
+                            <span className="block text-sm font-black">{option.label}</span>
+                            <span className="block text-xs font-semibold text-slate-400">{option.helper}</span>
+                          </span>
+                        </span>
+                        {active && <span className="text-sm font-black">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </aside>
 
