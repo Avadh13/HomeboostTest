@@ -57,12 +57,14 @@ Client handoff documents are included in the `docs` folder:
 
 ## Database Setup
 
-Import `db.sql` into MySQL.
+All SQL files are organized in the `sql` folder.
+
+Import `sql/db.sql` into MySQL for a fresh database setup.
 
 Example:
 
 ```bash
-mysql -u root -p project2 < db.sql
+mysql -u root -p project2 < sql/db.sql
 ```
 
 Confirm backend `.env` uses the same database name:
@@ -79,43 +81,4 @@ Create or update `backend/.env`, then run:
 cd backend
 npm install
 npm run dev
-```
-
-Backend runs on `http://localhost:5000`.
-
-## Frontend Setup
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend runs on `http://localhost:5173` or the next free Vite port.
-
-## Internal QA Seed Users
-
-After importing `db.sql`, run:
-
-```bash
-cd backend
-node src/seed/createAdminUser.js
-node src/seed/createHBTUser.js
-node src/seed/createEmployeeUser.js
-```
-
-Internal QA accounts:
-
-- `admin@test.com` / `admin123`
-- `hbt@test.com` / `hbt123`
-- `employee@test.com` / `employee123`
-
-## Main Local URLs
-
-```text
-http://localhost:5173/
-http://localhost:5173/joessmokeshop
-http://localhost:5173/login
-http://localhost:5173/hbt/companies
-http://localhost:5173/admin/users
 ```
