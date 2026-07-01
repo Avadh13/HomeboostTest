@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import API_BASE_URL from "../../api/api";
+import BrandLogo from "../../components/BrandLogo";
 
 type AdminLayoutProps = {
   title?: string;
@@ -105,7 +106,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
     <div className="min-h-screen bg-[#f3f4f8] text-slate-950">
       <header className="sticky top-0 z-40 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 shadow-sm lg:hidden">
         <Link to="/admin" className="flex items-center gap-2 text-lg font-black text-slate-950">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-violet-600 text-sm text-white">HB</span>
+          <BrandLogo variant="icon" iconClassName="h-10 w-10 rounded-xl shadow-sm" />
           HomeBoost Admin
         </Link>
         <button onClick={() => setSidebarOpen(!sidebarOpen)} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-black text-white">
@@ -115,7 +116,9 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
 
       <div className="flex min-h-screen">
         <aside className="sticky top-0 hidden h-screen w-16 shrink-0 flex-col items-center border-r border-slate-200 bg-white py-4 lg:flex">
-          <Link to="/admin" className="mb-5 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-violet-600 text-sm font-black text-white shadow-md shadow-violet-500/20">HB</Link>
+          <Link to="/admin" className="mb-5 flex h-10 w-10 items-center justify-center rounded-xl shadow-md shadow-violet-500/20">
+            <BrandLogo variant="icon" iconClassName="h-10 w-10 rounded-xl" />
+          </Link>
 
           <nav className="flex flex-1 flex-col items-center gap-2">
             {quickRail.map((item) => (
@@ -138,7 +141,10 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
           <div className="border-b border-slate-200 p-4">
             <div className="rounded-xl bg-slate-100 p-1.5">
               <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2.5 shadow-sm">
-                <div className="flex items-center gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-violet-600 text-[11px] font-black text-white">HB</span><div><p className="text-sm font-black leading-tight text-slate-950">HomeBoost</p><p className="text-[11px] font-bold text-slate-500">Client Control Panel</p></div></div>
+                <div className="flex items-center gap-2.5">
+                  <BrandLogo variant="icon" iconClassName="h-9 w-9 rounded-lg" />
+                  <div><p className="text-sm font-black leading-tight text-slate-950">HomeBoost</p><p className="text-[11px] font-bold text-slate-500">Client Control Panel</p></div>
+                </div>
                 <span className="text-sm text-slate-400">⌄</span>
               </div>
             </div>
