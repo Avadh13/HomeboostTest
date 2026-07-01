@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import API_BASE_URL from "../../api/api";
 import AdminLayout from "../components/AdminLayout";
@@ -174,7 +174,7 @@ function AdminDashboard() {
                     <h2 className="mt-2 text-3xl font-black text-white">{activeRate}%</h2>
                     <p className="mt-1 text-sm font-semibold text-slate-400">{activeUsers} active users</p>
                   </div>
-                  <div className="grid h-24 w-24 place-items-center rounded-full bg-[conic-gradient(#22d3ee_var(--progress),rgba(255,255,255,0.10)_0)]" style={{ "--progress": `${activeRate * 3.6}deg` } as React.CSSProperties}>
+                  <div className="grid h-24 w-24 place-items-center rounded-full bg-[conic-gradient(#22d3ee_var(--progress),rgba(255,255,255,0.10)_0)]" style={{ "--progress": `${activeRate * 3.6}deg` } as CSSProperties}>
                     <div className="grid h-16 w-16 place-items-center rounded-full bg-[#0b1220] text-lg font-black text-sky-300">{activeRate}%</div>
                   </div>
                 </div>
@@ -252,28 +252,43 @@ function AdminDashboard() {
 
               <section className="relative mt-5 grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
                 <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl md:p-6">
-                  <div className="mb-5 flex items-center justify-between gap-3">
+                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-300">Latest Activity</p>
                       <h2 className="mt-1 text-2xl font-black text-white">Recent users</h2>
                     </div>
-                    <Link to="/admin/users" className="rounded-full bg-white/10 px-3 py-2 text-xs font-black text-slate-200 hover:bg-white/15">View All</Link>
+                    <Link to="/admin/users" className="rounded-full bg-white/10 px-4 py-2 text-xs font-black text-slate-200 hover:bg-white/15">View All</Link>
                   </div>
 
                   <div className="space-y-3">
                     {recentUsers.map((user) => (
-                      <div key={user.id} className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-slate-950/30 p-4 md:flex-row md:items-center md:justify-between">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-400/15 text-sm font-black text-sky-300 ring-1 ring-sky-400/20">{initials(user.full_name || user.email)}</div>
-                          <div className="min-w-0">
-                            <p className="truncate font-black text-white">{user.full_name || "Unnamed user"}</p>
-                            <p className="truncate text-xs font-semibold text-slate-400">{user.email}</p>
+                      <div key={user.id} className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+                        <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
+                          <div className="flex min-w-0 items-center gap-4">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-400/15 text-base font-black text-sky-300 ring-1 ring-sky-400/20">
+                              {initials(user.full_name || user.email)}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="break-words text-base font-black leading-snug text-white md:text-lg">{user.full_name || "Unnamed user"}</p>
+                              <p className="mt-0.5 truncate text-sm font-semibold text-slate-400">{user.email}</p>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="rounded-full bg-violet-400/10 px-3 py-1 text-xs font-black capitalize text-violet-200 ring-1 ring-violet-400/20">{roleLabel(user.role)}</span>
-                          {user.hbt_name && <span className="rounded-full bg-sky-400/10 px-3 py-1 text-xs font-black text-sky-200 ring-1 ring-sky-400/20">{user.hbt_name}</span>}
-                          {user.employer_name && <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-black text-emerald-200 ring-1 ring-emerald-400/20">{user.employer_name}</span>}
+
+                          <div className="flex max-w-full flex-wrap gap-2 2xl:max-w-[420px] 2xl:justify-end">
+                            <span className="max-w-full rounded-full bg-violet-400/10 px-3 py-1 text-xs font-black capitalize text-violet-200 ring-1 ring-violet-400/20">
+                              {roleLabel(user.role)}
+                            </span>
+                            {user.hbt_name && (
+                              <span className="max-w-full truncate rounded-full bg-sky-400/10 px-3 py-1 text-xs font-black text-sky-200 ring-1 ring-sky-400/20 2xl:max-w-[210px]">
+                                {user.hbt_name}
+                              </span>
+                            )}
+                            {user.employer_name && (
+                              <span className="max-w-full truncate rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-black text-emerald-200 ring-1 ring-emerald-400/20 2xl:max-w-[190px]">
+                                {user.employer_name}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
