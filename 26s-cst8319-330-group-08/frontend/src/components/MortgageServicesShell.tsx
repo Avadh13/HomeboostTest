@@ -1,7 +1,7 @@
 import { useLocation } from "react-router-dom";
 import MortgageServicesSection from "./MortgageServicesSection";
 
-const publicPaths = ["/pricing", "/contact", "/partners"];
+const publicPaths = ["/", "/pricing", "/contact", "/partners"];
 
 function MortgageServicesShell() {
   const location = useLocation();
