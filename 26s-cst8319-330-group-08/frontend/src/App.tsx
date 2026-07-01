@@ -56,6 +56,9 @@ import AdminLayout from "./admin/components/AdminLayout";
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
 import FooterShell from "./components/FooterShell";
 import MortgageServicesShell from "./components/MortgageServicesShell";
+import PartnershipMortgageServicesShell from "./components/PartnershipMortgageServicesShell";
+import MobileStickyCTA from "./components/MobileStickyCTA";
+import FloatingThemeControl from "./components/FloatingThemeControl";
 import ScrollToTop from "./components/ScrollToTop";
 
 function App() {
@@ -125,6 +128,9 @@ function App() {
         <Route path="*" element={<NotFound />} />
       </Routes>
       <MortgageServicesShell />
+      <PartnershipMortgageServicesShell />
+      <FloatingThemeControl />
+      <MobileStickyCTA />
       <FooterShell />
     </BrowserRouter>
   );
