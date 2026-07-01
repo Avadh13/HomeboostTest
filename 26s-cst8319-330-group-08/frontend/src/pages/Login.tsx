@@ -119,45 +119,45 @@ function Login() {
   };
 
   return (
-    <main className="grid min-h-screen bg-[#f8f7ff] lg:grid-cols-2">
-      <section className="relative hidden overflow-hidden lg:block">
+    <main className="min-h-screen bg-[#f8f7ff] lg:grid lg:h-screen lg:grid-cols-2 lg:overflow-hidden">
+      <section className="relative hidden h-screen overflow-hidden lg:block">
         <img src={loginImage} alt="Modern home interior" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-br from-slate-950/90 via-indigo-950/70 to-violet-900/40" />
-        <Link to="/" className="absolute left-10 top-10 rounded-3xl bg-white/90 px-4 py-3 shadow-xl backdrop-blur-xl transition hover:-translate-y-0.5">
-          <BrandLogo className="h-16 w-[260px]" />
+        <Link to="/" className="absolute left-8 top-8 rounded-3xl bg-white/90 px-4 py-3 shadow-xl backdrop-blur-xl transition hover:-translate-y-0.5 xl:left-10 xl:top-10">
+          <BrandLogo className="h-14 w-[240px] xl:h-16 xl:w-[260px]" />
         </Link>
 
-        <div className="absolute bottom-10 left-10 right-10 rounded-[2rem] border border-white/15 bg-white/15 p-8 text-white backdrop-blur-xl">
-          <p className="text-sm font-black uppercase tracking-[0.25em] text-violet-100">One login</p>
-          <h2 className="mt-3 text-4xl font-black tracking-tight">Same door. Different dashboard.</h2>
-          <p className="mt-4 max-w-xl text-violet-50">Admins, HBT teams, employer managers, advisors, and employees all start here. The system reads the role and sends each user to the right place.</p>
-          <div className="mt-6 grid gap-3 sm:grid-cols-4">
+        <div className="absolute bottom-8 left-8 right-8 rounded-[2rem] border border-white/15 bg-white/15 p-6 text-white backdrop-blur-xl xl:bottom-10 xl:left-10 xl:right-10 xl:p-8">
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-violet-100 xl:text-sm">One login</p>
+          <h2 className="mt-3 text-3xl font-black tracking-tight xl:text-4xl">Same door. Different dashboard.</h2>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-violet-50 xl:mt-4 xl:text-base">Admins, HBT teams, employer managers, advisors, and employees all start here. The system reads the role and sends each user to the right place.</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-4 xl:mt-6">
             {["Admin", "HBT", "Employer", "Employee"].map((item) => <div key={item} className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black backdrop-blur">{item}</div>)}
           </div>
         </div>
       </section>
 
-      <section className="relative flex items-center justify-center overflow-hidden px-6 py-12">
+      <section className="relative flex min-h-screen items-center justify-center overflow-hidden px-5 py-6 lg:h-screen lg:min-h-0 lg:px-10 lg:py-4">
         <div className="floating-orb -right-24 top-20 h-80 w-80 bg-violet-400" />
         <div className="floating-orb -left-32 bottom-20 h-80 w-80 bg-blue-400" />
 
-        <div className="relative w-full max-w-md">
-          <Link to="/" className="mb-8 inline-flex rounded-3xl bg-white/85 px-4 py-3 shadow-lg backdrop-blur-xl transition hover:-translate-y-0.5 lg:hidden">
+        <div className="relative w-full max-w-[620px]">
+          <Link to="/" className="mb-6 inline-flex rounded-3xl bg-white/85 px-4 py-3 shadow-lg backdrop-blur-xl transition hover:-translate-y-0.5 lg:hidden">
             <BrandLogo className="h-14 w-[230px]" />
           </Link>
 
-          <form onSubmit={handleLogin} className="premium-card p-8">
+          <form onSubmit={handleLogin} className="premium-card p-6 sm:p-7 xl:p-8">
             <p className="eyebrow">Welcome back</p>
-            <h1 className="mt-2 text-4xl font-black tracking-tight md:text-5xl">Login</h1>
-            <p className="mt-3 text-sm leading-relaxed text-slate-600">Use your assigned account details to access your role-based dashboard.</p>
+            <h1 className="mt-2 text-4xl font-black tracking-tight xl:text-5xl">Login</h1>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600 xl:mt-3">Use your assigned account details to access your role-based dashboard.</p>
 
             {notice && (
-              <div className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${notice.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}>
+              <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-semibold ${notice.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}>
                 {notice.message}
               </div>
             )}
 
-            <div className="mt-7 space-y-4">
+            <div className="mt-5 space-y-3 xl:mt-6 xl:space-y-4">
               <label className="block">
                 <span className="mb-2 block text-sm font-bold text-slate-700">Email</span>
                 <input className="form-field" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -173,16 +173,16 @@ function Login() {
               </label>
             </div>
 
-            <button type="submit" disabled={loading} className="btn-primary mt-6 w-full justify-center disabled:opacity-60">
+            <button type="submit" disabled={loading} className="btn-primary mt-5 w-full justify-center disabled:opacity-60 xl:mt-6">
               {loading ? "Logging in..." : "Login"}
             </button>
 
-            <div className="mt-6 rounded-2xl border border-violet-100 bg-violet-50/80 p-4 text-sm text-slate-700">
+            <div className="mt-5 rounded-2xl border border-violet-100 bg-violet-50/80 p-4 text-sm text-slate-700 xl:mt-6">
               <p className="font-black text-violet-700">Need access?</p>
-              <p className="mt-2">Employees should start from their employer portal link. Employer managers and HBT team members should use the account provided by admin.</p>
+              <p className="mt-2 leading-relaxed">Employees should start from their employer portal link. Employer managers and HBT team members should use the account provided by admin.</p>
             </div>
 
-            <div className="mt-6 grid gap-3 text-center text-sm text-slate-600">
+            <div className="mt-4 grid gap-2 text-center text-sm text-slate-600 xl:mt-5">
               <p>Employee? <Link to="/partners" className="font-black text-violet-700">Start from your employer page</Link></p>
               <p>New employee account? <Link to="/signup" className="font-black text-violet-700">Create account with partnership slug</Link></p>
             </div>
