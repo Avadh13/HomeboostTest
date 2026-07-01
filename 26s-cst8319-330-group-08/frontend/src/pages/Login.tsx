@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API_BASE_URL from "../api/api";
+import BrandLogo from "../components/BrandLogo";
 
 const loginImage =
   "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80";
@@ -122,12 +123,8 @@ function Login() {
       <section className="relative hidden overflow-hidden lg:block">
         <img src={loginImage} alt="Modern home interior" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-br from-slate-950/90 via-indigo-950/70 to-violet-900/40" />
-        <Link to="/" className="absolute left-10 top-10 flex items-center gap-3 text-white">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 font-black backdrop-blur">HB</span>
-          <div>
-            <p className="text-2xl font-black">HomeBoost</p>
-            <p className="text-xs font-black uppercase tracking-[0.24em] text-violet-100">Employee Benefit</p>
-          </div>
+        <Link to="/" className="absolute left-10 top-10 rounded-3xl bg-white/90 px-4 py-3 shadow-xl backdrop-blur-xl transition hover:-translate-y-0.5">
+          <BrandLogo className="h-16 w-[260px]" />
         </Link>
 
         <div className="absolute bottom-10 left-10 right-10 rounded-[2rem] border border-white/15 bg-white/15 p-8 text-white backdrop-blur-xl">
@@ -145,12 +142,8 @@ function Login() {
         <div className="floating-orb -left-32 bottom-20 h-80 w-80 bg-blue-400" />
 
         <div className="relative w-full max-w-md">
-          <Link to="/" className="mb-8 inline-flex items-center gap-3 lg:hidden">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 font-black text-white shadow-lg shadow-violet-500/30">HB</span>
-            <div>
-              <p className="text-2xl font-black">HomeBoost</p>
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-violet-600">Employee Benefit</p>
-            </div>
+          <Link to="/" className="mb-8 inline-flex rounded-3xl bg-white/85 px-4 py-3 shadow-lg backdrop-blur-xl transition hover:-translate-y-0.5 lg:hidden">
+            <BrandLogo className="h-14 w-[230px]" />
           </Link>
 
           <form onSubmit={handleLogin} className="premium-card p-8">
