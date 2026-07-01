@@ -25,6 +25,13 @@ type RequestForm = {
   consent: boolean;
 };
 
+type SubmitSuccess = {
+  requestId: number;
+  message: string;
+  threadId?: number | null;
+  assignedName?: string | null;
+};
+
 const readUser = () => {
   try {
     return JSON.parse(localStorage.getItem("user") || "{}");
@@ -43,7 +50,7 @@ function MortgageRequest() {
   const [services, setServices] = useState<MortgageService[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState<{ requestId: number; message: string } | null>(null);
+  const [success, setSuccess] = useState<SubmitSuccess | null>(null);
   const [form, setForm] = useState<RequestForm>({
     service_key: selectedFromUrl,
     full_name: user.full_name || "",
@@ -117,8 +124,13 @@ function MortgageRequest() {
         return;
       }
 
-      setSuccess({ requestId: data.request_id, message: data.next_step || "An advisor will review this request." });
-      toast.success("Mortgage request submitted.");
+      setSuccess({
+        requestId: data.request_id,
+        message: data.next_step || "An advisor will review this request.",
+        threadId: data.thread_id || null,
+        assignedName: data.assigned_member_name || null,
+      });
+      toast.success(data.thread_id ? "Request submitted and advisor chat created." : "Mortgage request submitted.");
       setForm((prev) => ({ ...prev, preferred_time: "", message: "", consent: false }));
     } catch {
       toast.error("Failed to submit mortgage request.");
@@ -160,7 +172,7 @@ function MortgageRequest() {
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Intake Form</p>
                 <h2 className="mt-1 text-3xl font-black tracking-tight text-slate-950">Tell us how we can help</h2>
-                <p className="mt-2 text-sm text-slate-500">Your request is saved for advisor review. One-to-one message creation is the next batch.</p>
+                <p className="mt-2 text-sm text-slate-500">Your request is saved, assigned when possible, and a private advisor conversation is created for logged-in employees.</p>
               </div>
               {selectedService && <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-black text-blue-700">{selectedService.icon} {selectedService.short_title || selectedService.title}</span>}
             </div>
@@ -168,9 +180,10 @@ function MortgageRequest() {
             {success && (
               <div className="mb-5 rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900">
                 <p className="text-lg font-black">Request #{success.requestId} submitted successfully.</p>
+                {success.assignedName && <p className="mt-1 text-sm font-semibold">Assigned advisor: {success.assignedName}</p>}
                 <p className="mt-1 text-sm font-semibold">{success.message}</p>
                 <div className="mt-4 flex flex-wrap gap-3">
-                  <Link to={token ? "/employee/messages" : "/login"} className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700">Message Center</Link>
+                  <Link to={token ? "/employee/messages" : "/login"} className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700">{success.threadId ? "Open Advisor Chat" : "Message Center"}</Link>
                   <Link to={token ? "/employee/appointments" : "/contact"} className="rounded-full bg-white px-4 py-2 text-sm font-black text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100">Book Appointment</Link>
                 </div>
               </div>
