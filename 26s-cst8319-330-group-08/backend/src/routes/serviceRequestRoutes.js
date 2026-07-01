@@ -2,6 +2,7 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/db");
 const protect = require("../middleware/authMiddleware");
+const { createNotification, createAdminNotification } = require("../utils/notificationService");
 
 const router = express.Router();
 
@@ -12,11 +13,16 @@ const isHbtUser = (user) => user?.role === "hbt_admin" || user?.role === "hbt_me
 
 const normalizeText = (value, max = 255) => String(value || "").trim().slice(0, max);
 const normalizeEmail = (value) => normalizeText(value, 255).toLowerCase();
-const toBool = (value) => value === true || value === 1 || value === "1" || value === "true" ? 1 : 0;
+const toBool = (value) => (value === true || value === 1 || value === "1" || value === "true" ? 1 : 0);
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
 let schemaReady = false;
 let schemaPromise = null;
+
+const addColumnIfMissing = async (table, column, definition) => {
+  const [rows] = await pool.query(`SHOW COLUMNS FROM ${table} LIKE ?`, [column]);
+  if (rows.length === 0) await pool.query(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+};
 
 const ensureSchema = async () => {
   if (schemaReady) return;
@@ -57,6 +63,7 @@ const ensureSchema = async () => {
         partnership_id INT NULL,
         hbt_team_id INT NULL,
         assigned_member_id INT NULL,
+        message_thread_id INT NULL,
         source VARCHAR(80) DEFAULT 'website',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -65,9 +72,12 @@ const ensureSchema = async () => {
         INDEX idx_msr_partnership (partnership_id),
         INDEX idx_msr_hbt_team (hbt_team_id),
         INDEX idx_msr_assigned_member (assigned_member_id),
+        INDEX idx_msr_message_thread (message_thread_id),
         CONSTRAINT fk_msr_service FOREIGN KEY (service_id) REFERENCES mortgage_services(id) ON DELETE SET NULL
       )
     `);
+
+    await addColumnIfMissing("mortgage_service_requests", "message_thread_id", "message_thread_id INT NULL AFTER assigned_member_id");
 
     schemaReady = true;
   })();
@@ -92,7 +102,7 @@ const optionalUser = async (req, res, next) => {
 
     if (users[0] && Number(users[0].is_active) === 1) req.user = users[0];
   } catch {
-    // Public intake should still work if an optional token is missing or expired.
+    // Keep public intake available if optional token is missing or expired.
   }
   next();
 };
@@ -125,6 +135,92 @@ const getService = async ({ serviceId, serviceKey }) => {
   return null;
 };
 
+const findAdvisorForRequest = async ({ hbtTeamId }) => {
+  if (!hbtTeamId) return null;
+
+  const [[advisor]] = await pool.query(
+    `SELECT u.id, u.full_name, u.email, u.role, u.team_id, u.partnership_id
+     FROM users u
+     WHERE u.is_active = 1
+       AND u.team_id = ?
+       AND u.role IN ('hbt_member', 'hbt_admin')
+     ORDER BY FIELD(u.role, 'hbt_member', 'hbt_admin'), u.id ASC
+     LIMIT 1`,
+    [hbtTeamId]
+  );
+
+  return advisor || null;
+};
+
+const createAdvisorThread = async ({ connection, requestId, requester, advisor, context, service, message }) => {
+  if (!requester?.id || !advisor?.id) return null;
+
+  const subject = `Mortgage Request #${requestId}: ${service.title}`;
+  const body = [
+    `Hi, I submitted a mortgage support request for: ${service.title}.`,
+    message ? `Details: ${message}` : null,
+    "Please let me know the next step.",
+  ].filter(Boolean).join("\n\n");
+
+  const [threadResult] = await connection.query(
+    `INSERT INTO message_threads
+     (subject, employee_id, hbt_team_id, partnership_id, assigned_member_id, recipient_id, status, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
+    [subject, requester.id, context.hbt_team_id, context.partnership_id, advisor.id, advisor.id, requester.id]
+  );
+
+  const threadId = threadResult.insertId;
+  await connection.query(`INSERT INTO messages (thread_id, sender_id, message_body, is_read) VALUES (?, ?, ?, 0)`, [threadId, requester.id, body]);
+  await connection.query(`UPDATE mortgage_service_requests SET message_thread_id = ? WHERE id = ?`, [threadId, requestId]);
+  return threadId;
+};
+
+const notifyRequestCreated = async ({ requestId, requester, advisor, context, service, threadId, isPublicRequest }) => {
+  const requestLink = "/admin/service-requests";
+  const hbtLink = threadId ? "/hbt/messages" : "/hbt/dashboard";
+  const employeeLink = threadId ? "/employee/messages" : "/mortgage-request";
+  const personName = requester?.full_name || "A client";
+
+  if (advisor?.id) {
+    await createNotification({
+      user_id: advisor.id,
+      title: "New mortgage request assigned",
+      message: `${personName} requested help with ${service.title}.`,
+      link: hbtLink,
+      type: "info",
+    });
+  }
+
+  if (context.hbt_team_id) {
+    await createNotification({
+      target_role: "hbt_admin",
+      target_team_id: context.hbt_team_id,
+      title: "New mortgage request",
+      message: `${personName} submitted a ${service.title} request.`,
+      link: "/hbt/dashboard",
+      type: "info",
+    });
+  }
+
+  await createAdminNotification({
+    title: "New mortgage service request",
+    message: `${personName} submitted request #${requestId}: ${service.title}.`,
+    link: requestLink,
+    type: "system",
+  });
+
+  if (requester?.id && !isPublicRequest) {
+    await createNotification({
+      user_id: requester.id,
+      target_partnership_id: context.partnership_id,
+      title: "Mortgage request submitted",
+      message: advisor?.full_name ? `Your request was sent to ${advisor.full_name}.` : "Your request was submitted for advisor review.",
+      link: employeeLink,
+      type: "success",
+    });
+  }
+};
+
 const requestSelectSql = `
   SELECT
     r.*,
@@ -147,6 +243,7 @@ const requestSelectSql = `
 `;
 
 router.post("/", optionalUser, async (req, res) => {
+  const connection = await pool.getConnection();
   try {
     await ensureSchema();
 
@@ -163,14 +260,16 @@ router.post("/", optionalUser, async (req, res) => {
 
     if (!fullName || !email) return res.status(400).json({ status: "error", message: "Name and email are required" });
     if (!isValidEmail(email)) return res.status(400).json({ status: "error", message: "Please enter a valid email" });
-    if (!consent) return res.status(400).json({ status: "error", message: "Consent is required before submitting a mortgage request" });
+    if (!consent) return res.status(400).json({ status: "error", message: "Please confirm before submitting this request" });
 
     const context = await getPartnershipContext(req.user, req.body.partnership_slug);
+    const advisor = await findAdvisorForRequest({ hbtTeamId: context.hbt_team_id });
 
-    const [result] = await pool.query(
+    await connection.beginTransaction();
+    const [result] = await connection.query(
       `INSERT INTO mortgage_service_requests
-       (service_id, service_key, service_title, requester_user_id, full_name, email, phone, preferred_contact_method, preferred_time, message, consent, partnership_id, hbt_team_id, source)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (service_id, service_key, service_title, requester_user_id, full_name, email, phone, preferred_contact_method, preferred_time, message, consent, partnership_id, hbt_team_id, assigned_member_id, source)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         service.id,
         service.service_key,
@@ -185,18 +284,39 @@ router.post("/", optionalUser, async (req, res) => {
         consent,
         context.partnership_id,
         context.hbt_team_id,
+        advisor?.id || null,
         normalizeText(req.body.source, 80) || (req.user ? "employee_portal" : "website"),
       ]
     );
 
+    const requestId = result.insertId;
+    const threadId = await createAdvisorThread({ connection, requestId, requester: req.user, advisor, context, service, message });
+    await connection.commit();
+
+    await notifyRequestCreated({
+      requestId,
+      requester: req.user || { full_name: fullName, email },
+      advisor,
+      context,
+      service,
+      threadId,
+      isPublicRequest: !req.user,
+    });
+
     return res.status(201).json({
       status: "success",
       message: "Mortgage request submitted successfully",
-      request_id: result.insertId,
-      next_step: "An advisor will review this request and follow up.",
+      request_id: requestId,
+      assigned_member_id: advisor?.id || null,
+      assigned_member_name: advisor?.full_name || null,
+      thread_id: threadId,
+      next_step: threadId ? "A private advisor conversation was created in Messages." : "An advisor will review this request and follow up.",
     });
   } catch (error) {
+    await connection.rollback();
     return res.status(500).json({ status: "error", message: "Failed to submit mortgage request", error: error.message });
+  } finally {
+    connection.release();
   }
 });
 
@@ -255,6 +375,17 @@ router.put("/:id/status", protect, async (req, res) => {
       `UPDATE mortgage_service_requests SET status = ?, assigned_member_id = COALESCE(?, assigned_member_id) WHERE id = ?`,
       [status, req.body.assigned_member_id || null, req.params.id]
     );
+
+    if (request.requester_user_id) {
+      await createNotification({
+        user_id: request.requester_user_id,
+        target_partnership_id: request.partnership_id,
+        title: "Mortgage request updated",
+        message: `Your ${request.service_title || "mortgage"} request status changed to ${status.replace(/_/g, " ")}.`,
+        link: request.message_thread_id ? "/employee/messages" : "/mortgage-request",
+        type: "info",
+      });
+    }
 
     return res.json({ status: "success", message: "Mortgage request status updated" });
   } catch (error) {
