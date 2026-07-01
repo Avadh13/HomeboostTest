@@ -52,6 +52,7 @@ import AdminProtectedRoute from "./admin/components/AdminProtectedRoute";
 import AdminLayout from "./admin/components/AdminLayout";
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
 import FooterShell from "./components/FooterShell";
+import MortgageServicesShell from "./components/MortgageServicesShell";
 import ScrollToTop from "./components/ScrollToTop";
 
 function App() {
@@ -117,6 +118,7 @@ function App() {
         <Route path="/:slug" element={<PartnershipLanding />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      <MortgageServicesShell />
       <FooterShell />
     </BrowserRouter>
   );
