@@ -74,6 +74,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
     { path: "/admin/sections", label: "Sections", icon: "▥", group: "Content" },
     { path: "/admin/cards", label: "Cards", icon: "▦", group: "Content" },
     { path: "/admin/pricing", label: "Pricing", icon: "$", group: "Content" },
+    { path: "/admin/footer", label: "Footer Builder", icon: "▧", group: "Content" },
     { path: "/admin/faqs", label: "FAQs", icon: "?", group: "Content" },
     { path: "/admin/quizzes", label: "Quizzes", icon: "✦", group: "Content" },
     { path: "/admin/quiz-submissions", label: "Quiz Submissions", icon: "✓", group: "Communication" },
@@ -95,6 +96,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
     { path: "/admin", label: "Home", icon: "⌂" },
     { path: "/admin/profile", label: "Profile", icon: "◌" },
     { path: "/admin/resources", label: "Assets", icon: "▤" },
+    { path: "/admin/footer", label: "Footer", icon: "▧" },
     { path: "/admin/messages", label: "Messages", icon: "✉" },
     { path: "/admin/notifications", label: "Alerts", icon: "◉" },
   ];
@@ -177,7 +179,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
           <div className="border-b border-slate-200 bg-white/90 px-5 py-4 backdrop-blur-xl lg:px-7">
             <div className="mx-auto flex max-w-7xl flex-col justify-between gap-3 md:flex-row md:items-center">
               <div><p className="text-xs font-black uppercase tracking-[0.16em] text-violet-500">Admin Workspace</p><h1 className="mt-0.5 text-2xl font-black tracking-tight text-slate-950">{title || "Dashboard"}</h1></div>
-              <div className="flex flex-wrap gap-2"><Link to="/admin/profile" className="rounded-full bg-slate-100 px-3.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-200">My Profile</Link><Link to="/admin/sections" className="rounded-full bg-slate-100 px-3.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-200">CMS Editor</Link><Link to="/admin/partnerships" className="rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-3.5 py-2 text-xs font-black text-white shadow-md shadow-violet-500/20">New Partnership</Link></div>
+              <div className="flex flex-wrap gap-2"><Link to="/admin/profile" className="rounded-full bg-slate-100 px-3.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-200">My Profile</Link><Link to="/admin/footer" className="rounded-full bg-slate-100 px-3.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-200">Footer Builder</Link><Link to="/admin/sections" className="rounded-full bg-slate-100 px-3.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-200">CMS Editor</Link><Link to="/admin/partnerships" className="rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-3.5 py-2 text-xs font-black text-white shadow-md shadow-violet-500/20">New Partnership</Link></div>
             </div>
           </div>
 
