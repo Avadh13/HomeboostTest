@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import BrandLogo from "./BrandLogo";
 
 type User = {
   id: number;
@@ -115,16 +116,8 @@ function Navbar() {
   return (
     <nav className="sticky top-0 z-50 border-b border-white/70 bg-white/85 shadow-sm shadow-slate-200/60 backdrop-blur-2xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 lg:px-6">
-        <Link to="/" className="group flex min-w-0 items-center gap-3">
-          <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 text-base font-black text-white shadow-lg shadow-blue-500/30 transition group-hover:-translate-y-0.5 group-hover:shadow-xl md:h-12 md:w-12 md:text-lg">
-            HB
-            <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />
-          </span>
-
-          <div className="min-w-0 leading-tight">
-            <p className="truncate text-xl font-black tracking-tight text-slate-950 md:text-2xl">HomeBoost</p>
-            <p className="truncate text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 md:text-xs md:tracking-[0.26em]">Employee Benefit</p>
-          </div>
+        <Link to="/" className="group flex min-w-0 items-center">
+          <BrandLogo className="h-12 w-[210px] transition group-hover:-translate-y-0.5 md:h-14 md:w-[240px]" />
         </Link>
 
         <div className="hide-scrollbar hidden max-w-[46vw] items-center gap-1 overflow-x-auto rounded-full border border-slate-200 bg-white/70 p-1 text-xs font-bold text-slate-700 shadow-sm lg:flex xl:max-w-none xl:text-sm">
