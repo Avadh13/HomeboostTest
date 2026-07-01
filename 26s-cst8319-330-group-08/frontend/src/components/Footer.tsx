@@ -35,21 +35,21 @@ type FooterData = {
 const fallback: FooterData = {
   settings: {
     is_enabled: 1,
-    brand_name: "HomeBoost Employee Benefit",
+    brand_name: "HomeBoost Mortgage Benefit",
     logo_text: "HB",
-    tagline: "Employer home-buying benefit platform.",
-    description: "Modern employer portals, advisor communication, resources, quizzes, appointments, and guided home-buying support in one place.",
-    cta_text: "Request Setup",
-    cta_link: "/contact",
-    newsletter_title: "Need a custom employer portal?",
-    newsletter_text: "Footer content, links, and calls-to-action are controlled from the admin panel.",
+    tagline: "Mortgage & home buying benefit platform.",
+    description: "Modern employer portals, advisor communication, mortgage service intake, resources, appointments, and guided home-buying support in one place.",
+    cta_text: "Start Mortgage Request",
+    cta_link: "/login",
+    newsletter_title: "Need mortgage guidance?",
+    newsletter_text: "Choose a service, share your details, and connect with the right advisor through HomeBoost.",
     background_mode: "dark",
     layout_style: "three_column",
     copyright_text: "© 2026 HomeBoost. All rights reserved.",
   },
   links: [
     { id: 1, label: "Employer Portals", href: "/partners", column_key: "left", display_order: 1, is_active: 1, opens_new_tab: 0 },
-    { id: 2, label: "Pricing", href: "/pricing", column_key: "left", display_order: 2, is_active: 1, opens_new_tab: 0 },
+    { id: 2, label: "Mortgage Services", href: "/", column_key: "left", display_order: 2, is_active: 1, opens_new_tab: 0 },
     { id: 3, label: "Contact", href: "/contact", column_key: "left", display_order: 3, is_active: 1, opens_new_tab: 0 },
     { id: 4, label: "Login", href: "/login", column_key: "center", display_order: 1, is_active: 1, opens_new_tab: 0 },
   ],
@@ -145,7 +145,7 @@ function Footer() {
               <div className="flex items-center gap-3">
                 <BrandLogo variant="icon" iconClassName="h-14 w-14 rounded-2xl shadow-lg shadow-blue-500/20" />
                 <div>
-                  <h2 className="text-xl font-black tracking-tight">{settings.brand_name || "HomeBoost Employee Benefit"}</h2>
+                  <h2 className="text-xl font-black tracking-tight">{settings.brand_name || "HomeBoost Mortgage Benefit"}</h2>
                   {settings.tagline && <p className={`mt-0.5 text-sm font-semibold ${mutedClasses[backgroundMode]}`}>{settings.tagline}</p>}
                 </div>
               </div>
