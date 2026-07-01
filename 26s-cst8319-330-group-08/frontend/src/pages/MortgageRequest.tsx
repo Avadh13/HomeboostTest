@@ -44,6 +44,7 @@ function MortgageRequest() {
   const toast = useToast();
   const [searchParams] = useSearchParams();
   const selectedFromUrl = searchParams.get("service") || "";
+  const partnershipFromUrl = searchParams.get("partnership") || "";
   const token = localStorage.getItem("token");
   const user = readUser();
 
@@ -115,7 +116,7 @@ function MortgageRequest() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ ...form, source: token ? "employee_portal" : "website" }),
+        body: JSON.stringify({ ...form, partnership_slug: partnershipFromUrl, source: token ? "employee_portal" : partnershipFromUrl ? "partnership_landing" : "website" }),
       });
       const data = await response.json();
 
@@ -150,6 +151,7 @@ function MortgageRequest() {
             <p className="text-xs font-black uppercase tracking-[0.24em] text-sky-200">Mortgage request</p>
             <h1 className="mt-3 text-4xl font-black tracking-tight md:text-5xl">Start your mortgage support request.</h1>
             <p className="mt-4 text-sm leading-relaxed text-slate-300 md:text-base">{BRAND.description}</p>
+            {partnershipFromUrl && <p className="mt-4 rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-slate-200">Employer portal: /{partnershipFromUrl}</p>}
 
             <div className="mt-7 grid gap-3">
               {services.map((service) => {
@@ -205,7 +207,7 @@ function MortgageRequest() {
             </label>
 
             <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-5">
-              <Link to="/" className="rounded-full bg-slate-100 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-200">Cancel</Link>
+              <Link to={partnershipFromUrl ? `/${partnershipFromUrl}` : "/"} className="rounded-full bg-slate-100 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-200">Cancel</Link>
               <button disabled={submitting || loadingServices} className="rounded-full bg-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 disabled:opacity-60">{submitting ? "Submitting..." : "Submit mortgage request"}</button>
             </div>
           </form>
