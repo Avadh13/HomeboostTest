@@ -46,10 +46,12 @@ import QuizSubmissions from "./admin/pages/QuizSubmissions";
 import AdminPartnerships from "./admin/pages/AdminPartnerships";
 import AdminBuilder from "./admin/pages/AdminBuilder";
 import AdminAppointments from "./admin/pages/AdminAppointments";
+import ManageFooter from "./admin/pages/ManageFooter";
 
 import AdminProtectedRoute from "./admin/components/AdminProtectedRoute";
 import AdminLayout from "./admin/components/AdminLayout";
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
+import FooterShell from "./components/FooterShell";
 import ScrollToTop from "./components/ScrollToTop";
 
 function App() {
@@ -102,6 +104,7 @@ function App() {
         <Route path="/admin/sections" element={<AdminProtectedRoute><ManageSections /></AdminProtectedRoute>} />
         <Route path="/admin/cards" element={<AdminProtectedRoute><ManageCards /></AdminProtectedRoute>} />
         <Route path="/admin/pricing" element={<AdminProtectedRoute><ManagePricing /></AdminProtectedRoute>} />
+        <Route path="/admin/footer" element={<AdminProtectedRoute><ManageFooter /></AdminProtectedRoute>} />
         <Route path="/admin/contact-messages" element={<AdminProtectedRoute><ContactMessages /></AdminProtectedRoute>} />
         <Route path="/admin/faqs" element={<AdminProtectedRoute><ManageFAQs /></AdminProtectedRoute>} />
         <Route path="/admin/quizzes" element={<AdminProtectedRoute><ManageQuizzes /></AdminProtectedRoute>} />
@@ -114,6 +117,7 @@ function App() {
         <Route path="/:slug" element={<PartnershipLanding />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      <FooterShell />
     </BrowserRouter>
   );
 }
