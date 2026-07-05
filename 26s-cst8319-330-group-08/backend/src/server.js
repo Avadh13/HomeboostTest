@@ -42,6 +42,8 @@ const leadProgressRoutes = require("./routes/leadProgressRoutes");
 const hbtTaskRoutes = require("./routes/hbtTaskRoutes");
 const readinessRoutes = require("./routes/readinessRoutes");
 const leadPipelineRoutes = require("./routes/leadPipelineRoutes");
+const resourceRecommendationRoutes = require("./routes/resourceRecommendationRoutes");
+const companyAnalyticsRoutes = require("./routes/companyAnalyticsRoutes");
 
 const app = express();
 const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -138,6 +140,8 @@ app.use("/api/lead-progress", leadProgressRoutes);
 app.use("/api/hbt-tasks", hbtTaskRoutes);
 app.use("/api/readiness", readinessRoutes);
 app.use("/api/lead-pipeline", leadPipelineRoutes);
+app.use("/api/resource-recommendations", resourceRecommendationRoutes);
+app.use("/api/company-analytics", companyAnalyticsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
