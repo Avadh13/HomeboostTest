@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import API_BASE_URL from "../api/api";
 import BrandLogo from "./BrandLogo";
 
 type User = {
@@ -18,10 +19,17 @@ type NavLinkItem = {
   shortLabel?: string;
 };
 
+type MessageThreadSummary = {
+  unread_count?: number | string | null;
+};
+
 const initials = (name?: string) => (name || "User").trim().charAt(0).toUpperCase() || "U";
+const formatBadge = (count: number) => (count > 99 ? "99+" : String(count));
 
 function Navbar() {
   const [open, setOpen] = useState(false);
+  const [unreadAlerts, setUnreadAlerts] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -37,6 +45,51 @@ function Navbar() {
   }
 
   const isLoggedIn = !!token && !!user;
+
+  useEffect(() => {
+    if (!isLoggedIn || !token) {
+      setUnreadAlerts(0);
+      setUnreadMessages(0);
+      return;
+    }
+
+    let cancelled = false;
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const loadBadges = async () => {
+      try {
+        const [notificationsResponse, messagesResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/notifications/unread-count`, { headers }),
+          fetch(`${API_BASE_URL}/messages/threads`, { headers }),
+        ]);
+
+        if (cancelled) return;
+
+        if (notificationsResponse.ok) {
+          const data = await notificationsResponse.json();
+          setUnreadAlerts(Number(data.unread_count || 0));
+        }
+
+        if (messagesResponse.ok) {
+          const threads = await messagesResponse.json();
+          const unreadTotal = Array.isArray(threads)
+            ? threads.reduce((sum: number, thread: MessageThreadSummary) => sum + Number(thread.unread_count || 0), 0)
+            : 0;
+          setUnreadMessages(unreadTotal);
+        }
+      } catch {
+        // Badge refresh is non-critical. Keep the navbar usable if the API is temporarily unavailable.
+      }
+    };
+
+    loadBadges();
+    const timer = window.setInterval(loadBadges, 15_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [isLoggedIn, token, location.pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -113,6 +166,15 @@ function Navbar() {
     return location.pathname === to || location.pathname.startsWith(`${to}/`);
   };
 
+  const getBadgeCount = (link: NavLinkItem) => {
+    if (link.to.includes("messages")) return unreadMessages;
+    if (link.to.includes("notifications")) return unreadAlerts;
+    return 0;
+  };
+
+  const renderBadge = (count: number, className = "") =>
+    count > 0 ? <span className={`ml-1 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-black leading-none text-white ${className}`}>{formatBadge(count)}</span> : null;
+
   return (
     <nav className="sticky top-0 z-50 border-b border-white/70 bg-white/85 shadow-sm shadow-slate-200/60 backdrop-blur-2xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 lg:px-6">
@@ -121,12 +183,16 @@ function Navbar() {
         </Link>
 
         <div className="hide-scrollbar hidden max-w-[46vw] items-center gap-1 overflow-x-auto rounded-full border border-slate-200 bg-white/70 p-1 text-xs font-bold text-slate-700 shadow-sm lg:flex xl:max-w-none xl:text-sm">
-          {links.map((link) => (
-            <Link key={`${link.to}-${link.label}`} to={link.to} title={link.label} className={`whitespace-nowrap rounded-full px-3 py-2 transition xl:px-4 ${isActive(link.to) ? "bg-blue-50 text-blue-700 shadow-sm" : "hover:bg-slate-50 hover:text-blue-700"}`}>
-              <span className="xl:hidden">{link.shortLabel || link.label}</span>
-              <span className="hidden xl:inline">{link.label}</span>
-            </Link>
-          ))}
+          {links.map((link) => {
+            const badgeCount = getBadgeCount(link);
+            return (
+              <Link key={`${link.to}-${link.label}`} to={link.to} title={link.label} className={`relative whitespace-nowrap rounded-full px-3 py-2 transition xl:px-4 ${isActive(link.to) ? "bg-blue-50 text-blue-700 shadow-sm" : "hover:bg-slate-50 hover:text-blue-700"}`}>
+                <span className="xl:hidden">{link.shortLabel || link.label}</span>
+                <span className="hidden xl:inline">{link.label}</span>
+                {renderBadge(badgeCount)}
+              </Link>
+            );
+          })}
         </div>
 
         <div className="hidden shrink-0 items-center gap-2 lg:flex xl:gap-3">
@@ -160,7 +226,15 @@ function Navbar() {
         <div className="max-h-[calc(100vh-72px)] overflow-y-auto border-t border-slate-100 bg-white/95 px-4 py-4 shadow-xl backdrop-blur-xl lg:hidden">
           {isLoggedIn && <div className="mb-3 rounded-2xl border border-slate-100 bg-slate-50 p-4"><p className="font-black text-slate-950">{user?.full_name}</p><p className="text-xs font-bold uppercase tracking-wide text-slate-500">{user?.role?.replace("_", " ")}</p></div>}
           <div className="grid gap-2">
-            {links.map((link) => <Link key={`${link.to}-${link.label}`} to={link.to} onClick={() => setOpen(false)} className={`block rounded-2xl px-4 py-3 font-black transition ${isActive(link.to) ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>{link.label}</Link>)}
+            {links.map((link) => {
+              const badgeCount = getBadgeCount(link);
+              return (
+                <Link key={`${link.to}-${link.label}`} to={link.to} onClick={() => setOpen(false)} className={`flex items-center justify-between rounded-2xl px-4 py-3 font-black transition ${isActive(link.to) ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>
+                  <span>{link.label}</span>
+                  {renderBadge(badgeCount, "ml-3 px-2 py-1 text-xs")}
+                </Link>
+              );
+            })}
             {!isLoggedIn ? (
               <>
                 <Link to="/login" onClick={() => setOpen(false)} className="block rounded-2xl px-4 py-3 font-black text-slate-700 hover:bg-blue-50">Login</Link>
