@@ -28,6 +28,19 @@ h4,
   letter-spacing: 0.12em;
 }
 
+/* Global navbar now handles page-to-page navigation. Hide old page-level back links. */
+.theme-page header > a:first-child[href],
+.theme-page header > div > a:first-child[href],
+main header > a:first-child[href^="/"],
+main header > div > a:first-child[href^="/"],
+main aside a[href="/employee-portal"],
+main aside a[href="/company/dashboard"],
+main aside a[href="/hbt/dashboard"],
+main aside a[href="/hbt/member-dashboard"],
+main aside a[href="/admin"] {
+  display: none !important;
+}
+
 html[data-theme="dark"] .bg-white,
 html[data-theme="dark"] .bg-white\/90,
 html[data-theme="dark"] .bg-white\/95,
