@@ -65,7 +65,10 @@ type PersonPreview = {
   name: string;
   email?: string | null;
   role?: string | null;
+  title?: string | null;
   company_name?: string | null;
+  hbt_team_name?: string | null;
+  partnership_slug?: string | null;
   photo_url?: string | null;
   is_online?: boolean;
   status_label?: string | null;
@@ -119,43 +122,11 @@ const getLastSeenLabel = (person: PersonPreview) => {
 };
 
 const getRoleMeta = (role?: string) => {
-  if (role === "employee") {
-    return {
-      title: "Messages",
-      subtitle: "Private chats with your advisor, company contact, or support.",
-      homePath: "/employee-portal",
-    };
-  }
-
-  if (role === "company_admin" || role === "company") {
-    return {
-      title: "Messages",
-      subtitle: "Private chats with employees, HBT contacts, or support.",
-      homePath: "/company/dashboard",
-    };
-  }
-
-  if (role === "hbt_member") {
-    return {
-      title: "Messages",
-      subtitle: "Private chats with clients, company managers, team members, or support.",
-      homePath: "/hbt/member-dashboard",
-    };
-  }
-
-  if (role === "hbt_admin") {
-    return {
-      title: "Messages",
-      subtitle: "One-to-one private conversations only.",
-      homePath: "/hbt/dashboard",
-    };
-  }
-
-  return {
-    title: "Messages",
-    subtitle: "Private platform support conversations.",
-    homePath: "/admin",
-  };
+  if (role === "employee") return { title: "Messages", subtitle: "Private chats with your advisor, company contact, or support.", homePath: "/employee-portal" };
+  if (role === "company_admin" || role === "company") return { title: "Messages", subtitle: "Private chats with employees, HBT contacts, or support.", homePath: "/company/dashboard" };
+  if (role === "hbt_member") return { title: "Messages", subtitle: "Private chats with clients, company managers, team members, or support.", homePath: "/hbt/member-dashboard" };
+  if (role === "hbt_admin") return { title: "Messages", subtitle: "One-to-one private conversations only.", homePath: "/hbt/dashboard" };
+  return { title: "Messages", subtitle: "Private platform support conversations.", homePath: "/admin" };
 };
 
 type AvatarProps = {
@@ -167,20 +138,52 @@ type AvatarProps = {
 function ProfileAvatar({ person, size = "md", showStatus = true }: AvatarProps) {
   const sizeClass = size === "lg" ? "h-14 w-14" : size === "sm" ? "h-10 w-10" : "h-12 w-12";
   const textClass = size === "lg" ? "text-2xl" : size === "sm" ? "text-base" : "text-xl";
-  const fallbackClass = person.photo_url
-    ? "bg-slate-100 text-white"
-    : "bg-blue-100 text-blue-700 ring-1 ring-blue-200";
+  const fallbackClass = person.photo_url ? "bg-slate-100 text-white" : "bg-blue-100 text-blue-700 ring-1 ring-blue-200";
 
   return (
     <div className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full ${fallbackClass} font-black shadow-sm`}>
-      {person.photo_url ? (
-        <img src={person.photo_url} alt={person.name} className="h-full w-full object-cover" />
-      ) : (
-        <span className={`${textClass} leading-none`}>{initials(person.name)}</span>
-      )}
-      {showStatus && (
-        <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white ${person.is_online ? "bg-emerald-500" : "bg-slate-400"}`} />
-      )}
+      {person.photo_url ? <img src={person.photo_url} alt={person.name} className="h-full w-full object-cover" /> : <span className={`${textClass} leading-none`}>{initials(person.name)}</span>}
+      {showStatus && <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white ${person.is_online ? "bg-emerald-500" : "bg-slate-400"}`} />}
+    </div>
+  );
+}
+
+function ProfileDetailsModal({ person, onClose }: { person: PersonPreview; onClose: () => void }) {
+  const rows = [
+    ["Name", person.name],
+    ["Email", person.email || "Not provided"],
+    ["Role", roleLabel(person.role)],
+    ["Title", person.title || "Not provided"],
+    ["Company", person.company_name || "Not provided"],
+    ["HBT Team", person.hbt_team_name || "Not provided"],
+    ["Partnership", person.partnership_slug ? `/${person.partnership_slug}` : "Not provided"],
+    ["Status", getLastSeenLabel(person)],
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 px-4 backdrop-blur-sm" onClick={onClose}>
+      <section className="w-full max-w-lg rounded-[2rem] bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <ProfileAvatar person={person} size="lg" />
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Profile information</p>
+              <h2 className="mt-1 text-2xl font-black text-slate-950">{person.name}</h2>
+              <p className={`mt-1 text-sm font-black ${person.is_online ? "text-emerald-600" : "text-slate-400"}`}>{getLastSeenLabel(person)}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-black text-slate-500 hover:bg-slate-200">Close</button>
+        </div>
+
+        <div className="mt-6 grid gap-3">
+          {rows.map(([label, value]) => (
+            <div key={label} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
+              <p className="mt-1 break-words text-sm font-bold capitalize text-slate-800">{value}</p>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
@@ -196,6 +199,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
   const [replyBody, setReplyBody] = useState("");
   const [searchText, setSearchText] = useState("");
   const [showNewChat, setShowNewChat] = useState(false);
+  const [profilePerson, setProfilePerson] = useState<PersonPreview | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -211,34 +215,46 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
     return map;
   }, [contacts]);
 
+  const personFromContact = (contact: ContactUser): PersonPreview => ({
+    id: contact.id,
+    name: contact.full_name,
+    email: contact.email,
+    role: contact.role,
+    title: contact.title,
+    company_name: contact.company_name,
+    hbt_team_name: contact.hbt_team_name,
+    partnership_slug: contact.partnership_slug,
+    photo_url: contact.photo_url || null,
+    is_online: Boolean(contact.is_online),
+    status_label: contact.status_label,
+    last_seen_at: contact.last_seen_at,
+  });
+
   const getOtherPerson = (thread: Thread): PersonPreview => {
     const otherId = Number(thread.created_by) === Number(user.id) ? thread.recipient_id : thread.created_by;
     const contact = otherId ? contactById.get(Number(otherId)) : undefined;
+    if (contact) return personFromContact(contact);
 
     if (Number(thread.created_by) === Number(user.id)) {
       return {
         id: thread.recipient_id,
-        name: contact?.full_name || thread.recipient_name || "Recipient",
-        email: contact?.email || thread.recipient_email,
-        role: contact?.role || thread.recipient_role,
-        company_name: contact?.company_name || thread.company_name,
-        photo_url: contact?.photo_url || null,
-        is_online: Boolean(contact?.is_online),
-        status_label: contact?.status_label,
-        last_seen_at: contact?.last_seen_at,
+        name: thread.recipient_name || "Recipient",
+        email: thread.recipient_email,
+        role: thread.recipient_role,
+        company_name: thread.company_name,
+        photo_url: null,
+        is_online: false,
       };
     }
 
     return {
       id: thread.created_by,
-      name: contact?.full_name || thread.created_by_name || "Sender",
-      email: contact?.email || thread.created_by_email,
-      role: contact?.role || thread.created_by_role,
-      company_name: contact?.company_name || thread.company_name,
-      photo_url: contact?.photo_url || null,
-      is_online: Boolean(contact?.is_online),
-      status_label: contact?.status_label,
-      last_seen_at: contact?.last_seen_at,
+      name: thread.created_by_name || "Sender",
+      email: thread.created_by_email,
+      role: thread.created_by_role,
+      company_name: thread.company_name,
+      photo_url: null,
+      is_online: false,
     };
   };
 
@@ -246,17 +262,9 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
 
   const filteredThreads = useMemo(() => {
     const search = searchText.toLowerCase().trim();
-
     return threads.filter((thread) => {
       const other = getOtherPerson(thread);
-      return (
-        !search ||
-        [thread.subject, other.name, other.email, other.company_name, thread.hbt_team_name, thread.last_message]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(search)
-      );
+      return !search || [thread.subject, other.name, other.email, other.company_name, thread.hbt_team_name, thread.last_message].filter(Boolean).join(" ").toLowerCase().includes(search);
     });
   }, [threads, searchText, user.id, contactById]);
 
@@ -264,12 +272,8 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
 
   const updatePresence = async () => {
     if (!token) return;
-
     try {
-      await fetch(`${API_BASE_URL}/messages/presence`, {
-        method: "POST",
-        headers: authHeaders,
-      });
+      await fetch(`${API_BASE_URL}/messages/presence`, { method: "POST", headers: authHeaders });
     } catch {
       // Presence should never block the message UI.
     }
@@ -280,13 +284,11 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
       setLoading(true);
       const response = await fetch(`${API_BASE_URL}/messages/threads`, { headers: authHeaders });
       const data = await response.json();
-
       if (!response.ok) {
         toast.error(data.message || "Failed to load conversations.");
         setThreads([]);
         return;
       }
-
       setThreads(Array.isArray(data) ? data : []);
     } catch {
       setThreads([]);
@@ -310,12 +312,10 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
     try {
       const response = await fetch(`${API_BASE_URL}/messages/threads/${threadId}`, { headers: authHeaders });
       const data = await response.json();
-
       if (!response.ok) {
         toast.error(data.message || "Failed to load conversation.");
         return;
       }
-
       setSelected(data);
       setShowNewChat(false);
       await loadThreads();
@@ -343,12 +343,10 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
 
   const createThread = async (event: FormEvent) => {
     event.preventDefault();
-
     if (!selectedRecipient) {
       toast.warning("Please select one person to message.");
       return;
     }
-
     if (!messageBody.trim()) {
       toast.warning("Message is required.");
       return;
@@ -361,19 +359,13 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
       const response = await fetch(`${API_BASE_URL}/messages/threads`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          subject: finalSubject,
-          message_body: messageBody.trim(),
-          recipient_id: selectedRecipient.id,
-        }),
+        body: JSON.stringify({ subject: finalSubject, message_body: messageBody.trim(), recipient_id: selectedRecipient.id }),
       });
       const data = await response.json();
-
       if (!response.ok) {
         toast.error(data.message || "Failed to create conversation.");
         return;
       }
-
       setSubject("");
       setMessageBody("");
       setSelectedRecipientId("");
@@ -390,7 +382,6 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
 
   const sendReply = async (event: FormEvent) => {
     event.preventDefault();
-
     if (!selected || !replyBody.trim()) {
       toast.warning("Reply message is required.");
       return;
@@ -404,12 +395,10 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
         body: JSON.stringify({ message_body: replyBody.trim() }),
       });
       const data = await response.json();
-
       if (!response.ok) {
         toast.error(data.message || "Failed to send reply.");
         return;
       }
-
       setReplyBody("");
       await loadThreadDetails(selected.thread.id);
     } catch {
@@ -421,16 +410,13 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
 
   const deleteMessage = async (messageId: number) => {
     if (!selected || !confirm("Delete this message?")) return;
-
     try {
       const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, { method: "DELETE", headers: authHeaders });
       const data = await response.json().catch(() => ({}));
-
       if (!response.ok) {
         toast.error(data.message || "Failed to delete message.");
         return;
       }
-
       await loadThreadDetails(selected.thread.id);
       toast.success("Message deleted.");
     } catch {
@@ -440,16 +426,13 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
 
   const deleteThread = async (threadId: number) => {
     if (!confirm("Delete this full conversation?")) return;
-
     try {
       const response = await fetch(`${API_BASE_URL}/messages/threads/${threadId}`, { method: "DELETE", headers: authHeaders });
       const data = await response.json().catch(() => ({}));
-
       if (!response.ok) {
         toast.error(data.message || "Failed to delete conversation.");
         return;
       }
-
       setSelected(null);
       await loadThreads();
       toast.success("Conversation deleted.");
@@ -460,9 +443,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
 
   const selectedOther = selected ? getOtherPerson(selected.thread) : null;
   const pageClass = embedded ? "text-slate-950" : "min-h-screen bg-[#e8eef7] text-slate-950";
-  const shellClass = embedded
-    ? "h-[calc(100dvh-190px)] rounded-[1.5rem] border border-slate-200"
-    : "h-[calc(100dvh-76px)] border-x border-white/70";
+  const shellClass = embedded ? "h-[calc(100dvh-190px)] rounded-[1.5rem] border border-slate-200" : "h-[calc(100dvh-76px)] border-x border-white/70";
 
   return (
     <main className={pageClass}>
@@ -477,26 +458,12 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
                 <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">{meta.title}</h1>
                 <p className="truncate text-xs font-semibold text-slate-500">{meta.subtitle}</p>
               </div>
-              <button
-                onClick={() => {
-                  setSelected(null);
-                  setShowNewChat(true);
-                }}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-2xl font-black text-white shadow-lg shadow-blue-500/30 transition hover:-translate-y-0.5 hover:bg-blue-700"
-                title="New chat"
-              >
-                +
-              </button>
+              <button onClick={() => { setSelected(null); setShowNewChat(true); }} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-2xl font-black text-white shadow-lg shadow-blue-500/30 transition hover:-translate-y-0.5 hover:bg-blue-700" title="New chat">+</button>
             </div>
 
             <div className="mt-4 flex items-center gap-2 rounded-full bg-slate-100 px-4 py-3 ring-1 ring-slate-200">
               <span className="text-slate-400">⌕</span>
-              <input
-                className="w-full bg-transparent text-sm font-semibold outline-none placeholder:text-slate-400"
-                placeholder="Search messages"
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-              />
+              <input className="w-full bg-transparent text-sm font-semibold outline-none placeholder:text-slate-400" placeholder="Search messages" value={searchText} onChange={(event) => setSearchText(event.target.value)} />
             </div>
 
             <div className="mt-3 flex items-center justify-between text-xs font-black uppercase tracking-wide text-slate-400">
@@ -514,35 +481,17 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
 
               <select className="form-field bg-white" value={selectedRecipientId} onChange={(event) => setSelectedRecipientId(event.target.value)}>
                 <option value="">Choose one person...</option>
-                {contacts.map((contact) => (
-                  <option key={contact.id} value={contact.id}>
-                    {contact.full_name} — {contact.title || roleLabel(contact.role)}{contact.company_name ? ` (${contact.company_name})` : ""}{contact.is_online ? " • Online" : " • Offline"}
-                  </option>
-                ))}
+                {contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.full_name} — {contact.title || roleLabel(contact.role)}{contact.company_name ? ` (${contact.company_name})` : ""}{contact.is_online ? " • Online" : " • Offline"}</option>)}
               </select>
-
               <input className="form-field mt-3 bg-white" placeholder="Subject optional" value={subject} onChange={(event) => setSubject(event.target.value)} />
               <textarea className="form-field mt-3 min-h-[100px] bg-white" placeholder="Write your first message..." value={messageBody} onChange={(event) => setMessageBody(event.target.value)} />
-
-              <button disabled={saving} className="mt-3 w-full rounded-full bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-md shadow-blue-500/25 transition hover:bg-blue-700 disabled:opacity-60">
-                {saving ? "Sending..." : "Send Message"}
-              </button>
+              <button disabled={saving} className="mt-3 w-full rounded-full bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-md shadow-blue-500/25 transition hover:bg-blue-700 disabled:opacity-60">{saving ? "Sending..." : "Send Message"}</button>
             </form>
           )}
 
           <div className="flex-1 overflow-y-auto bg-white">
             {loading ? (
-              <div className="space-y-3 p-4">
-                {[1, 2, 3, 4].map((item) => (
-                  <div key={item} className="flex gap-3 rounded-2xl p-3">
-                    <div className="h-12 w-12 rounded-full bg-slate-100" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 w-2/3 rounded bg-slate-100" />
-                      <div className="h-3 w-full rounded bg-slate-100" />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <div className="space-y-3 p-4">{[1, 2, 3, 4].map((item) => <div key={item} className="flex gap-3 rounded-2xl p-3"><div className="h-12 w-12 rounded-full bg-slate-100" /><div className="flex-1 space-y-2"><div className="h-4 w-2/3 rounded bg-slate-100" /><div className="h-3 w-full rounded bg-slate-100" /></div></div>)}</div>
             ) : filteredThreads.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center px-8 text-center">
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl">💬</div>
@@ -554,7 +503,6 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
               filteredThreads.map((thread) => {
                 const other = getOtherPerson(thread);
                 const active = selected?.thread.id === thread.id;
-
                 return (
                   <button key={thread.id} onClick={() => loadThreadDetails(thread.id)} className={`flex w-full gap-3 border-b border-slate-100 p-4 text-left transition ${active ? "bg-blue-50" : "bg-white hover:bg-slate-50"}`}>
                     <ProfileAvatar person={other} size="md" />
@@ -588,15 +536,16 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
           ) : (
             <>
               <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <div className="flex min-w-0 items-center gap-3">
-                  <button onClick={() => setSelected(null)} className="rounded-full p-2 text-xl font-black text-slate-500 hover:bg-slate-100 md:hidden">‹</button>
+                <button type="button" onClick={() => setProfilePerson(selectedOther)} className="flex min-w-0 items-center gap-3 rounded-2xl p-1 text-left transition hover:bg-slate-50" title="View profile information">
+                  <span onClick={(event) => { event.stopPropagation(); setSelected(null); }} className="rounded-full p-2 text-xl font-black text-slate-500 hover:bg-slate-100 md:hidden">‹</span>
                   <ProfileAvatar person={selectedOther} size="lg" />
                   <div className="min-w-0">
                     <h2 className="truncate text-base font-black text-slate-950 md:text-lg">{selectedOther.name}</h2>
                     <p className="truncate text-xs font-bold capitalize text-slate-500">{roleLabel(selectedOther.role)}{selected.thread.company_name ? ` · ${selected.thread.company_name}` : ""}</p>
                     <p className={`text-[11px] font-black ${selectedOther.is_online ? "text-emerald-600" : "text-slate-400"}`}>{getLastSeenLabel(selectedOther)}</p>
                   </div>
-                </div>
+                  <span className="hidden rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 md:inline-flex">Profile</span>
+                </button>
                 <div className="flex items-center gap-2">
                   <button onClick={() => { loadThreads(); loadContacts(); }} className="hidden rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-700 hover:bg-slate-200 md:inline-flex">Refresh</button>
                   <button onClick={() => deleteThread(selected.thread.id)} className="rounded-full bg-red-50 px-4 py-2 text-xs font-black text-red-600 hover:bg-red-100">Delete</button>
@@ -614,10 +563,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
                         <div className={`group max-w-[82%] md:max-w-[68%] ${isMine ? "items-end" : "items-start"}`}>
                           <div className={`rounded-3xl px-4 py-3 shadow-sm ${isMine ? "rounded-br-md bg-blue-600 text-white" : "rounded-bl-md bg-white text-slate-900 ring-1 ring-slate-200"}`}>
                             <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.message_body}</p>
-                            <div className={`mt-2 flex items-center gap-2 text-[11px] ${isMine ? "justify-end text-blue-100" : "justify-start text-slate-400"}`}>
-                              <span>{formatTime(message.created_at)}</span>
-                              {isMine && <span>✓✓</span>}
-                            </div>
+                            <div className={`mt-2 flex items-center gap-2 text-[11px] ${isMine ? "justify-end text-blue-100" : "justify-start text-slate-400"}`}><span>{formatTime(message.created_at)}</span>{isMine && <span>✓✓</span>}</div>
                           </div>
                           <div className={`mt-1 flex ${isMine ? "justify-end" : "justify-start"}`}>
                             <span className="text-[11px] font-semibold text-slate-400">{formatFullDate(message.created_at)}</span>
@@ -641,6 +587,8 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
           )}
         </section>
       </section>
+
+      {profilePerson && <ProfileDetailsModal person={profilePerson} onClose={() => setProfilePerson(null)} />}
     </main>
   );
 }
