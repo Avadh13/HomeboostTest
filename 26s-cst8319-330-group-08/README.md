@@ -73,6 +73,36 @@ Confirm backend `.env` uses the same database name:
 DB_NAME=project2
 ```
 
+## Environment Setup
+
+Copy the example environment files before running locally.
+
+Frontend:
+
+```bash
+cd frontend
+copy .env.example .env
+```
+
+Backend:
+
+```bash
+cd backend
+copy .env.example .env
+```
+
+For production, set these variables in the hosting dashboards instead of committing real `.env` files:
+
+```env
+VITE_API_BASE_URL=https://your-backend-url/api
+CORS_ORIGINS=https://your-frontend-url
+JWT_SECRET=replace_with_a_long_random_secret
+DB_HOST=your-db-host
+DB_USER=your-db-user
+DB_PASSWORD=your-db-password
+DB_NAME=your-db-name
+```
+
 ## Backend Setup
 
 Create or update `backend/.env`, then run:
@@ -81,4 +111,47 @@ Create or update `backend/.env`, then run:
 cd backend
 npm install
 npm run dev
+```
+
+Backend syntax check:
+
+```bash
+npm run check
+```
+
+## Frontend Setup
+
+Create or update `frontend/.env`, then run:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend quality checks:
+
+```bash
+npm run typecheck
+npm run lint
+npm run build
+```
+
+## Deployment Notes
+
+Vercel frontend:
+
+```text
+Root Directory: 26s-cst8319-330-group-08/frontend
+Build Command: npm run build
+Output Directory: dist
+Environment: VITE_API_BASE_URL=https://your-backend-url/api
+```
+
+Railway backend:
+
+```text
+Root Directory: 26s-cst8319-330-group-08/backend
+Start Command: npm start
+Environment: copy backend/.env.example and fill production values
 ```
