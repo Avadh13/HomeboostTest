@@ -31,7 +31,7 @@ function MortgageReadinessWidget() {
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const token = localStorage.getItem("token");
-  const shouldShow = pathname === "/employee-portal" && user?.role === "employee" && token;
+  const shouldShow = Boolean(pathname === "/employee-portal" && user?.role === "employee" && token);
 
   useEffect(() => {
     if (!shouldShow) return;
