@@ -68,7 +68,6 @@ type PersonPreview = {
 };
 
 type ThreadDetails = { thread: Thread; messages: Message[] };
-
 type MessageCenterProps = { embedded?: boolean };
 
 const readUser = () => {
@@ -124,7 +123,6 @@ function ContactInfoPopup({ person, onClose }: { person: PersonPreview; onClose:
           </div>
           <button className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-violet-600 text-white">✎</button>
         </header>
-
         <div className="flex-1 overflow-y-auto bg-gradient-to-b from-blue-50/70 via-white to-violet-50/70 px-5 pb-6">
           <div className="flex flex-col items-center pt-7 text-center">
             <div className="relative flex h-32 w-32 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-600 to-violet-600 text-5xl font-black text-white shadow-xl shadow-blue-500/25 ring-4 ring-white">
@@ -134,17 +132,7 @@ function ContactInfoPopup({ person, onClose }: { person: PersonPreview; onClose:
             <h1 className="mt-4 text-3xl font-black">{person.name}</h1>
             <p className="mt-1 text-sm font-bold text-slate-500">{person.phone || person.email || roleLabel(person.role)}</p>
             <p className={`mt-1 text-xs font-black ${person.is_online ? "text-emerald-600" : "text-slate-400"}`}>{lastSeenLabel(person)}</p>
-
-            <div className="mt-5 flex gap-4">
-              {[["☎", "Voice"], ["▣", "Video"], ["⌕", "Search"]].map(([icon, label]) => (
-                <div key={label} className="flex flex-col items-center gap-2">
-                  <span className="flex h-14 w-16 items-center justify-center rounded-[1.5rem] bg-white text-2xl text-blue-700 shadow ring-1 ring-slate-100">{icon}</span>
-                  <span className="text-xs font-black text-slate-700">{label}</span>
-                </div>
-              ))}
-            </div>
           </div>
-
           <div className="mt-8 border-t border-slate-200 pt-5">
             <p className="text-sm font-black text-slate-500">About</p>
             <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -215,6 +203,11 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
     return { id: thread.created_by, name: thread.created_by_name || thread.employee_name || "Sender", email: thread.created_by_email || thread.employee_email, role: thread.created_by_role };
   };
 
+  const contactKeyForThread = (thread: Thread) => {
+    const other = getOtherPerson(thread);
+    return String(other.id || other.email || other.name || thread.id).toLowerCase();
+  };
+
   const selectedRecipient = contacts.find((contact) => String(contact.id) === selectedRecipientId);
 
   const filteredThreads = useMemo(() => {
@@ -228,7 +221,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
         const searchable = [thread.subject, other.name, other.email, other.company_name, thread.hbt_team_name, thread.last_message].filter(Boolean).join(" ").toLowerCase();
         if (search && !searchable.includes(search)) return false;
 
-        const contactKey = String(other.id || other.email || other.name || thread.id).toLowerCase();
+        const contactKey = contactKeyForThread(thread);
         if (seenContacts.has(contactKey)) return false;
 
         seenContacts.add(contactKey);
@@ -278,17 +271,33 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
 
   const loadThreadDetails = async (threadId: number) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/messages/threads/${threadId}`, { headers: authHeaders });
-      const data = await response.json();
-      if (!response.ok) {
-        toast.error(data.message || "Failed to load conversation.");
-        return;
-      }
-      setSelected(data);
+      const clickedThread = threads.find((thread) => Number(thread.id) === Number(threadId));
+      const groupedThreads = clickedThread
+        ? threads.filter((thread) => contactKeyForThread(thread) === contactKeyForThread(clickedThread))
+        : threads.filter((thread) => Number(thread.id) === Number(threadId));
+
+      const sortedGroup = (groupedThreads.length ? groupedThreads : [{ id: threadId } as Thread]).sort(
+        (left, right) => new Date(left.last_message_at || left.updated_at || left.created_at || 0).getTime() - new Date(right.last_message_at || right.updated_at || right.created_at || 0).getTime()
+      );
+
+      const details = await Promise.all(sortedGroup.map(async (thread) => {
+        const response = await fetch(`${API_BASE_URL}/messages/threads/${thread.id}`, { headers: authHeaders });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "Failed to load conversation.");
+        return data as ThreadDetails;
+      }));
+
+      const mergedMessages = details
+        .flatMap((detail) => detail.messages)
+        .sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime());
+
+      const latestDetail = details[details.length - 1];
+      const latestThread = sortedGroup[sortedGroup.length - 1] || latestDetail.thread;
+      setSelected({ thread: { ...latestDetail.thread, ...latestThread }, messages: mergedMessages });
       setShowNewChat(false);
       await loadThreads();
-    } catch {
-      toast.error("Failed to load conversation.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load conversation.");
     }
   };
 
@@ -483,7 +492,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
 
               <div className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_32%),linear-gradient(135deg,#eef5ff_0%,#f8fafc_42%,#eef2ff_100%)] px-4 py-5 md:px-8">
                 <div className="mx-auto max-w-3xl space-y-4">
-                  <div className="mx-auto w-fit rounded-full bg-white/80 px-4 py-1.5 text-xs font-bold text-slate-500 shadow-sm ring-1 ring-slate-200">{selected.thread.subject}</div>
+                  <div className="mx-auto w-fit rounded-full bg-white/80 px-4 py-1.5 text-xs font-bold text-slate-500 shadow-sm ring-1 ring-slate-200">All conversations with {selectedOther.name}</div>
                   {selected.messages.map((message) => {
                     const isMine = Number(message.sender_id) === Number(user.id);
                     const canDelete = isMine || isAdmin;
