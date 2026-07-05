@@ -240,22 +240,24 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
     }
   };
 
-  const loadThreads = async () => {
+  const loadThreads = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await fetch(`${API_BASE_URL}/messages/threads`, { headers: authHeaders });
       const data = await response.json();
       if (!response.ok) {
-        toast.error(data.message || "Failed to load conversations.");
-        setThreads([]);
+        if (!silent) toast.error(data.message || "Failed to load conversations.");
+        if (!silent) setThreads([]);
         return;
       }
       setThreads(Array.isArray(data) ? data : []);
     } catch {
-      setThreads([]);
-      toast.error("Failed to load conversations.");
+      if (!silent) {
+        setThreads([]);
+        toast.error("Failed to load conversations.");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -269,7 +271,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
     }
   };
 
-  const loadThreadDetails = async (threadId: number) => {
+  const loadThreadDetails = async (threadId: number, silent = false) => {
     try {
       const clickedThread = threads.find((thread) => Number(thread.id) === Number(threadId));
       const groupedThreads = clickedThread
@@ -295,9 +297,9 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
       const latestThread = sortedGroup[sortedGroup.length - 1] || latestDetail.thread;
       setSelected({ thread: { ...latestDetail.thread, ...latestThread }, messages: mergedMessages });
       setShowNewChat(false);
-      await loadThreads();
+      await loadThreads(true);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to load conversation.");
+      if (!silent) toast.error(error instanceof Error ? error.message : "Failed to load conversation.");
     }
   };
 
@@ -306,9 +308,21 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
     loadThreads();
     loadContacts();
     const presenceTimer = window.setInterval(updatePresence, 60_000);
-    const refreshTimer = window.setInterval(() => { loadThreads(); loadContacts(); }, 90_000);
+    const refreshTimer = window.setInterval(() => { loadThreads(true); loadContacts(); }, 15_000);
     return () => { window.clearInterval(presenceTimer); window.clearInterval(refreshTimer); };
   }, []);
+
+  useEffect(() => {
+    if (!selected?.thread.id) return;
+
+    const activeThreadId = selected.thread.id;
+    const messageTimer = window.setInterval(() => {
+      loadContacts();
+      loadThreadDetails(activeThreadId, true);
+    }, 4_000);
+
+    return () => window.clearInterval(messageTimer);
+  }, [selected?.thread.id, threads.length, token]);
 
   const createThread = async (event: FormEvent) => {
     event.preventDefault();
@@ -328,7 +342,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
       setMessageBody("");
       setSelectedRecipientId("");
       setShowNewChat(false);
-      await loadThreads();
+      await loadThreads(true);
       if (data.thread_id) await loadThreadDetails(data.thread_id);
       toast.success("Private message sent.");
     } catch {
@@ -485,7 +499,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
                   <span className="hidden rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 md:inline-flex">Contact info</span>
                 </button>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => { loadThreads(); loadContacts(); }} className="hidden rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-700 hover:bg-slate-200 md:inline-flex">Refresh</button>
+                  <button onClick={() => { loadThreads(); loadContacts(); if (selected.thread.id) loadThreadDetails(selected.thread.id); }} className="hidden rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-700 hover:bg-slate-200 md:inline-flex">Refresh</button>
                   <button onClick={() => deleteThread(selected.thread.id)} className="rounded-full bg-red-50 px-4 py-2 text-xs font-black text-red-600 hover:bg-red-100">Delete</button>
                 </div>
               </div>
