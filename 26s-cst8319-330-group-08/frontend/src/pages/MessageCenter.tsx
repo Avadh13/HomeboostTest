@@ -47,6 +47,7 @@ type ContactUser = {
   hbt_team_name?: string | null;
   partnership_slug?: string | null;
   title?: string | null;
+  phone?: string | null;
   photo_url?: string | null;
   is_online?: boolean;
   status_label?: string | null;
@@ -66,6 +67,7 @@ type PersonPreview = {
   email?: string | null;
   role?: string | null;
   title?: string | null;
+  phone?: string | null;
   company_name?: string | null;
   hbt_team_name?: string | null;
   partnership_slug?: string | null;
@@ -149,39 +151,96 @@ function ProfileAvatar({ person, size = "md", showStatus = true }: AvatarProps) 
 }
 
 function ProfileDetailsModal({ person, onClose }: { person: PersonPreview; onClose: () => void }) {
-  const rows = [
-    ["Name", person.name],
-    ["Email", person.email || "Not provided"],
-    ["Role", roleLabel(person.role)],
-    ["Title", person.title || "Not provided"],
-    ["Company", person.company_name || "Not provided"],
-    ["HBT Team", person.hbt_team_name || "Not provided"],
-    ["Partnership", person.partnership_slug ? `/${person.partnership_slug}` : "Not provided"],
-    ["Status", getLastSeenLabel(person)],
+  const contactLine = person.phone || person.email || roleLabel(person.role);
+  const profileRows = [
+    { icon: "✉", label: "Email", value: person.email || "Not provided" },
+    { icon: "👤", label: "Role", value: roleLabel(person.role) },
+    { icon: "💼", label: "Title", value: person.title || "Not provided" },
+    { icon: "🏢", label: "Company", value: person.company_name || "Not provided" },
+    { icon: "🏠", label: "HBT Team", value: person.hbt_team_name || "Not provided" },
+    { icon: "🔗", label: "Partnership", value: person.partnership_slug ? `/${person.partnership_slug}` : "Not provided" },
+    { icon: "●", label: "Status", value: getLastSeenLabel(person) },
+  ];
+
+  const quickActions = [
+    { icon: "☎", label: "Voice", href: person.phone ? `tel:${person.phone}` : person.email ? `mailto:${person.email}` : undefined },
+    { icon: "▣", label: "Video", href: undefined },
+    { icon: "⌕", label: "Search", href: undefined },
+  ];
+
+  const settingRows = [
+    { icon: "▧", label: "Media, links and docs", value: "0" },
+    { icon: "☆", label: "Starred messages" },
+    { icon: "🔔", label: "Notification settings" },
+    { icon: "◌", label: "Disappearing messages" },
   ];
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 px-4 backdrop-blur-sm" onClick={onClose}>
-      <section className="w-full max-w-lg rounded-[2rem] bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <ProfileAvatar person={person} size="lg" />
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Profile information</p>
-              <h2 className="mt-1 text-2xl font-black text-slate-950">{person.name}</h2>
-              <p className={`mt-1 text-sm font-black ${person.is_online ? "text-emerald-600" : "text-slate-400"}`}>{getLastSeenLabel(person)}</p>
+    <div className="fixed inset-0 z-[80] bg-[#111315] text-white" role="dialog" aria-modal="true">
+      <section className="mx-auto flex h-dvh max-w-6xl flex-col overflow-hidden border-x border-white/5 bg-[#111315] shadow-2xl shadow-black/50">
+        <header className="flex shrink-0 items-center justify-between px-5 py-5 md:px-7">
+          <div className="flex items-center gap-5">
+            <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full text-4xl font-light leading-none text-white transition hover:bg-white/10" aria-label="Close contact info">
+              ×
+            </button>
+            <h2 className="text-xl font-bold tracking-tight md:text-2xl">Contact info</h2>
+          </div>
+          <button className="flex h-10 w-10 items-center justify-center rounded-full text-2xl text-white transition hover:bg-white/10" title="Edit contact">
+            ✎
+          </button>
+        </header>
+
+        <div className="flex-1 overflow-y-auto px-5 pb-8 md:px-7">
+          <div className="flex flex-col items-center pt-8 text-center md:pt-12">
+            <div className="relative flex h-36 w-36 items-center justify-center overflow-hidden rounded-full bg-neutral-800 text-6xl font-black text-white ring-4 ring-white/10 md:h-44 md:w-44">
+              {person.photo_url ? <img src={person.photo_url} alt={person.name} className="h-full w-full object-cover" /> : <span>{initials(person.name)}</span>}
+              <span className={`absolute bottom-4 right-4 h-5 w-5 rounded-full border-4 border-[#111315] ${person.is_online ? "bg-emerald-500" : "bg-neutral-500"}`} />
+            </div>
+
+            <h1 className="mt-6 max-w-3xl break-words text-3xl font-semibold text-white md:text-4xl">{person.name}</h1>
+            <p className="mt-3 max-w-3xl break-words text-lg font-semibold text-neutral-400 md:text-xl">{contactLine}</p>
+            <p className={`mt-2 text-sm font-bold ${person.is_online ? "text-emerald-400" : "text-neutral-500"}`}>{getLastSeenLabel(person)}</p>
+
+            <div className="mt-6 flex items-center justify-center gap-6">
+              {quickActions.map((action) => {
+                const circle = (
+                  <span className={`flex h-16 w-20 items-center justify-center rounded-[2rem] text-4xl transition md:h-[72px] md:w-[92px] ${action.href ? "bg-neutral-800 text-white hover:bg-neutral-700" : "bg-neutral-800/70 text-neutral-500"}`}>{action.icon}</span>
+                );
+
+                return (
+                  <div key={action.label} className="flex flex-col items-center gap-3">
+                    {action.href ? <a href={action.href}>{circle}</a> : circle}
+                    <span className="text-base font-bold text-neutral-100">{action.label}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
-          <button onClick={onClose} className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-black text-slate-500 hover:bg-slate-200">Close</button>
-        </div>
 
-        <div className="mt-6 grid gap-3">
-          {rows.map(([label, value]) => (
-            <div key={label} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
-              <p className="mt-1 break-words text-sm font-bold capitalize text-slate-800">{value}</p>
+          <div className="mt-12 border-t border-neutral-800 pt-8">
+            <p className="text-lg font-bold text-neutral-400">About</p>
+            <div className="mt-6 overflow-hidden rounded-3xl border border-neutral-800 bg-[#151718]">
+              {profileRows.map((row, index) => (
+                <div key={row.label} className={`flex gap-5 px-6 py-5 ${index !== profileRows.length - 1 ? "border-b border-neutral-800" : ""}`}>
+                  <span className="w-8 shrink-0 text-2xl text-neutral-500">{row.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-neutral-500">{row.label}</p>
+                    <p className="mt-1 break-words text-lg font-semibold capitalize text-neutral-100">{row.value}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          <div className="mt-6 overflow-hidden border-y border-neutral-800">
+            {settingRows.map((row, index) => (
+              <button key={row.label} className="flex w-full items-center gap-6 border-b border-neutral-800 px-6 py-6 text-left last:border-b-0 hover:bg-white/[0.03]">
+                <span className="w-8 shrink-0 text-3xl text-neutral-500">{row.icon}</span>
+                <span className="flex-1 text-xl font-semibold text-neutral-100">{row.label}</span>
+                {row.value && <span className="text-xl font-bold text-neutral-500">{row.value}</span>}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
     </div>
@@ -221,6 +280,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
     email: contact.email,
     role: contact.role,
     title: contact.title,
+    phone: contact.phone,
     company_name: contact.company_name,
     hbt_team_name: contact.hbt_team_name,
     partnership_slug: contact.partnership_slug,
@@ -536,7 +596,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
           ) : (
             <>
               <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <button type="button" onClick={() => setProfilePerson(selectedOther)} className="flex min-w-0 items-center gap-3 rounded-2xl p-1 text-left transition hover:bg-slate-50" title="View profile information">
+                <button type="button" onClick={() => setProfilePerson(selectedOther)} className="flex min-w-0 items-center gap-3 rounded-2xl p-1 text-left transition hover:bg-slate-50" title="View contact info">
                   <span onClick={(event) => { event.stopPropagation(); setSelected(null); }} className="rounded-full p-2 text-xl font-black text-slate-500 hover:bg-slate-100 md:hidden">‹</span>
                   <ProfileAvatar person={selectedOther} size="lg" />
                   <div className="min-w-0">
@@ -544,7 +604,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
                     <p className="truncate text-xs font-bold capitalize text-slate-500">{roleLabel(selectedOther.role)}{selected.thread.company_name ? ` · ${selected.thread.company_name}` : ""}</p>
                     <p className={`text-[11px] font-black ${selectedOther.is_online ? "text-emerald-600" : "text-slate-400"}`}>{getLastSeenLabel(selectedOther)}</p>
                   </div>
-                  <span className="hidden rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 md:inline-flex">Profile</span>
+                  <span className="hidden rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 md:inline-flex">Contact info</span>
                 </button>
                 <div className="flex items-center gap-2">
                   <button onClick={() => { loadThreads(); loadContacts(); }} className="hidden rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-700 hover:bg-slate-200 md:inline-flex">Refresh</button>
