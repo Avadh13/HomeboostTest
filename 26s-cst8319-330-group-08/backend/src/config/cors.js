@@ -23,13 +23,16 @@ const getAllowedOrigins = () => {
     "http://127.0.0.1:8080",
   ];
 
-  const defaults = process.env.NODE_ENV === "production" ? [] : localOrigins;
+  const vercelOrigins = [
+    "https://homeboost-test.vercel.app",
+    "https://homeboosttest.vercel.app",
+  ];
 
-  return [...new Set([...defaults, ...envOrigins])];
+  return [...new Set([...localOrigins, ...vercelOrigins, ...envOrigins])];
 };
 
 const isAllowedVercelPreview = (origin) => {
-  if (process.env.ALLOW_VERCEL_PREVIEWS !== "true") return false;
+  if (process.env.ALLOW_VERCEL_PREVIEWS === "false") return false;
 
   const allowedPreviewPrefixes = [
     "https://homeboost-test-",
@@ -48,7 +51,7 @@ const isAllowedVercelPreview = (origin) => {
 };
 
 const isAllowedCodespacesOrigin = (origin) => {
-  return process.env.ALLOW_CODESPACES_ORIGINS === "true" && /^https:\/\/[a-z0-9-]+-\d+\.app\.github\.dev$/i.test(origin);
+  return process.env.ALLOW_CODESPACES_ORIGINS === "true" && origin.startsWith("https://") && origin.endsWith(".app.github.dev");
 };
 
 const corsOptions = {
