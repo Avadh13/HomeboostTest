@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
+const pool = require("../config/db");
 const authMiddleware = require("../middleware/authMiddleware");
 const quizController = require("../controllers/quizController");
 
@@ -30,16 +31,101 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
+const latestQuizSubmissionsOnly = async (req, res) => {
+  try {
+    const user = req.user;
+    let whereClause = "";
+    const params = [];
+
+    if (user.role === "hbt_admin" || user.role === "hbt_member") {
+      whereClause = "WHERE p.team_id = ?";
+      params.push(user.team_id);
+    }
+
+    const [submissions] = await pool.query(
+      `SELECT 
+        qs.id,
+        qs.quiz_id,
+        qs.user_id,
+        qs.partnership_id,
+        qs.submitted_at,
+        COALESCE(qs.follow_up_status, 'new') AS follow_up_status,
+        q.title AS quiz_title,
+        COALESCE(qs.full_name, u.full_name, 'Employee') AS employee_name,
+        COALESCE(qs.email, u.email, '') AS employee_email,
+        e.name AS company_name,
+        h.name AS team_name,
+        p.slug AS partnership_slug
+       FROM quiz_submissions qs
+       LEFT JOIN quizzes q ON qs.quiz_id = q.id
+       LEFT JOIN users u ON qs.user_id = u.id
+       LEFT JOIN partnerships p ON qs.partnership_id = p.id
+       LEFT JOIN employers e ON p.employer_id = e.id
+       LEFT JOIN home_buying_teams h ON p.team_id = h.id
+       ${whereClause}
+       ORDER BY qs.submitted_at DESC, qs.id DESC`,
+      params
+    );
+
+    const latestMap = new Map();
+
+    submissions.forEach((submission) => {
+      const employeeKey = submission.user_id || String(submission.employee_email || "").toLowerCase() || submission.id;
+      const quizKey = `${submission.quiz_id || submission.quiz_title || "quiz"}:${employeeKey}`;
+      const existing = latestMap.get(quizKey);
+
+      if (!existing) {
+        latestMap.set(quizKey, {
+          ...submission,
+          is_latest_submission: true,
+          older_submission_count: 0,
+        });
+      } else {
+        existing.older_submission_count = Number(existing.older_submission_count || 0) + 1;
+      }
+    });
+
+    const latestSubmissions = Array.from(latestMap.values());
+
+    for (const submission of latestSubmissions) {
+      const [answers] = await pool.query(
+        `SELECT 
+          qa.id,
+          qa.answer_text,
+          qq.question_text,
+          qq.question_type,
+          qq.display_order
+         FROM quiz_answers qa
+         LEFT JOIN quiz_questions qq ON qa.question_id = qq.id
+         WHERE qa.submission_id = ?
+         ORDER BY qq.display_order ASC, qa.id ASC`,
+        [submission.id]
+      );
+
+      submission.answers = answers;
+    }
+
+    return res.json(latestSubmissions);
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to load latest quiz submissions",
+      error: error.message,
+    });
+  }
+};
+
 /*
   Quiz submissions:
-  - Admin/Super Admin can see all submissions
-  - HBT Admin can see only submissions from partnerships assigned to their team
+  - Admin/Super Admin can see latest submissions for all employees
+  - HBT Admin/HBT Member can see latest submissions from partnerships assigned to their team
+  - Older attempts are hidden from the follow-up queue so advisors focus on the newest quiz only
 */
 router.get(
   "/submissions",
   authMiddleware,
   adminOrHbtOnly,
-  quizController.getQuizSubmissions
+  latestQuizSubmissionsOnly
 );
 
 router.get(
