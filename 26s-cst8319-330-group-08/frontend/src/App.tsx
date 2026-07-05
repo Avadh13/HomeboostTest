@@ -73,6 +73,7 @@ const localNavbarExactPaths = new Set([
   "/profile",
   "/company/dashboard",
   "/employee/messages",
+  "/employee/appointments",
   "/company/messages",
   "/hbt/messages",
 ]);
