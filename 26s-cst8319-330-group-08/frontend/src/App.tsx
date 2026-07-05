@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -54,6 +54,7 @@ import ManageServiceRequests from "./admin/pages/ManageServiceRequests";
 import AdminProtectedRoute from "./admin/components/AdminProtectedRoute";
 import AdminLayout from "./admin/components/AdminLayout";
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
+import Navbar from "./components/Navbar";
 import FooterShell from "./components/FooterShell";
 import MortgageServicesShell from "./components/MortgageServicesShell";
 import PartnershipMortgageServicesShell from "./components/PartnershipMortgageServicesShell";
@@ -61,10 +62,41 @@ import MobileStickyCTA from "./components/MobileStickyCTA";
 import FloatingThemeControl from "./components/FloatingThemeControl";
 import ScrollToTop from "./components/ScrollToTop";
 
+const localNavbarExactPaths = new Set([
+  "/",
+  "/pricing",
+  "/contact",
+  "/login",
+  "/signup",
+  "/partners",
+  "/mortgage-request",
+  "/profile",
+  "/company/dashboard",
+  "/employee/messages",
+  "/company/messages",
+  "/hbt/messages",
+]);
+
+const localNavbarPrefixes = ["/resources", "/quiz"];
+const globalNavbarSingleSegmentPaths = new Set(["/employee-portal", "/notifications"]);
+
+function GlobalNavbarGate() {
+  const { pathname } = useLocation();
+  const normalizedPath = pathname.replace(/\/$/, "") || "/";
+  const isAdminRoute = normalizedPath === "/admin" || normalizedPath.startsWith("/admin/");
+  const isSingleSegmentPublicSlug = /^\/[^/]+$/.test(normalizedPath) && !globalNavbarSingleSegmentPaths.has(normalizedPath);
+  const hasPageNavbar = localNavbarExactPaths.has(normalizedPath) || localNavbarPrefixes.some((prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`));
+
+  if (isAdminRoute || isSingleSegmentPublicSlug || hasPageNavbar) return null;
+
+  return <Navbar />;
+}
+
 function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
+      <GlobalNavbarGate />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/pricing" element={<Pricing />} />
