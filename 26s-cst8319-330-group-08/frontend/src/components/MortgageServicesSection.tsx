@@ -63,7 +63,7 @@ function MortgageServicesSection({
     <section className={`px-4 py-12 md:px-6 lg:py-16 ${className}`}>
       <div className="section-container">
         <div className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/90 shadow-2xl shadow-blue-950/10 backdrop-blur-xl">
-          <div className="grid gap-0 lg:grid-cols-[0.78fr_1.22fr]">
+          <div className={showHeroCopy ? "grid gap-0 lg:grid-cols-[0.78fr_1.22fr]" : "grid gap-0"}>
             {showHeroCopy && (
               <div className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-violet-950 p-6 text-white md:p-8">
                 <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-sky-400/20 blur-3xl" />
@@ -88,19 +88,19 @@ function MortgageServicesSection({
               </div>
             )}
 
-            <div className={`grid gap-4 p-5 md:p-7 ${showHeroCopy ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
+            <div className={`grid w-full gap-4 p-5 md:p-7 ${showHeroCopy ? "md:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
               {services.map((service) => (
                 <Link
                   key={serviceKey(service)}
                   to={getRequestLink(service)}
-                  className="group rounded-[1.5rem] border border-slate-100 bg-slate-50 p-4 transition hover:-translate-y-1 hover:bg-white hover:shadow-xl md:p-5"
+                  className="group flex h-full min-h-[240px] flex-col rounded-[1.5rem] border border-slate-100 bg-slate-50 p-4 transition hover:-translate-y-1 hover:bg-white hover:shadow-xl md:p-5"
                 >
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-violet-100 text-2xl transition group-hover:scale-110">{serviceIcon(service)}</span>
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-violet-100 text-2xl transition group-hover:scale-110">{serviceIcon(service)}</span>
                     <span className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">Service</span>
                   </div>
                   <h3 className="text-lg font-black tracking-tight text-slate-950 md:text-xl">{service.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{service.description}</p>
+                  <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-600">{service.description}</p>
                   <p className="mt-4 text-sm font-black text-blue-700">Start request →</p>
                 </Link>
               ))}
