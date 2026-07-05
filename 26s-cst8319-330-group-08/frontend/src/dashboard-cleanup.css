@@ -1,0 +1,13 @@
+/* Dashboard pages already have role-aware navigation. Keep the hero headers clean by hiding duplicated quick-nav buttons. */
+
+/* HBT member dashboard: duplicate Messages / Notifications / Logout + quick links row */
+main.theme-page > div.mx-auto > header.theme-panel > div.grid > div.flex.flex-wrap.gap-2,
+main.theme-page > div.mx-auto > header.theme-panel > div.mt-6.flex.flex-wrap.gap-3 {
+  display: none !important;
+}
+
+/* Company dashboard: keep View Portal, hide duplicate Notifications / Logout from the hero. */
+main.theme-page > section > header a[href="/notifications"],
+main.theme-page > section > header button {
+  display: none !important;
+}
