@@ -165,7 +165,6 @@ function HBTMemberDashboard() {
   const activeLeads = [...leadAssignments]
     .sort((a, b) => Number(a.progress_percent || 0) - Number(b.progress_percent || 0))
     .slice(0, 5);
-  const latestMessages = messageThreads.slice(0, 5);
   const latestSubmissions = submissions.slice(0, 5);
 
   const priorityAction: PriorityAction = useMemo(() => {
@@ -176,7 +175,7 @@ function HBTMemberDashboard() {
         title: unreadThread.employee_name || unreadThread.subject,
         body: unreadThread.last_message || "A client is waiting for your response.",
         href: "/hbt/messages",
-        cta: "Open inbox",
+        cta: "Open messages",
         tone: "from-indigo-600 to-violet-700",
       };
     }
@@ -209,7 +208,7 @@ function HBTMemberDashboard() {
     return {
       label: "Workspace clear",
       title: "No urgent follow-up",
-      body: "Your inbox, appointments, and lead tasks are quiet right now.",
+      body: "Your messages, appointments, and lead tasks are quiet right now.",
       href: "/hbt/messages",
       cta: "Check messages",
       tone: "from-emerald-500 to-teal-600",
@@ -377,7 +376,7 @@ function HBTMemberDashboard() {
                 </div>
               </div>
 
-              <aside className="grid gap-5">
+              <aside>
                 <div className="premium-card">
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <div>
@@ -402,33 +401,6 @@ function HBTMemberDashboard() {
                       </Link>
                     ))}
                     {nextAppointments.length === 0 && <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No upcoming appointments.</p>}
-                  </div>
-                </div>
-
-                <div className="premium-card">
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="eyebrow">Inbox</p>
-                      <h2 className="mt-1 text-xl font-black text-slate-950">Recent messages</h2>
-                    </div>
-                    <Link to="/hbt/messages" className="text-sm font-black text-violet-700">Open →</Link>
-                  </div>
-
-                  <div className="space-y-3">
-                    {latestMessages.map((thread) => (
-                      <Link key={thread.id} to="/hbt/messages" className="block rounded-2xl border border-slate-100 bg-slate-50 p-4 hover:bg-violet-50">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate font-black text-slate-950">{thread.employee_name || thread.subject}</p>
-                            <p className="mt-1 truncate text-xs font-semibold text-slate-500">{thread.company_name || thread.subject}</p>
-                          </div>
-                          {Number(thread.unread_count || 0) > 0 && <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-black text-white">{thread.unread_count}</span>}
-                        </div>
-                        <p className="mt-2 line-clamp-2 text-sm text-slate-600">{thread.last_message || "No message preview"}</p>
-                        <p className="mt-2 text-xs font-bold text-slate-400">{formatDateTime(thread.last_message_at)}</p>
-                      </Link>
-                    ))}
-                    {latestMessages.length === 0 && <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No messages yet.</p>}
                   </div>
                 </div>
               </aside>
