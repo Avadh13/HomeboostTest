@@ -1,6 +1,6 @@
 const pool = require("../config/db");
 
-const VALID_TYPES = new Set(["info", "success", "warning", "appointment", "system"]);
+const VALID_TYPES = new Set(["info", "success", "warning", "appointment", "message", "service_request", "system"]);
 
 const createNotification = async ({
   user_id = null,
