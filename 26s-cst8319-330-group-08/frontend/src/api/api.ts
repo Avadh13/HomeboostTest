@@ -1,30 +1,46 @@
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
+const railwayFallbackApiUrl = "https://tender-laughter-production-7cd3.up.railway.app/api";
+const localFallbackApiUrl = "http://localhost:5000/api";
+
 const envApiUrl =
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
   "";
 
-const localFallbackApiUrl = "http://localhost:5000/api";
-const isLocalBrowser =
-  typeof window !== "undefined" &&
-  ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const browserHostname = typeof window !== "undefined" ? window.location.hostname : "";
+const browserOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
-// In local Vite development, old deployed Railway URLs can make login fail with
-// a network/CORS error. Prefer the local backend when running on localhost.
-const shouldUseLocalFallback =
-  import.meta.env.DEV &&
-  isLocalBrowser &&
-  (!envApiUrl || envApiUrl.includes("railway.app"));
+const isLocalBrowser = ["localhost", "127.0.0.1"].includes(browserHostname);
+const isCodespacesBrowser = browserHostname.endsWith(".app.github.dev");
+const useCodespaceBackend = import.meta.env.VITE_USE_CODESPACE_BACKEND === "true";
 
-const rawApiUrl = shouldUseLocalFallback
-  ? localFallbackApiUrl
-  : envApiUrl || (import.meta.env.DEV ? localFallbackApiUrl : "");
+const codespaceBackendApiUrl =
+  browserOrigin && isCodespacesBrowser
+    ? `${browserOrigin.replace(/-\d+\.app\.github\.dev$/, "-5000.app.github.dev")}/api`
+    : "";
 
-if (!rawApiUrl && import.meta.env.PROD) {
-  throw new Error("VITE_API_BASE_URL is required for production builds.");
-}
+const getApiBaseUrl = () => {
+  // Local PC: use local Node backend unless the developer explicitly points to another API.
+  if (import.meta.env.DEV && isLocalBrowser) {
+    if (!envApiUrl || envApiUrl.includes("railway.app") || envApiUrl.includes("app.github.dev")) {
+      return localFallbackApiUrl;
+    }
+    return envApiUrl;
+  }
 
-const API_BASE_URL = trimTrailingSlash(rawApiUrl);
+  // GitHub Codespaces frontend: default to Railway backend for stable demo data.
+  // To test a Codespaces backend instead, set VITE_USE_CODESPACE_BACKEND=true.
+  if (import.meta.env.DEV && isCodespacesBrowser) {
+    if (useCodespaceBackend && codespaceBackendApiUrl) return codespaceBackendApiUrl;
+    if (envApiUrl && !envApiUrl.includes("app.github.dev") && !envApiUrl.includes("localhost")) return envApiUrl;
+    return railwayFallbackApiUrl;
+  }
+
+  // Vercel production/preview: use Vercel env first, Railway fallback second.
+  return envApiUrl || railwayFallbackApiUrl;
+};
+
+const API_BASE_URL = trimTrailingSlash(getApiBaseUrl());
 
 export default API_BASE_URL;
