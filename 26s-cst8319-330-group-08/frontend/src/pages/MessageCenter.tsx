@@ -150,103 +150,6 @@ function ProfileAvatar({ person, size = "md", showStatus = true }: AvatarProps) 
   );
 }
 
-function ProfileDetailsModal({ person, onClose }: { person: PersonPreview; onClose: () => void }) {
-  const contactLine = person.phone || person.email || roleLabel(person.role);
-  const profileRows = [
-    { icon: "✉", label: "Email", value: person.email || "Not provided" },
-    { icon: "👤", label: "Role", value: roleLabel(person.role) },
-    { icon: "💼", label: "Title", value: person.title || "Not provided" },
-    { icon: "🏢", label: "Company", value: person.company_name || "Not provided" },
-    { icon: "🏠", label: "HBT Team", value: person.hbt_team_name || "Not provided" },
-    { icon: "🔗", label: "Partnership", value: person.partnership_slug ? `/${person.partnership_slug}` : "Not provided" },
-    { icon: "●", label: "Status", value: getLastSeenLabel(person) },
-  ];
-
-  const quickActions = [
-    { icon: "☎", label: "Voice", href: person.phone ? `tel:${person.phone}` : person.email ? `mailto:${person.email}` : undefined },
-    { icon: "▣", label: "Video", href: undefined },
-    { icon: "⌕", label: "Search", href: undefined },
-  ];
-
-  const settingRows = [
-    { icon: "▧", label: "Media, links and docs", value: "0" },
-    { icon: "☆", label: "Starred messages" },
-    { icon: "🔔", label: "Notification settings" },
-    { icon: "◌", label: "Disappearing messages" },
-  ];
-
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm" onClick={onClose} role="dialog" aria-modal="true">
-      <section className="flex max-h-[86dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white text-slate-950 shadow-2xl shadow-slate-950/30" onClick={(event) => event.stopPropagation()}>
-        <header className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur md:px-6">
-          <div className="flex items-center gap-3">
-            <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-2xl font-light leading-none text-slate-700 transition hover:bg-slate-200" aria-label="Close contact info">
-              ×
-            </button>
-            <h2 className="text-xl font-black tracking-tight text-slate-950">Contact info</h2>
-          </div>
-          <button className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-violet-600 text-lg text-white shadow-md shadow-blue-500/20 transition hover:-translate-y-0.5" title="Edit contact">
-            ✎
-          </button>
-        </header>
-
-        <div className="flex-1 overflow-y-auto bg-gradient-to-b from-blue-50/70 via-white to-violet-50/70 px-5 pb-6 md:px-6">
-          <div className="flex flex-col items-center pt-7 text-center">
-            <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-600 to-violet-600 text-5xl font-black text-white shadow-xl shadow-blue-500/25 ring-4 ring-white md:h-32 md:w-32">
-              {person.photo_url ? <img src={person.photo_url} alt={person.name} className="h-full w-full object-cover" /> : <span>{initials(person.name)}</span>}
-              <span className={`absolute bottom-3 right-3 h-4 w-4 rounded-full border-[3px] border-white ${person.is_online ? "bg-emerald-500" : "bg-slate-400"}`} />
-            </div>
-
-            <h1 className="mt-4 max-w-xl break-words text-2xl font-black text-slate-950 md:text-3xl">{person.name}</h1>
-            <p className="mt-1 max-w-xl break-words text-sm font-bold text-slate-500 md:text-base">{contactLine}</p>
-            <p className={`mt-1 text-xs font-black ${person.is_online ? "text-emerald-600" : "text-slate-400"}`}>{getLastSeenLabel(person)}</p>
-
-            <div className="mt-5 flex items-center justify-center gap-4">
-              {quickActions.map((action) => {
-                const circle = (
-                  <span className={`flex h-14 w-16 items-center justify-center rounded-[1.5rem] text-2xl transition ${action.href ? "bg-white text-blue-700 shadow-lg shadow-slate-200 ring-1 ring-slate-100 hover:-translate-y-0.5 hover:bg-blue-50" : "bg-slate-100 text-slate-400 ring-1 ring-slate-200"}`}>{action.icon}</span>
-                );
-
-                return (
-                  <div key={action.label} className="flex flex-col items-center gap-2">
-                    {action.href ? <a href={action.href}>{circle}</a> : circle}
-                    <span className="text-xs font-black text-slate-700">{action.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="mt-8 border-t border-slate-200 pt-5">
-            <p className="text-sm font-black text-slate-500">About</p>
-            <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-              {profileRows.map((row, index) => (
-                <div key={row.label} className={`flex gap-4 px-5 py-4 ${index !== profileRows.length - 1 ? "border-b border-slate-100" : ""}`}>
-                  <span className="w-7 shrink-0 text-xl text-slate-400">{row.icon}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">{row.label}</p>
-                    <p className="mt-1 break-words text-sm font-bold text-slate-800">{row.value}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-            {settingRows.map((row) => (
-              <button key={row.label} className="flex w-full items-center gap-4 border-b border-slate-100 px-5 py-4 text-left last:border-b-0 hover:bg-slate-50">
-                <span className="w-7 shrink-0 text-xl text-slate-400">{row.icon}</span>
-                <span className="flex-1 text-sm font-black text-slate-800">{row.label}</span>
-                {row.value && <span className="text-sm font-black text-slate-400">{row.value}</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
-
 function MessageCenter({ embedded = false }: MessageCenterProps) {
   const toast = useToast();
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -258,7 +161,6 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
   const [replyBody, setReplyBody] = useState("");
   const [searchText, setSearchText] = useState("");
   const [showNewChat, setShowNewChat] = useState(false);
-  const [profilePerson, setProfilePerson] = useState<PersonPreview | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -596,16 +498,15 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
           ) : (
             <>
               <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <button type="button" onClick={() => setProfilePerson(selectedOther)} className="flex min-w-0 items-center gap-3 rounded-2xl p-1 text-left transition hover:bg-slate-50" title="View contact info">
-                  <span onClick={(event) => { event.stopPropagation(); setSelected(null); }} className="rounded-full p-2 text-xl font-black text-slate-500 hover:bg-slate-100 md:hidden">‹</span>
+                <div className="flex min-w-0 items-center gap-3 rounded-2xl p-1 text-left">
+                  <span onClick={() => setSelected(null)} className="rounded-full p-2 text-xl font-black text-slate-500 hover:bg-slate-100 md:hidden">‹</span>
                   <ProfileAvatar person={selectedOther} size="lg" />
                   <div className="min-w-0">
                     <h2 className="truncate text-base font-black text-slate-950 md:text-lg">{selectedOther.name}</h2>
                     <p className="truncate text-xs font-bold capitalize text-slate-500">{roleLabel(selectedOther.role)}{selected.thread.company_name ? ` · ${selected.thread.company_name}` : ""}</p>
                     <p className={`text-[11px] font-black ${selectedOther.is_online ? "text-emerald-600" : "text-slate-400"}`}>{getLastSeenLabel(selectedOther)}</p>
                   </div>
-                  <span className="hidden rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 md:inline-flex">Contact info</span>
-                </button>
+                </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => { loadThreads(); loadContacts(); }} className="hidden rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-700 hover:bg-slate-200 md:inline-flex">Refresh</button>
                   <button onClick={() => deleteThread(selected.thread.id)} className="rounded-full bg-red-50 px-4 py-2 text-xs font-black text-red-600 hover:bg-red-100">Delete</button>
@@ -647,8 +548,6 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
           )}
         </section>
       </section>
-
-      {profilePerson && <ProfileDetailsModal person={profilePerson} onClose={() => setProfilePerson(null)} />}
     </main>
   );
 }
