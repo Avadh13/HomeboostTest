@@ -63,6 +63,9 @@ type PriorityAction = {
   tone: string;
 };
 
+type LeadFilter = "open" | "attention" | "completed" | "all";
+type SignalFilter = "all" | "new" | "pending" | "completed";
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return "Not scheduled";
   return new Date(value).toLocaleString(undefined, {
@@ -93,6 +96,20 @@ const initials = (name?: string) =>
     .map((part) => part.charAt(0).toUpperCase())
     .join("") || "C";
 
+const getLeadAttentionScore = (lead: LeadAssignment) => {
+  const progress = Number(lead.progress_percent || 0);
+  const openTodos = lead.todos.filter((todo) => Number(todo.is_completed) !== 1).length;
+  return openTodos * 100 + (100 - progress);
+};
+
+const matchesSignalFilter = (submission: QuizSubmission, filter: SignalFilter) => {
+  const status = (submission.follow_up_status || "new").toLowerCase();
+  if (filter === "all") return true;
+  if (filter === "new") return status === "new";
+  if (filter === "pending") return status.includes("pending") || status.includes("review") || status.includes("follow");
+  return status.includes("complete") || status.includes("closed");
+};
+
 function HBTMemberDashboard() {
   const toast = useToast();
   const [submissions, setSubmissions] = useState<QuizSubmission[]>([]);
@@ -102,6 +119,9 @@ function HBTMemberDashboard() {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [loading, setLoading] = useState(true);
   const [savingTodoId, setSavingTodoId] = useState<number | null>(null);
+  const [leadQuery, setLeadQuery] = useState("");
+  const [leadFilter, setLeadFilter] = useState<LeadFilter>("open");
+  const [signalFilter, setSignalFilter] = useState<SignalFilter>("all");
 
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -155,17 +175,45 @@ function HBTMemberDashboard() {
     ? Math.round(leadAssignments.reduce((sum, item) => sum + Number(item.progress_percent || 0), 0) / leadAssignments.length)
     : 0;
 
-  const sortedAppointments = [...appointments].sort((a, b) => {
-    const aTime = a.preferred_date ? new Date(a.preferred_date).getTime() : Number.MAX_SAFE_INTEGER;
-    const bTime = b.preferred_date ? new Date(b.preferred_date).getTime() : Number.MAX_SAFE_INTEGER;
-    return aTime - bTime;
-  });
+  const sortedAppointments = useMemo(() => {
+    return [...appointments].sort((a, b) => {
+      const aTime = a.preferred_date ? new Date(a.preferred_date).getTime() : Number.MAX_SAFE_INTEGER;
+      const bTime = b.preferred_date ? new Date(b.preferred_date).getTime() : Number.MAX_SAFE_INTEGER;
+      return aTime - bTime;
+    });
+  }, [appointments]);
 
-  const nextAppointments = sortedAppointments.filter((item) => item.status !== "completed" && item.status !== "cancelled" && item.status !== "rejected").slice(0, 4);
-  const activeLeads = [...leadAssignments]
-    .sort((a, b) => Number(a.progress_percent || 0) - Number(b.progress_percent || 0))
-    .slice(0, 5);
-  const latestSubmissions = submissions.slice(0, 5);
+  const nextAppointments = sortedAppointments.filter(
+    (item) => item.status !== "completed" && item.status !== "cancelled" && item.status !== "rejected"
+  );
+
+  const filteredLeads = useMemo(() => {
+    const query = leadQuery.trim().toLowerCase();
+
+    return [...leadAssignments]
+      .filter((lead) => {
+        const progress = Number(lead.progress_percent || 0);
+        const hasOpenTodo = lead.todos.some((todo) => Number(todo.is_completed) !== 1);
+        const matchesFilter =
+          leadFilter === "all" ||
+          (leadFilter === "open" && progress < 100) ||
+          (leadFilter === "attention" && progress < 75 && hasOpenTodo) ||
+          (leadFilter === "completed" && progress >= 100);
+
+        const searchText = [lead.employee_name, lead.employee_email, lead.employer_name, lead.partnership_slug]
+          .join(" ")
+          .toLowerCase();
+
+        return matchesFilter && (!query || searchText.includes(query));
+      })
+      .sort((a, b) => getLeadAttentionScore(b) - getLeadAttentionScore(a));
+  }, [leadAssignments, leadFilter, leadQuery]);
+
+  const filteredSubmissions = useMemo(() => {
+    return [...submissions]
+      .filter((submission) => matchesSignalFilter(submission, signalFilter))
+      .sort((a, b) => new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime());
+  }, [signalFilter, submissions]);
 
   const priorityAction: PriorityAction = useMemo(() => {
     const unreadThread = messageThreads.find((thread) => Number(thread.unread_count || 0) > 0);
@@ -249,7 +297,7 @@ function HBTMemberDashboard() {
               <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-200">Advisor workspace</p>
               <h1 className="mt-3 text-3xl font-black tracking-tight md:text-5xl">Good to see you, {user.full_name || "Advisor"}</h1>
               <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300 md:text-base">
-                Your day at a glance: assigned clients, priority follow-ups, messages, appointments, and lead tasks.
+                Manage assigned clients, follow-up signals, and appointment queues from one focused workspace.
               </p>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-4">
@@ -289,10 +337,10 @@ function HBTMemberDashboard() {
           <>
             <section className="grid gap-4 md:grid-cols-4">
               {[
-                ["Assigned clients", leadAssignments.length, "Active book of business", "text-violet-700"],
+                ["Assigned clients", leadAssignments.length, "Search and task-manage", "text-violet-700"],
                 ["Completed", completedLeads, "Clients fully moved through", "text-emerald-700"],
-                ["Notifications", unreadNotifications, "Items waiting for review", "text-blue-700"],
-                ["Quiz leads", submissions.length, "Readiness forms received", "text-amber-700"],
+                ["Appointments", nextAppointments.length, "Upcoming and pending", "text-blue-700"],
+                ["Quiz signals", filteredSubmissions.length, "Filtered readiness leads", "text-amber-700"],
               ].map(([label, value, helper, color]) => (
                 <div key={String(label)} className="metric-card">
                   <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
@@ -302,32 +350,68 @@ function HBTMemberDashboard() {
               ))}
             </section>
 
-            <section className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
+            <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
               <div className="premium-card">
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+                <div className="mb-5 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
                   <div>
                     <p className="eyebrow">Client pipeline</p>
                     <h2 className="mt-1 text-2xl font-black text-slate-950">My assigned clients</h2>
-                    <p className="mt-1 text-sm text-slate-500">Work the lowest-progress leads first and keep tasks moving.</p>
+                    <p className="mt-1 text-sm text-slate-500">Search, filter, and update tasks without losing the full employee list.</p>
                   </div>
-                  <Link to="/hbt/employees" className="btn-secondary">View all employees</Link>
+                  <Link to="/hbt/employees" className="btn-secondary">Full employee manager</Link>
                 </div>
 
-                <div className="grid gap-4">
-                  {activeLeads.map((assignment) => {
+                <div className="mb-5 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+                  <input
+                    className="form-field"
+                    value={leadQuery}
+                    onChange={(event) => setLeadQuery(event.target.value)}
+                    placeholder="Search client, email, company, or portal slug..."
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      ["open", "Open"],
+                      ["attention", "Needs action"],
+                      ["completed", "Completed"],
+                      ["all", "All"],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        onClick={() => setLeadFilter(value as LeadFilter)}
+                        className={`rounded-full px-3 py-2 text-xs font-black transition ${leadFilter === value ? "bg-violet-700 text-white shadow-md" : "bg-slate-100 text-slate-600 hover:bg-violet-50 hover:text-violet-700"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mb-3 flex items-center justify-between text-xs font-black uppercase tracking-wide text-slate-400">
+                  <span>{filteredLeads.length} clients showing</span>
+                  <span>{leadAssignments.length} total assigned</span>
+                </div>
+
+                <div className="grid max-h-[780px] gap-3 overflow-y-auto pr-1">
+                  {filteredLeads.map((assignment) => {
                     const completedTodos = assignment.todos.filter((todo) => Number(todo.is_completed) === 1).length;
                     const nextTodo = assignment.todos.find((todo) => Number(todo.is_completed) !== 1);
+                    const progress = Number(assignment.progress_percent || 0);
 
                     return (
                       <article key={assignment.id} className="rounded-[1.5rem] border border-slate-100 bg-slate-50 p-4 transition hover:bg-white hover:shadow-lg">
-                        <div className="grid gap-4 lg:grid-cols-[1fr_190px] lg:items-center">
+                        <div className="grid gap-4 lg:grid-cols-[1fr_210px] lg:items-center">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-3">
                               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-sm font-black text-violet-700 shadow-sm">
                                 {initials(assignment.employee_name)}
                               </div>
                               <div className="min-w-0">
-                                <h3 className="truncate text-xl font-black text-slate-950">{assignment.employee_name}</h3>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h3 className="truncate text-xl font-black text-slate-950">{assignment.employee_name}</h3>
+                                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${progress >= 100 ? "bg-emerald-100 text-emerald-700" : progress < 50 ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
+                                    {progress >= 100 ? "Complete" : progress < 50 ? "Needs action" : "Active"}
+                                  </span>
+                                </div>
                                 <p className="truncate text-sm font-semibold text-slate-500">{assignment.employee_email}</p>
                                 <p className="mt-1 text-xs font-black uppercase tracking-wide text-violet-600">{assignment.employer_name} · /{assignment.partnership_slug}</p>
                               </div>
@@ -336,10 +420,10 @@ function HBTMemberDashboard() {
                             <div className="mt-4">
                               <div className="mb-2 flex items-center justify-between text-xs font-black uppercase tracking-wide text-slate-400">
                                 <span>Progress</span>
-                                <span>{assignment.progress_percent}%</span>
+                                <span>{progress}%</span>
                               </div>
                               <div className="h-3 rounded-full bg-white">
-                                <div className="h-3 rounded-full bg-gradient-to-r from-blue-600 to-violet-600" style={{ width: `${assignment.progress_percent}%` }} />
+                                <div className="h-3 rounded-full bg-gradient-to-r from-blue-600 to-violet-600" style={{ width: `${progress}%` }} />
                               </div>
                             </div>
 
@@ -349,8 +433,13 @@ function HBTMemberDashboard() {
                           </div>
 
                           <div className="rounded-2xl bg-white p-4 shadow-sm">
-                            <p className="text-xs font-black uppercase tracking-wide text-slate-400">Tasks</p>
-                            <p className="mt-1 text-2xl font-black text-slate-950">{completedTodos}/{assignment.todos.length}</p>
+                            <div className="flex items-end justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-black uppercase tracking-wide text-slate-400">Tasks</p>
+                                <p className="mt-1 text-2xl font-black text-slate-950">{completedTodos}/{assignment.todos.length}</p>
+                              </div>
+                              <Link to="/hbt/messages" className="rounded-full bg-slate-950 px-3 py-2 text-xs font-black text-white hover:bg-violet-700">Message</Link>
+                            </div>
                             <div className="mt-3 grid gap-2">
                               {assignment.todos.slice(0, 3).map((todo) => (
                                 <button
@@ -370,64 +459,92 @@ function HBTMemberDashboard() {
                     );
                   })}
 
-                  {activeLeads.length === 0 && (
-                    <div className="rounded-[1.5rem] bg-slate-50 p-8 text-center text-slate-500">No assigned clients yet.</div>
+                  {filteredLeads.length === 0 && (
+                    <div className="rounded-[1.5rem] bg-slate-50 p-8 text-center text-slate-500">No clients match this filter.</div>
                   )}
                 </div>
               </div>
 
-              <aside>
+              <aside className="space-y-5 xl:sticky xl:top-24 xl:self-start">
                 <div className="premium-card">
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <div>
-                      <p className="eyebrow">Schedule</p>
+                      <p className="eyebrow">Schedule queue</p>
                       <h2 className="mt-1 text-xl font-black text-slate-950">Upcoming appointments</h2>
+                      <p className="mt-1 text-xs font-bold text-slate-500">Compact list for busy advisor days.</p>
                     </div>
-                    <Link to="/hbt/appointments" className="text-sm font-black text-violet-700">Open →</Link>
+                    <Link to="/hbt/appointments" className="text-sm font-black text-violet-700">Manage →</Link>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="mb-3 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-2xl bg-amber-50 p-3"><p className="text-xl font-black text-amber-700">{pendingAppointments}</p><p className="text-[10px] font-black uppercase text-amber-700">Pending</p></div>
+                    <div className="rounded-2xl bg-blue-50 p-3"><p className="text-xl font-black text-blue-700">{nextAppointments.length}</p><p className="text-[10px] font-black uppercase text-blue-700">Upcoming</p></div>
+                    <div className="rounded-2xl bg-emerald-50 p-3"><p className="text-xl font-black text-emerald-700">{completedLeads}</p><p className="text-[10px] font-black uppercase text-emerald-700">Done</p></div>
+                  </div>
+
+                  <div className="max-h-[340px] space-y-3 overflow-y-auto pr-1">
                     {nextAppointments.map((appointment) => (
                       <Link key={appointment.id} to="/hbt/appointments" className="block rounded-2xl border border-slate-100 bg-slate-50 p-4 hover:bg-white hover:shadow-md">
                         <div className="flex items-start justify-between gap-3">
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-lg font-black text-slate-950">{formatTime(appointment.preferred_date)}</p>
-                            <p className="mt-1 text-sm font-bold text-slate-700">{appointment.topic}</p>
+                            <p className="mt-1 truncate text-sm font-bold text-slate-700">{appointment.topic}</p>
                           </div>
-                          <span className={`rounded-full px-3 py-1 text-xs font-black ${statusClass(appointment.status)}`}>{appointment.status}</span>
+                          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${statusClass(appointment.status)}`}>{appointment.status}</span>
                         </div>
-                        <p className="mt-2 text-xs font-semibold text-slate-500">{appointment.employee_name} · {appointment.employer_name || "Employer"}</p>
+                        <p className="mt-2 truncate text-xs font-semibold text-slate-500">{appointment.employee_name} · {appointment.employer_name || "Employer"}</p>
                         <p className="mt-1 text-xs font-bold text-slate-400">{formatDateTime(appointment.preferred_date)}</p>
                       </Link>
                     ))}
                     {nextAppointments.length === 0 && <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No upcoming appointments.</p>}
                   </div>
                 </div>
-              </aside>
-            </section>
 
-            <section className="premium-card">
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="eyebrow">Readiness signals</p>
-                  <h2 className="mt-1 text-2xl font-black text-slate-950">Recent quiz leads</h2>
-                  <p className="mt-1 text-sm text-slate-500">Use quiz activity to prioritize warm follow-ups.</p>
+                <div className="premium-card">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="eyebrow">Readiness queue</p>
+                      <h2 className="mt-1 text-xl font-black text-slate-950">Quiz follow-ups</h2>
+                      <p className="mt-1 text-xs font-bold text-slate-500">Review signals without scrolling the full dashboard.</p>
+                    </div>
+                    <Link to="/hbt/quiz-submissions" className="text-sm font-black text-violet-700">All →</Link>
+                  </div>
+
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {[
+                      ["all", "All"],
+                      ["new", "New"],
+                      ["pending", "Pending"],
+                      ["completed", "Done"],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        onClick={() => setSignalFilter(value as SignalFilter)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-black transition ${signalFilter === value ? "bg-violet-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-violet-50 hover:text-violet-700"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                    {filteredSubmissions.map((submission) => (
+                      <Link key={submission.id} to="/hbt/quiz-submissions" className="block rounded-2xl border border-slate-100 bg-slate-50 p-4 hover:bg-violet-50">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="truncate font-black text-slate-950">{submission.employee_name}</h3>
+                            <p className="truncate text-xs font-semibold text-slate-500">{submission.employee_email}</p>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${statusClass(submission.follow_up_status || "new")}`}>{submission.follow_up_status || "new"}</span>
+                        </div>
+                        <p className="mt-3 line-clamp-2 text-sm font-bold text-slate-700">{submission.quiz_title}</p>
+                        <p className="mt-2 text-xs text-slate-500">{submission.company_name} · {formatDateTime(submission.submitted_at)}</p>
+                      </Link>
+                    ))}
+                    {filteredSubmissions.length === 0 && <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No quiz leads for this filter.</p>}
+                  </div>
                 </div>
-                <Link to="/hbt/quiz-submissions" className="btn-secondary">View submissions</Link>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                {latestSubmissions.map((submission) => (
-                  <Link key={submission.id} to="/hbt/quiz-submissions" className="rounded-3xl border border-slate-100 bg-slate-50 p-4 hover:bg-violet-50">
-                    <span className={`rounded-full px-3 py-1 text-xs font-black ${statusClass(submission.follow_up_status || "new")}`}>{submission.follow_up_status || "new"}</span>
-                    <h3 className="mt-3 font-black text-slate-950">{submission.employee_name}</h3>
-                    <p className="text-xs font-semibold text-slate-500">{submission.employee_email}</p>
-                    <p className="mt-3 line-clamp-2 text-sm font-bold text-slate-700">{submission.quiz_title}</p>
-                    <p className="mt-2 text-xs text-slate-500">{submission.company_name} · {formatDateTime(submission.submitted_at)}</p>
-                  </Link>
-                ))}
-                {latestSubmissions.length === 0 && <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500 md:col-span-2 xl:col-span-5">No quiz leads yet.</p>}
-              </div>
+              </aside>
             </section>
           </>
         )}
