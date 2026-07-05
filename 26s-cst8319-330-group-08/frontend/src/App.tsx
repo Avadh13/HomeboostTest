@@ -64,6 +64,8 @@ import FloatingThemeControl from "./components/FloatingThemeControl";
 import ScrollToTop from "./components/ScrollToTop";
 import MortgageReadinessWidget from "./components/MortgageReadinessWidget";
 import HBTLeadPipelineWidget from "./components/HBTLeadPipelineWidget";
+import CompanyROIWidget from "./components/CompanyROIWidget";
+import RecommendedResourcesWidget from "./components/RecommendedResourcesWidget";
 
 const localNavbarExactPaths = new Set([
   "/",
@@ -164,7 +166,9 @@ function App() {
         <Route path="*" element={<NotFound />} />
       </Routes>
       <MortgageReadinessWidget />
+      <RecommendedResourcesWidget />
       <HBTLeadPipelineWidget />
+      <CompanyROIWidget />
       <MortgageServicesShell />
       <PartnershipMortgageServicesShell />
       <FloatingThemeControl />
