@@ -42,9 +42,18 @@ const leadProgressRoutes = require("./routes/leadProgressRoutes");
 
 const app = express();
 const uploadsDir = path.join(__dirname, "..", "uploads");
+const isProduction = process.env.NODE_ENV === "production";
 fs.mkdirSync(uploadsDir, { recursive: true });
 
 app.set("trust proxy", 1);
+app.disable("x-powered-by");
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+});
 app.use(cors(corsOptions));
 app.use(apiLimiter);
 app.use(express.json({ limit: "1mb" }));
@@ -62,33 +71,35 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-app.get("/api/test-db", async (req, res, next) => {
-  try {
-    const [rows] = await pool.query("SELECT 1 + 1 AS result");
+if (!isProduction || process.env.ENABLE_DIAGNOSTIC_ROUTES === "true") {
+  app.get("/api/test-db", async (req, res, next) => {
+    try {
+      const [rows] = await pool.query("SELECT 1 + 1 AS result");
 
-    res.json({
-      status: "success",
-      message: "Database connected successfully",
-      result: rows[0].result,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+      res.json({
+        status: "success",
+        message: "Database connected successfully",
+        result: rows[0].result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
 
-app.get("/api/test-tables", async (req, res, next) => {
-  try {
-    const [tables] = await pool.query("SHOW TABLES");
+  app.get("/api/test-tables", async (req, res, next) => {
+    try {
+      const [tables] = await pool.query("SHOW TABLES");
 
-    res.json({
-      status: "success",
-      message: "Tables loaded successfully",
-      tables,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+      res.json({
+        status: "success",
+        message: "Tables loaded successfully",
+        tables,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+}
 
 app.use("/api/auth", authRoutes);
 app.use("/api/resources", resourceRoutes);
