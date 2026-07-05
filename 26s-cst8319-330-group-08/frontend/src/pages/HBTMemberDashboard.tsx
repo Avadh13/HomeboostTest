@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 import ChatWidget from "../components/ChatWidget";
+import HBTTaskScheduler from "../components/HBTTaskScheduler";
 import { useToast } from "../components/ToastProvider";
 
 type Appointment = {
@@ -239,22 +240,20 @@ function HBTMemberDashboard() {
     ? Math.round(leadAssignments.reduce((sum, item) => sum + Number(item.progress_percent || 0), 0) / leadAssignments.length)
     : 0;
 
-  const sortedAppointments = useMemo(() => {
-    return [...appointments].sort((a, b) => {
-      const aDisplay = getAppointmentDisplay(a);
-      const bDisplay = getAppointmentDisplay(b);
-      const aTime = a.preferred_date ? new Date(a.preferred_date).getTime() : Number.MAX_SAFE_INTEGER;
-      const bTime = b.preferred_date ? new Date(b.preferred_date).getTime() : Number.MAX_SAFE_INTEGER;
-      return aDisplay.priority - bDisplay.priority || aTime - bTime;
-    });
+  const appointmentQueue = useMemo(() => {
+    return [...appointments]
+      .filter((item) => {
+        const status = String(item.status || "").toLowerCase();
+        return status !== "cancelled" && status !== "rejected";
+      })
+      .sort((a, b) => {
+        const aDisplay = getAppointmentDisplay(a);
+        const bDisplay = getAppointmentDisplay(b);
+        const aTime = a.preferred_date ? new Date(a.preferred_date).getTime() : Number.MAX_SAFE_INTEGER;
+        const bTime = b.preferred_date ? new Date(b.preferred_date).getTime() : Number.MAX_SAFE_INTEGER;
+        return aDisplay.priority - bDisplay.priority || aTime - bTime;
+      });
   }, [appointments]);
-
-  const appointmentQueue = sortedAppointments.filter((item) => {
-    const status = String(item.status || "").toLowerCase();
-    return status !== "cancelled" && status !== "rejected";
-  });
-
-  const nextAppointments = appointmentQueue.filter((item) => String(item.status || "").toLowerCase() !== "completed");
 
   const filteredLeads = useMemo(() => {
     const query = leadQuery.trim().toLowerCase();
@@ -378,7 +377,7 @@ function HBTMemberDashboard() {
               <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-200">Advisor workspace</p>
               <h1 className="mt-3 text-3xl font-black tracking-tight md:text-5xl">Good to see you, {user.full_name || "Advisor"}</h1>
               <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300 md:text-base">
-                Manage assigned clients, follow-up signals, and appointment queues from one focused workspace.
+                Manage assigned clients, scheduled tasks, follow-up signals, and appointment queues from one focused workspace.
               </p>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-4">
@@ -430,6 +429,8 @@ function HBTMemberDashboard() {
                 </div>
               ))}
             </section>
+
+            <HBTTaskScheduler />
 
             <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
               <div className="premium-card">
