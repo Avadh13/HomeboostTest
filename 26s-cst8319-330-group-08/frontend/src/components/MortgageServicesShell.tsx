@@ -10,18 +10,7 @@ function MortgageServicesShell() {
   const location = useLocation();
 
   if (location.pathname === "/employee-portal") {
-    return (
-      <>
-        <EmployeeMortgageRequestsPanel />
-        <MortgageServicesSection
-          compact
-          showHeroCopy={false}
-          ctaHref="/mortgage-request"
-          secondaryHref="/employee/appointments"
-          className="bg-slate-50"
-        />
-      </>
-    );
+    return <EmployeeMortgageRequestsPanel />;
   }
 
   if (location.pathname === "/hbt/member-dashboard" || location.pathname === "/hbt/dashboard") {
