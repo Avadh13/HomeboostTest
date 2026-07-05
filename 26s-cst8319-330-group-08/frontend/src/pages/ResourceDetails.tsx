@@ -34,6 +34,20 @@ function ResourceDetails() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+    if (!id || !token || user?.role !== "employee") return;
+
+    fetch(`${API_BASE_URL}/resource-recommendations/${id}/view`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {
+      // Background view recording should never block the resource page.
+    });
+  }, [id]);
+
   return (
     <main className="min-h-screen bg-gray-50">
       <Navbar />
