@@ -5,14 +5,13 @@ const envApiUrl =
   import.meta.env.VITE_API_URL ||
   "";
 
-const productionFallback = "https://tender-laughter-production-7cd3.up.railway.app/api";
-const localFallback = "http://localhost:5000/api";
+const localFallbackApiUrl = "http://localhost:5000/api";
+const rawApiUrl = envApiUrl || (import.meta.env.DEV ? localFallbackApiUrl : "");
 
-const fallbackApiUrl =
-  typeof window !== "undefined" && window.location.hostname.includes("vercel.app")
-    ? productionFallback
-    : localFallback;
+if (!rawApiUrl && import.meta.env.PROD) {
+  throw new Error("VITE_API_BASE_URL is required for production builds.");
+}
 
-const API_BASE_URL = trimTrailingSlash(envApiUrl || fallbackApiUrl);
+const API_BASE_URL = trimTrailingSlash(rawApiUrl);
 
 export default API_BASE_URL;
