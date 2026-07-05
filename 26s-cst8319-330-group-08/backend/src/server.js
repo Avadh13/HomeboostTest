@@ -40,6 +40,8 @@ const companyManagerRoutes = require("./routes/companyManagerRoutes");
 const companyMortgageRoutes = require("./routes/companyMortgageRoutes");
 const leadProgressRoutes = require("./routes/leadProgressRoutes");
 const hbtTaskRoutes = require("./routes/hbtTaskRoutes");
+const readinessRoutes = require("./routes/readinessRoutes");
+const leadPipelineRoutes = require("./routes/leadPipelineRoutes");
 
 const app = express();
 const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -134,6 +136,8 @@ app.use("/api/company-manager", companyManagerRoutes);
 app.use("/api/company-mortgage", companyMortgageRoutes);
 app.use("/api/lead-progress", leadProgressRoutes);
 app.use("/api/hbt-tasks", hbtTaskRoutes);
+app.use("/api/readiness", readinessRoutes);
+app.use("/api/lead-pipeline", leadPipelineRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
