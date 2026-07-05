@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 
@@ -55,7 +55,7 @@ function NotificationCenter({ embedded = false }: NotificationCenterProps) {
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
-  const loadNotifications = async (silent = false) => {
+  const loadNotifications = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/notifications`, { headers });
@@ -76,13 +76,13 @@ function NotificationCenter({ embedded = false }: NotificationCenterProps) {
     } finally {
       if (!silent) setLoading(false);
     }
-  };
+  }, [headers]);
 
   useEffect(() => {
     loadNotifications();
     const timer = window.setInterval(() => loadNotifications(true), 15_000);
     return () => window.clearInterval(timer);
-  }, [token]);
+  }, [loadNotifications]);
 
   const markRead = async (notification: Notification, shouldNavigate = false) => {
     try {
