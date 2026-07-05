@@ -66,6 +66,14 @@ type PriorityAction = {
 type LeadFilter = "open" | "attention" | "completed" | "all";
 type SignalFilter = "all" | "new" | "pending" | "completed";
 
+type AppointmentDisplay = {
+  label: string;
+  helper: string;
+  className: string;
+  priority: number;
+  isMissed: boolean;
+};
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return "Not scheduled";
   return new Date(value).toLocaleString(undefined, {
@@ -86,6 +94,60 @@ const statusClass = (status?: string) => {
   if (status === "pending" || status === "new") return "bg-amber-100 text-amber-700";
   if (status === "cancelled" || status === "not_interested" || status === "rejected") return "bg-red-100 text-red-700";
   return "bg-blue-100 text-blue-700";
+};
+
+const getAppointmentDisplay = (appointment: Appointment, now = Date.now()): AppointmentDisplay => {
+  const status = String(appointment.status || "pending").toLowerCase();
+  const appointmentTime = appointment.preferred_date ? new Date(appointment.preferred_date).getTime() : null;
+  const isPast = Boolean(appointmentTime && appointmentTime < now);
+
+  if (status === "completed") {
+    return {
+      label: "Done",
+      helper: "Meeting completed",
+      className: "bg-emerald-100 text-emerald-700",
+      priority: 4,
+      isMissed: false,
+    };
+  }
+
+  if (status === "cancelled" || status === "rejected") {
+    return {
+      label: status === "cancelled" ? "Cancelled" : "Rejected",
+      helper: "No action needed",
+      className: "bg-slate-200 text-slate-600",
+      priority: 5,
+      isMissed: false,
+    };
+  }
+
+  if (isPast) {
+    return {
+      label: "Missed",
+      helper: "Past meeting not marked complete",
+      className: "bg-red-100 text-red-700",
+      priority: 0,
+      isMissed: true,
+    };
+  }
+
+  if (status === "pending") {
+    return {
+      label: "Pending",
+      helper: "Needs review",
+      className: "bg-amber-100 text-amber-700",
+      priority: 1,
+      isMissed: false,
+    };
+  }
+
+  return {
+    label: "Upcoming",
+    helper: "Scheduled meeting",
+    className: "bg-blue-100 text-blue-700",
+    priority: 2,
+    isMissed: false,
+  };
 };
 
 const initials = (name?: string) =>
@@ -169,6 +231,8 @@ function HBTMemberDashboard() {
 
   const unreadMessages = messageThreads.reduce((sum, item) => sum + Number(item.unread_count || 0), 0);
   const pendingAppointments = appointments.filter((item) => item.status === "pending").length;
+  const missedAppointments = appointments.filter((item) => getAppointmentDisplay(item).isMissed).length;
+  const doneAppointments = appointments.filter((item) => String(item.status || "").toLowerCase() === "completed").length;
   const openLeads = leadAssignments.filter((item) => Number(item.progress_percent || 0) < 100).length;
   const completedLeads = leadAssignments.filter((item) => Number(item.progress_percent || 0) >= 100).length;
   const averageProgress = leadAssignments.length
@@ -177,15 +241,20 @@ function HBTMemberDashboard() {
 
   const sortedAppointments = useMemo(() => {
     return [...appointments].sort((a, b) => {
+      const aDisplay = getAppointmentDisplay(a);
+      const bDisplay = getAppointmentDisplay(b);
       const aTime = a.preferred_date ? new Date(a.preferred_date).getTime() : Number.MAX_SAFE_INTEGER;
       const bTime = b.preferred_date ? new Date(b.preferred_date).getTime() : Number.MAX_SAFE_INTEGER;
-      return aTime - bTime;
+      return aDisplay.priority - bDisplay.priority || aTime - bTime;
     });
   }, [appointments]);
 
-  const nextAppointments = sortedAppointments.filter(
-    (item) => item.status !== "completed" && item.status !== "cancelled" && item.status !== "rejected"
-  );
+  const appointmentQueue = sortedAppointments.filter((item) => {
+    const status = String(item.status || "").toLowerCase();
+    return status !== "cancelled" && status !== "rejected";
+  });
+
+  const nextAppointments = appointmentQueue.filter((item) => String(item.status || "").toLowerCase() !== "completed");
 
   const filteredLeads = useMemo(() => {
     const query = leadQuery.trim().toLowerCase();
@@ -216,6 +285,18 @@ function HBTMemberDashboard() {
   }, [signalFilter, submissions]);
 
   const priorityAction: PriorityAction = useMemo(() => {
+    const missedAppointment = appointments.find((appointment) => getAppointmentDisplay(appointment).isMissed);
+    if (missedAppointment) {
+      return {
+        label: "Missed meeting",
+        title: missedAppointment.employee_name,
+        body: `${missedAppointment.topic} passed and still needs to be marked complete, rescheduled, or cancelled.`,
+        href: "/hbt/appointments",
+        cta: "Update meeting",
+        tone: "from-red-600 to-rose-700",
+      };
+    }
+
     const unreadThread = messageThreads.find((thread) => Number(thread.unread_count || 0) > 0);
     if (unreadThread) {
       return {
@@ -303,7 +384,7 @@ function HBTMemberDashboard() {
               <div className="mt-6 grid gap-3 sm:grid-cols-4">
                 {[
                   ["Open leads", openLeads],
-                  ["Pending appts", pendingAppointments],
+                  ["Missed meetings", missedAppointments],
                   ["Unread messages", unreadMessages],
                   ["Avg progress", `${averageProgress}%`],
                 ].map(([label, value]) => (
@@ -338,8 +419,8 @@ function HBTMemberDashboard() {
             <section className="grid gap-4 md:grid-cols-4">
               {[
                 ["Assigned clients", leadAssignments.length, "Search and task-manage", "text-violet-700"],
-                ["Completed", completedLeads, "Clients fully moved through", "text-emerald-700"],
-                ["Appointments", nextAppointments.length, "Upcoming and pending", "text-blue-700"],
+                ["Completed leads", completedLeads, "Clients fully moved through", "text-emerald-700"],
+                ["Done meetings", doneAppointments, "Marked completed", "text-emerald-700"],
                 ["Quiz signals", filteredSubmissions.length, "Filtered readiness leads", "text-amber-700"],
               ].map(([label, value, helper, color]) => (
                 <div key={String(label)} className="metric-card">
@@ -469,34 +550,39 @@ function HBTMemberDashboard() {
                 <div className="premium-card">
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <div>
-                      <p className="eyebrow">Schedule queue</p>
-                      <h2 className="mt-1 text-xl font-black text-slate-950">Upcoming appointments</h2>
-                      <p className="mt-1 text-xs font-bold text-slate-500">Compact list for busy advisor days.</p>
+                      <p className="eyebrow">Meeting status queue</p>
+                      <h2 className="mt-1 text-xl font-black text-slate-950">Missed, upcoming, done</h2>
+                      <p className="mt-1 text-xs font-bold text-slate-500">Past uncompleted meetings show as missed. Completed meetings show as done.</p>
                     </div>
                     <Link to="/hbt/appointments" className="text-sm font-black text-violet-700">Manage →</Link>
                   </div>
 
                   <div className="mb-3 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-2xl bg-red-50 p-3"><p className="text-xl font-black text-red-700">{missedAppointments}</p><p className="text-[10px] font-black uppercase text-red-700">Missed</p></div>
                     <div className="rounded-2xl bg-amber-50 p-3"><p className="text-xl font-black text-amber-700">{pendingAppointments}</p><p className="text-[10px] font-black uppercase text-amber-700">Pending</p></div>
-                    <div className="rounded-2xl bg-blue-50 p-3"><p className="text-xl font-black text-blue-700">{nextAppointments.length}</p><p className="text-[10px] font-black uppercase text-blue-700">Upcoming</p></div>
-                    <div className="rounded-2xl bg-emerald-50 p-3"><p className="text-xl font-black text-emerald-700">{completedLeads}</p><p className="text-[10px] font-black uppercase text-emerald-700">Done</p></div>
+                    <div className="rounded-2xl bg-emerald-50 p-3"><p className="text-xl font-black text-emerald-700">{doneAppointments}</p><p className="text-[10px] font-black uppercase text-emerald-700">Done</p></div>
                   </div>
 
-                  <div className="max-h-[340px] space-y-3 overflow-y-auto pr-1">
-                    {nextAppointments.map((appointment) => (
-                      <Link key={appointment.id} to="/hbt/appointments" className="block rounded-2xl border border-slate-100 bg-slate-50 p-4 hover:bg-white hover:shadow-md">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-lg font-black text-slate-950">{formatTime(appointment.preferred_date)}</p>
-                            <p className="mt-1 truncate text-sm font-bold text-slate-700">{appointment.topic}</p>
+                  <div className="max-h-[380px] space-y-3 overflow-y-auto pr-1">
+                    {appointmentQueue.map((appointment) => {
+                      const display = getAppointmentDisplay(appointment);
+
+                      return (
+                        <Link key={appointment.id} to="/hbt/appointments" className={`block rounded-2xl border p-4 hover:bg-white hover:shadow-md ${display.isMissed ? "border-red-200 bg-red-50/70" : "border-slate-100 bg-slate-50"}`}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-lg font-black text-slate-950">{formatTime(appointment.preferred_date)}</p>
+                              <p className="mt-1 truncate text-sm font-bold text-slate-700">{appointment.topic}</p>
+                            </div>
+                            <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${display.className}`}>{display.label}</span>
                           </div>
-                          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${statusClass(appointment.status)}`}>{appointment.status}</span>
-                        </div>
-                        <p className="mt-2 truncate text-xs font-semibold text-slate-500">{appointment.employee_name} · {appointment.employer_name || "Employer"}</p>
-                        <p className="mt-1 text-xs font-bold text-slate-400">{formatDateTime(appointment.preferred_date)}</p>
-                      </Link>
-                    ))}
-                    {nextAppointments.length === 0 && <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No upcoming appointments.</p>}
+                          <p className="mt-2 truncate text-xs font-semibold text-slate-500">{appointment.employee_name} · {appointment.employer_name || "Employer"}</p>
+                          <p className="mt-1 text-xs font-bold text-slate-400">{formatDateTime(appointment.preferred_date)}</p>
+                          <p className={`mt-2 text-xs font-black ${display.isMissed ? "text-red-700" : "text-slate-500"}`}>{display.helper}</p>
+                        </Link>
+                      );
+                    })}
+                    {appointmentQueue.length === 0 && <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No appointment records yet.</p>}
                   </div>
                 </div>
 
