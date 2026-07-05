@@ -62,6 +62,21 @@ const toDateInput = (value?: string | null) => {
   return Number.isNaN(date.getTime()) ? today : date.toISOString().split("T")[0];
 };
 
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "Not specified";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not specified";
+  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+};
+
+const initials = (name?: string) =>
+  (name || "Employee")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("") || "E";
+
 const getPreferredTimeStyle = (appointment: Appointment) => {
   if (!appointment.preferred_date) {
     return { className: "bg-slate-100 text-slate-600 border-slate-200", label: "No time selected" };
@@ -89,6 +104,7 @@ function HBTAppointments() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("newest");
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [rescheduleTarget, setRescheduleTarget] = useState<Appointment | null>(null);
   const [rescheduleAdvisorId, setRescheduleAdvisorId] = useState("");
   const [rescheduleDate, setRescheduleDate] = useState(today);
@@ -170,7 +186,8 @@ function HBTAppointments() {
         return;
       }
 
-      toast.success("Appointment updated. Employee can now see the advisor note and meeting link.");
+      toast.success(status === appointment.status ? "Advisor note/link saved." : `Appointment marked ${status}.`);
+      setSelectedAppointment(null);
       await loadAppointments();
     } catch (error) {
       console.error("Appointment update failed:", error);
@@ -182,6 +199,7 @@ function HBTAppointments() {
 
   const openReschedule = (appointment: Appointment) => {
     const matchedAdvisor = teamMembers.find((member) => member.full_name === appointment.team_member_name);
+    setSelectedAppointment(null);
     setRescheduleTarget(appointment);
     setRescheduleAdvisorId(matchedAdvisor ? String(matchedAdvisor.id) : teamMembers[0] ? String(teamMembers[0].id) : "");
     setRescheduleDate(toDateInput(appointment.preferred_date));
@@ -288,6 +306,7 @@ function HBTAppointments() {
       }
 
       toast.success("Appointment cancelled and employee notified.");
+      setSelectedAppointment(null);
       await loadAppointments();
     } catch (error) {
       console.error("Cancel failed:", error);
@@ -316,18 +335,7 @@ function HBTAppointments() {
       })
       .filter((appointment) => {
         if (!normalizedSearch) return true;
-        const searchable = [
-          appointment.topic,
-          appointment.employee_name,
-          appointment.employee_email,
-          appointment.employer_name,
-          appointment.partnership_slug,
-          appointment.team_member_name,
-          appointment.message,
-          appointment.advisor_note,
-          appointment.meeting_link,
-          appointment.status,
-        ].filter(Boolean).join(" ").toLowerCase();
+        const searchable = [appointment.topic, appointment.employee_name, appointment.employee_email, appointment.employer_name, appointment.partnership_slug, appointment.team_member_name, appointment.message, appointment.advisor_note, appointment.meeting_link, appointment.status].filter(Boolean).join(" ").toLowerCase();
         return searchable.includes(normalizedSearch);
       })
       .sort((a, b) => {
@@ -344,13 +352,15 @@ function HBTAppointments() {
     setSortBy("newest");
   };
 
+  const activeSelectedAppointment = selectedAppointment ? appointments.find((appointment) => appointment.id === selectedAppointment.id) || selectedAppointment : null;
+
   return (
     <main className="theme-page min-h-screen px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto max-w-7xl space-y-5">
         <header className="theme-panel">
           <Link to="/hbt/dashboard" className="text-sm font-black text-violet-200 hover:text-white">← Back to HBT dashboard</Link>
           <h1 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">Appointment Requests</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-violet-100 md:text-base">Review, reschedule, cancel, and update employee appointments from one advisor queue.</p>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-violet-100 md:text-base">Compact advisor queue. Open any card for notes, meeting link, reschedule, cancel, approve, reject, or complete actions.</p>
         </header>
 
         <section className="grid gap-4 md:grid-cols-5">
@@ -361,7 +371,7 @@ function HBTAppointments() {
             ["Completed", stats.completed, "completed"],
             ["Rejected", stats.rejected, "rejected"],
           ].map(([label, value, filter]) => (
-            <button key={label} onClick={() => setStatusFilter(filter as StatusFilter)} className={`premium-card text-left ${statusFilter === filter ? "ring-4 ring-violet-100" : ""}`}>
+            <button key={String(label)} onClick={() => setStatusFilter(filter as StatusFilter)} className={`premium-card text-left ${statusFilter === filter ? "ring-4 ring-violet-100" : ""}`}>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
               <h2 className="mt-2 text-3xl font-black text-slate-950">{value}</h2>
             </button>
@@ -407,67 +417,39 @@ function HBTAppointments() {
             ) : filteredAppointments.length === 0 ? (
               <div className="rounded-2xl bg-slate-50 p-8 text-center text-slate-600">No appointments match the selected filters.</div>
             ) : (
-              <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {filteredAppointments.map((appointment) => {
-                  const draft = drafts[appointment.id] || { advisor_note: "", meeting_link: "" };
                   const preferredTimeStyle = getPreferredTimeStyle(appointment);
-                  const isClosed = appointment.status === "completed" || appointment.status === "rejected";
+                  const hasAdvisorResponse = Boolean(appointment.meeting_link || appointment.advisor_note);
 
                   return (
-                    <article key={appointment.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-4 md:p-5">
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div>
-                          <h3 className="text-xl font-black text-slate-950 md:text-2xl">{appointment.topic}</h3>
-                          <p className="mt-1 text-sm font-semibold text-slate-500">{appointment.employee_name} · {appointment.employee_email}</p>
-                          <p className="mt-1 text-sm text-slate-500">{appointment.employer_name || "Employer"} / {appointment.partnership_slug || "partnership"}</p>
+                    <article key={appointment.id} className="rounded-[1.5rem] border border-slate-100 bg-slate-50 p-4 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-lg">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-sm font-black text-violet-700 shadow-sm">{initials(appointment.employee_name)}</div>
+                          <div className="min-w-0">
+                            <h3 className="line-clamp-2 text-lg font-black text-slate-950">{appointment.topic}</h3>
+                            <p className="mt-1 truncate text-sm font-semibold text-slate-500">{appointment.employee_name}</p>
+                            <p className="truncate text-xs font-semibold text-slate-400">{appointment.employee_email}</p>
+                          </div>
                         </div>
-                        <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${statusClasses[appointment.status] || statusClasses.pending}`}>{appointment.status}</span>
+                        <span className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-black uppercase ${statusClasses[appointment.status] || statusClasses.pending}`}>{appointment.status}</span>
                       </div>
 
-                      <div className="mt-4 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
-                        <p className="rounded-2xl bg-white px-4 py-3"><strong>Requested expert:</strong> {appointment.team_member_name || "Any available team member"}</p>
-                        <div className={`rounded-2xl border px-4 py-3 font-bold ${preferredTimeStyle.className}`}>
-                          <p>Preferred time: {appointment.preferred_date ? new Date(appointment.preferred_date).toLocaleString() : "Not specified"}</p>
-                          <p className="mt-1 text-xs uppercase tracking-[0.16em]">{preferredTimeStyle.label}</p>
+                      <div className="mt-4 grid gap-2 text-sm">
+                        <div className={`rounded-2xl border px-3 py-2 font-bold ${preferredTimeStyle.className}`}>
+                          <p className="truncate">{formatDateTime(appointment.preferred_date)}</p>
+                          <p className="mt-1 text-[10px] uppercase tracking-[0.16em]">{preferredTimeStyle.label}</p>
                         </div>
-                      </div>
-
-                      {appointment.message && <p className="mt-4 rounded-2xl bg-white p-4 text-sm leading-relaxed text-slate-600">{appointment.message}</p>}
-
-                      <div className="mt-5 rounded-3xl border border-violet-100 bg-white p-4 md:p-5">
-                        <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">Advisor response</p>
-                        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                          <label className="block">
-                            <span className="mb-2 block text-sm font-bold text-slate-700">Google Meet / Zoom link</span>
-                            <input className="form-field" placeholder="https://meet.google.com/... or https://zoom.us/..." value={draft.meeting_link} onChange={(e) => updateDraft(appointment.id, "meeting_link", e.target.value)} />
-                          </label>
-                          <label className="block">
-                            <span className="mb-2 block text-sm font-bold text-slate-700">Message to employee</span>
-                            <textarea className="form-field min-h-24" placeholder="Example: Hi, here is the meeting link for our call." value={draft.advisor_note} onChange={(e) => updateDraft(appointment.id, "advisor_note", e.target.value)} />
-                          </label>
+                        <div className="rounded-2xl bg-white px-3 py-2 text-slate-600">
+                          <p className="truncate"><strong>Advisor:</strong> {appointment.team_member_name || "Any available team member"}</p>
+                          <p className="truncate text-xs font-semibold text-slate-400">{appointment.employer_name || "Employer"} / {appointment.partnership_slug || "partnership"}</p>
                         </div>
                       </div>
 
-                      <div className="mt-5 flex flex-wrap gap-2">
-                        <button disabled={updatingId === appointment.id} onClick={() => updateAppointment(appointment, appointment.status)} className="btn-primary disabled:cursor-not-allowed disabled:opacity-40">
-                          {updatingId === appointment.id ? "Saving..." : "Save Note/Link"}
-                        </button>
-                        <button disabled={updatingId === appointment.id || isClosed} onClick={() => openReschedule(appointment)} className="rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-black text-white shadow-md disabled:cursor-not-allowed disabled:opacity-40">
-                          Reschedule
-                        </button>
-                        <button disabled={updatingId === appointment.id || isClosed} onClick={() => cancelAppointment(appointment)} className="btn-danger disabled:cursor-not-allowed disabled:opacity-40">
-                          Cancel
-                        </button>
-                        {[
-                          ["approved", "Approve"],
-                          ["rejected", "Reject"],
-                          ["completed", "Complete"],
-                          ["pending", "Reset Pending"],
-                        ].map(([status, label]) => (
-                          <button key={status} disabled={updatingId === appointment.id || appointment.status === status} onClick={() => updateAppointment(appointment, status)} className="btn-dark disabled:cursor-not-allowed disabled:opacity-40">
-                            {updatingId === appointment.id ? "Updating..." : label}
-                          </button>
-                        ))}
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                        <span className={`rounded-full px-3 py-1 text-xs font-black ${hasAdvisorResponse ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>{hasAdvisorResponse ? "Response added" : "No response yet"}</span>
+                        <button onClick={() => setSelectedAppointment(appointment)} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-violet-700">Open details</button>
                       </div>
                     </article>
                   );
@@ -477,6 +459,69 @@ function HBTAppointments() {
           </div>
         </section>
       </div>
+
+      {activeSelectedAppointment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6 backdrop-blur-sm">
+          <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[2rem] bg-white p-5 shadow-2xl md:p-7">
+            {(() => {
+              const appointment = activeSelectedAppointment;
+              const draft = drafts[appointment.id] || { advisor_note: "", meeting_link: "" };
+              const preferredTimeStyle = getPreferredTimeStyle(appointment);
+              const isClosed = appointment.status === "completed" || appointment.status === "rejected";
+
+              return (
+                <>
+                  <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-5">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">Appointment details</p>
+                      <h2 className="mt-2 text-2xl font-black text-slate-950 md:text-3xl">{appointment.topic}</h2>
+                      <p className="mt-2 text-sm font-semibold text-slate-500">{appointment.employee_name} · {appointment.employee_email}</p>
+                      <p className="mt-1 text-sm text-slate-500">{appointment.employer_name || "Employer"} / {appointment.partnership_slug || "partnership"}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.16em] ${statusClasses[appointment.status] || statusClasses.pending}`}>{appointment.status}</span>
+                      <button onClick={() => setSelectedAppointment(null)} className="rounded-full bg-slate-100 px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-200">Close</button>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-4 text-sm text-slate-700 md:grid-cols-2">
+                    <p className="rounded-2xl bg-slate-50 px-4 py-3"><strong>Requested expert:</strong> {appointment.team_member_name || "Any available team member"}</p>
+                    <div className={`rounded-2xl border px-4 py-3 font-bold ${preferredTimeStyle.className}`}>
+                      <p>Preferred time: {formatDateTime(appointment.preferred_date)}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.16em]">{preferredTimeStyle.label}</p>
+                    </div>
+                  </div>
+
+                  {appointment.message && <p className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">{appointment.message}</p>}
+
+                  <div className="mt-5 rounded-3xl border border-violet-100 bg-white p-4 md:p-5">
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">Advisor response</p>
+                    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-bold text-slate-700">Google Meet / Zoom link</span>
+                        <input className="form-field" placeholder="https://meet.google.com/... or https://zoom.us/..." value={draft.meeting_link} onChange={(e) => updateDraft(appointment.id, "meeting_link", e.target.value)} />
+                      </label>
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-bold text-slate-700">Message to employee</span>
+                        <textarea className="form-field min-h-28" placeholder="Example: Hi, here is the meeting link for our call." value={draft.advisor_note} onChange={(e) => updateDraft(appointment.id, "advisor_note", e.target.value)} />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <button disabled={updatingId === appointment.id} onClick={() => updateAppointment(appointment, appointment.status)} className="btn-primary disabled:cursor-not-allowed disabled:opacity-40">{updatingId === appointment.id ? "Saving..." : "Save Note/Link"}</button>
+                    <button disabled={updatingId === appointment.id || isClosed} onClick={() => openReschedule(appointment)} className="rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-black text-white shadow-md disabled:cursor-not-allowed disabled:opacity-40">Reschedule</button>
+                    <button disabled={updatingId === appointment.id || isClosed} onClick={() => cancelAppointment(appointment)} className="btn-danger disabled:cursor-not-allowed disabled:opacity-40">Cancel</button>
+                    {[["approved", "Approve"], ["rejected", "Reject"], ["completed", "Complete"], ["pending", "Reset Pending"]].map(([status, label]) => (
+                      <button key={status} disabled={updatingId === appointment.id || appointment.status === status} onClick={() => updateAppointment(appointment, status)} className="btn-dark disabled:cursor-not-allowed disabled:opacity-40">{updatingId === appointment.id ? "Updating..." : label}</button>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {rescheduleTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
@@ -515,9 +560,7 @@ function HBTAppointments() {
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2">
                     {availableTimes.map((time) => (
-                      <button key={time.value} type="button" onClick={() => setReschedulePreferredDate(time.value)} className={`rounded-2xl border px-4 py-3 text-left font-bold transition ${reschedulePreferredDate === time.value ? "border-blue-500 bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300 hover:bg-blue-50"}`}>
-                        {time.label}
-                      </button>
+                      <button key={time.value} type="button" onClick={() => setReschedulePreferredDate(time.value)} className={`rounded-2xl border px-4 py-3 text-left font-bold transition ${reschedulePreferredDate === time.value ? "border-blue-500 bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300 hover:bg-blue-50"}`}>{time.label}</button>
                     ))}
                   </div>
                 )}
@@ -529,9 +572,7 @@ function HBTAppointments() {
               </label>
             </div>
 
-            <button disabled={updatingId === rescheduleTarget.id || loadingTimes} onClick={submitReschedule} className="btn-primary mt-6 w-full disabled:opacity-50">
-              {updatingId === rescheduleTarget.id ? "Rescheduling..." : "Confirm Reschedule"}
-            </button>
+            <button disabled={updatingId === rescheduleTarget.id || loadingTimes} onClick={submitReschedule} className="btn-primary mt-6 w-full disabled:opacity-50">{updatingId === rescheduleTarget.id ? "Rescheduling..." : "Confirm Reschedule"}</button>
           </div>
         </div>
       )}
