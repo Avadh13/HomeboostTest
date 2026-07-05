@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 import Navbar from "../components/Navbar";
 import { useToast } from "../components/ToastProvider";
@@ -227,8 +226,7 @@ function EmployeeAppointments() {
       <main className="theme-page min-h-screen px-4 py-6 md:px-6 md:py-8">
         <div className="mx-auto max-w-7xl space-y-5">
           <header className="theme-panel">
-            <Link to="/employee-portal" className="text-sm font-black text-violet-200 hover:text-white">← Back to portal</Link>
-            <h1 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">Appointment Requests</h1>
+            <h1 className="text-3xl font-black tracking-tight md:text-4xl">Appointment Requests</h1>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-violet-100 md:text-base">Select an advisor, review their work time, and pick an available 1-hour meeting slot.</p>
           </header>
 
