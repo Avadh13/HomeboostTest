@@ -1,0 +1,300 @@
+/* Final UI polish: spacing, mobile behavior, theme consistency, and dashboard readability. */
+
+html {
+  overflow-x: hidden;
+}
+
+body {
+  min-width: 320px;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.theme-page,
+.page-shell {
+  isolation: isolate;
+}
+
+.theme-page > .mx-auto,
+.page-shell > .mx-auto,
+.section-container {
+  width: 100%;
+}
+
+.theme-panel,
+.hero-panel,
+.premium-card,
+.metric-card,
+.glass-card,
+.premium-surface,
+.empty-state,
+.loading-state,
+.table-shell {
+  overflow-wrap: anywhere;
+}
+
+.theme-panel h1,
+.hero-panel h1 {
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+.theme-panel p,
+.hero-panel p,
+.premium-card p,
+.metric-card p {
+  text-wrap: pretty;
+}
+
+.premium-card,
+.metric-card,
+.glass-card,
+.premium-surface {
+  will-change: transform;
+}
+
+button,
+a,
+.btn-primary,
+.btn-secondary,
+.btn-dark,
+.btn-danger,
+.form-field {
+  touch-action: manipulation;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-dark,
+.btn-danger {
+  white-space: nowrap;
+}
+
+.form-field {
+  min-height: 44px;
+}
+
+textarea.form-field {
+  line-height: 1.55;
+}
+
+.table-shell table {
+  min-width: 720px;
+}
+
+/* Keep dashboard actions readable when there are many buttons. */
+.theme-page .flex.flex-wrap.gap-2,
+.theme-page .flex.flex-wrap.gap-3,
+.theme-page .flex.flex-wrap.gap-4 {
+  align-items: center;
+}
+
+/* Modal polish used by appointments, messages, profile, and admin overlays. */
+.fixed.inset-0.z-50 {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.fixed.inset-0.z-50 > div {
+  overscroll-behavior: contain;
+}
+
+/* Mobile layout tightening. */
+@media (max-width: 768px) {
+  .theme-page,
+  .page-shell {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    padding-top: 1rem !important;
+    padding-bottom: 1.25rem !important;
+  }
+
+  .theme-page > .mx-auto,
+  .page-shell > .mx-auto {
+    gap: 1rem !important;
+  }
+
+  .theme-panel,
+  .hero-panel {
+    border-radius: 1.35rem !important;
+    padding: 1.15rem !important;
+  }
+
+  .premium-card,
+  .metric-card,
+  .glass-card,
+  .premium-surface,
+  .empty-state,
+  .loading-state {
+    border-radius: 1.2rem !important;
+    padding: 1rem !important;
+  }
+
+  .theme-panel h1,
+  .hero-panel h1 {
+    font-size: clamp(2rem, 9vw, 3rem) !important;
+    letter-spacing: -0.055em;
+  }
+
+  .theme-panel p,
+  .hero-panel p {
+    font-size: 0.92rem !important;
+  }
+
+  .metric-card h2,
+  .metric-card .text-3xl {
+    font-size: 1.65rem !important;
+  }
+
+  .form-field,
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-dark,
+  .btn-danger,
+  .theme-page a[class*="rounded-full"],
+  .theme-page button[class*="rounded-full"] {
+    min-height: 44px;
+  }
+
+  .theme-page .grid,
+  .page-shell .grid {
+    min-width: 0;
+  }
+
+  .theme-page aside,
+  .theme-page article,
+  .theme-page section,
+  .premium-card,
+  .metric-card {
+    min-width: 0;
+  }
+
+  .fixed.inset-0.z-50 > div {
+    max-height: calc(100vh - 2rem) !important;
+    border-radius: 1.35rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .theme-page,
+  .page-shell {
+    padding-left: 0.85rem !important;
+    padding-right: 0.85rem !important;
+  }
+
+  .theme-panel,
+  .hero-panel,
+  .premium-card,
+  .metric-card {
+    border-radius: 1rem !important;
+  }
+
+  .theme-panel h1,
+  .hero-panel h1 {
+    font-size: clamp(1.85rem, 10vw, 2.4rem) !important;
+  }
+
+  .eyebrow,
+  .uppercase {
+    letter-spacing: 0.1em !important;
+  }
+}
+
+/* Disable hover lift on touch devices to avoid jumpy mobile cards. */
+@media (hover: none) {
+  .premium-card:hover,
+  .metric-card:hover,
+  .glass-card:hover,
+  .premium-surface:hover,
+  .theme-page article:hover,
+  .theme-page a:hover,
+  .theme-page button:hover {
+    transform: none !important;
+  }
+}
+
+/* Dark theme consistency for utility-heavy cards. */
+html[data-theme="dark"] .theme-panel,
+html[data-theme="dark"] .hero-panel {
+  box-shadow: 0 24px 80px rgba(2, 6, 23, 0.6) !important;
+}
+
+html[data-theme="dark"] .bg-slate-950,
+html[data-theme="dark"] .bg-slate-900 {
+  background-color: #020617 !important;
+}
+
+html[data-theme="dark"] .bg-slate-200,
+html[data-theme="dark"] .bg-slate-300 {
+  background-color: rgba(71, 85, 105, 0.9) !important;
+}
+
+html[data-theme="dark"] .text-white,
+html[data-theme="dark"] .text-white\/80,
+html[data-theme="dark"] .text-white\/85,
+html[data-theme="dark"] .text-white\/90 {
+  color: #f8fafc !important;
+}
+
+html[data-theme="dark"] .shadow-violet-200\/50,
+html[data-theme="dark"] .shadow-slate-200\/70,
+html[data-theme="dark"] .shadow-violet-950\/10,
+html[data-theme="dark"] .shadow-violet-950\/20 {
+  --tw-shadow-color: rgba(2, 6, 23, 0.45) !important;
+}
+
+html[data-theme="dark"] select option {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .fixed.inset-0.z-50 > div.bg-white,
+html[data-theme="dark"] .fixed.inset-0.z-50 > div[class*="bg-white"] {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+html[data-theme="dark"] .bg-emerald-50,
+html[data-theme="dark"] .bg-green-50 {
+  background-color: rgba(6, 78, 59, 0.35) !important;
+}
+
+html[data-theme="dark"] .bg-amber-50,
+html[data-theme="dark"] .bg-yellow-50 {
+  background-color: rgba(120, 53, 15, 0.35) !important;
+}
+
+html[data-theme="dark"] .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.35) !important;
+}
+
+html[data-theme="dark"] .bg-violet-100,
+html[data-theme="dark"] .bg-indigo-100,
+html[data-theme="dark"] .bg-blue-100 {
+  background-color: rgba(49, 46, 129, 0.45) !important;
+}
+
+/* Print/demo screenshot polish. */
+@media print {
+  .fixed,
+  .floating-orb,
+  .safe-bottom {
+    display: none !important;
+  }
+
+  .theme-page,
+  .page-shell {
+    background: #ffffff !important;
+  }
+}
