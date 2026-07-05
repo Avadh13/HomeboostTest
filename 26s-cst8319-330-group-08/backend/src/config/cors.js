@@ -3,35 +3,34 @@ const normalizeOrigin = (origin) => {
   return origin.trim().replace(/\/+$/, "");
 };
 
-const getAllowedOrigins = () => {
-  const envOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "")
+const parseOrigins = (value) =>
+  String(value || "")
     .split(",")
     .map(normalizeOrigin)
     .filter(Boolean);
 
-  const defaultOrigins = process.env.NODE_ENV === "production"
-    ? [
-        "https://homeboosttest.vercel.app",
-        "https://homeboost-test.vercel.app",
-        "https://homeboosttest-git-main-avadh2708s-projects.vercel.app",
-      ]
-    : [
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://localhost:8080",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:5175",
-        "http://127.0.0.1:8080",
+const getAllowedOrigins = () => {
+  const envOrigins = parseOrigins(process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "");
 
+  const localOrigins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://localhost:8080",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175",
+    "http://127.0.0.1:8080",
+  ];
 
-      ];
+  const defaults = process.env.NODE_ENV === "production" ? [] : localOrigins;
 
-  return [...new Set([...defaultOrigins, ...envOrigins])];
+  return [...new Set([...defaults, ...envOrigins])];
 };
 
 const isAllowedVercelPreview = (origin) => {
+  if (process.env.ALLOW_VERCEL_PREVIEWS !== "true") return false;
+
   const allowedPreviewPrefixes = [
     "https://homeboost-test-",
     "https://homeboosttest-",
@@ -49,7 +48,7 @@ const isAllowedVercelPreview = (origin) => {
 };
 
 const isAllowedCodespacesOrigin = (origin) => {
-  return /^https:\/\/[a-z0-9-]+-\d+\.app\.github\.dev$/i.test(origin);
+  return process.env.ALLOW_CODESPACES_ORIGINS === "true" && /^https:\/\/[a-z0-9-]+-\d+\.app\.github\.dev$/i.test(origin);
 };
 
 const corsOptions = {
