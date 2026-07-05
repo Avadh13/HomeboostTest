@@ -4,6 +4,7 @@ const router = express.Router();
 const protect = require("../middleware/authMiddleware");
 const pool = require("../config/db");
 const messageController = require("../controllers/messageController");
+const { createNotification } = require("../utils/notificationService");
 
 const isAdmin = (user) => user.role === "admin" || user.role === "super_admin";
 const isHbtUser = (user) => user.role === "hbt_admin" || user.role === "hbt_member";
@@ -176,6 +177,130 @@ const baseContactSelect = `
   LEFT JOIN employers e ON p.employer_id = e.id
 `;
 
+const getMessageLinkForRole = (role) => {
+  if (role === "employee") return "/employee/messages";
+  if (role === "company_admin" || role === "company") return "/company/messages";
+  if (role === "hbt_admin" || role === "hbt_member") return "/hbt/messages";
+  if (role === "admin" || role === "super_admin") return "/admin/messages";
+  return "/notifications";
+};
+
+const notifyMessageRecipient = async ({ sender, recipient, threadId, messageBody }) => {
+  if (!recipient?.id || Number(recipient.id) === Number(sender.id)) return;
+
+  const preview = String(messageBody || "").trim().slice(0, 140);
+
+  await createNotification({
+    user_id: recipient.id,
+    title: `New message from ${sender.full_name || "HomeBoost user"}`,
+    message: preview || "You have a new message.",
+    link: getMessageLinkForRole(recipient.role),
+    type: "message",
+  });
+};
+
+const getRecipient = async (recipientId) => {
+  const [[recipient]] = await pool.query(
+    `SELECT id, full_name, email, role, team_id, partnership_id FROM users WHERE id = ? AND is_active = 1 LIMIT 1`,
+    [recipientId]
+  );
+  return recipient || null;
+};
+
+const getThreadOtherUser = async (thread, user) => {
+  const otherUserId = Number(thread.created_by) === Number(user.id) ? thread.recipient_id : thread.created_by;
+  if (!otherUserId) return null;
+  return getRecipient(otherUserId);
+};
+
+const canMessageRecipient = async (sender, recipient) => {
+  if (!recipient || Number(sender.id) === Number(recipient.id)) return { allowed: false, message: "Invalid recipient" };
+  if (isAdmin(sender) || isAdmin(recipient)) return { allowed: true };
+
+  if (sender.role === "employee") {
+    const partnership = await getCompanyPartnership(sender.partnership_id);
+    if (!partnership) return { allowed: false, message: "Employee is not linked to a partnership" };
+    if (isHbtUser(recipient) && Number(recipient.team_id) === Number(partnership.team_id)) return { allowed: true };
+    if (isCompanyManager(recipient) && Number(recipient.partnership_id) === Number(sender.partnership_id)) return { allowed: true };
+    return { allowed: false, message: "Recipient is not connected to your employer partnership" };
+  }
+
+  if (isCompanyManager(sender)) {
+    const partnership = await getCompanyPartnership(sender.partnership_id);
+    if (!partnership) return { allowed: false, message: "Company account is not linked to a partnership" };
+    if (recipient.role === "employee" && Number(recipient.partnership_id) === Number(sender.partnership_id)) return { allowed: true };
+    if (isHbtUser(recipient) && Number(recipient.team_id) === Number(partnership.team_id)) return { allowed: true };
+    return { allowed: false, message: "Recipient is not connected to your company partnership" };
+  }
+
+  if (isHbtUser(sender)) {
+    if (isHbtUser(recipient) && Number(recipient.team_id) === Number(sender.team_id)) return { allowed: true };
+    if (recipient.role === "employee") {
+      const partnership = await getCompanyPartnership(recipient.partnership_id);
+      if (partnership && Number(partnership.team_id) === Number(sender.team_id)) return { allowed: true };
+    }
+    if (isCompanyManager(recipient)) {
+      const partnership = await getCompanyPartnership(recipient.partnership_id);
+      if (partnership && Number(partnership.team_id) === Number(sender.team_id)) return { allowed: true };
+    }
+    return { allowed: false, message: "Recipient is not connected to your HBT team" };
+  }
+
+  return { allowed: false, message: "You are not allowed to message this recipient" };
+};
+
+const buildThreadMetadata = async (sender, recipient) => {
+  let employeeId = null;
+  let partnershipId = null;
+  let hbtTeamId = null;
+  let assignedMemberId = null;
+
+  if (sender.role === "employee") {
+    employeeId = sender.id;
+    partnershipId = sender.partnership_id;
+  }
+  if (recipient.role === "employee") {
+    employeeId = recipient.id;
+    partnershipId = recipient.partnership_id;
+  }
+  if (isCompanyManager(sender)) partnershipId = sender.partnership_id;
+  if (isCompanyManager(recipient)) partnershipId = recipient.partnership_id;
+  if (isHbtUser(sender)) {
+    hbtTeamId = sender.team_id;
+    assignedMemberId = sender.id;
+  }
+  if (isHbtUser(recipient)) {
+    hbtTeamId = recipient.team_id;
+    assignedMemberId = recipient.id;
+  }
+  if (!hbtTeamId && partnershipId) {
+    const partnership = await getCompanyPartnership(partnershipId);
+    hbtTeamId = partnership?.team_id || null;
+  }
+  if (isAdmin(sender) || isAdmin(recipient)) {
+    hbtTeamId = null;
+    assignedMemberId = isHbtUser(sender) ? sender.id : isHbtUser(recipient) ? recipient.id : null;
+  }
+  return { employeeId, partnershipId, hbtTeamId, assignedMemberId };
+};
+
+const findExistingOneToOneThread = async (senderId, recipientId, connection = pool) => {
+  const [rows] = await connection.query(
+    `SELECT id
+     FROM message_threads
+     WHERE status <> 'closed'
+       AND (
+         (created_by = ? AND recipient_id = ?)
+         OR (created_by = ? AND recipient_id = ?)
+       )
+     ORDER BY updated_at DESC, id DESC
+     LIMIT 1`,
+    [senderId, recipientId, recipientId, senderId]
+  );
+
+  return rows[0] || null;
+};
+
 const getContacts = async (req, res) => {
   try {
     const user = req.user;
@@ -289,85 +414,6 @@ const getThreadDetails = async (req, res) => {
   }
 };
 
-const getRecipient = async (recipientId) => {
-  const [[recipient]] = await pool.query(
-    `SELECT id, full_name, email, role, team_id, partnership_id FROM users WHERE id = ? AND is_active = 1 LIMIT 1`,
-    [recipientId]
-  );
-  return recipient || null;
-};
-
-const canMessageRecipient = async (sender, recipient) => {
-  if (!recipient || Number(sender.id) === Number(recipient.id)) return { allowed: false, message: "Invalid recipient" };
-  if (isAdmin(sender) || isAdmin(recipient)) return { allowed: true };
-
-  if (sender.role === "employee") {
-    const partnership = await getCompanyPartnership(sender.partnership_id);
-    if (!partnership) return { allowed: false, message: "Employee is not linked to a partnership" };
-    if (isHbtUser(recipient) && Number(recipient.team_id) === Number(partnership.team_id)) return { allowed: true };
-    if (isCompanyManager(recipient) && Number(recipient.partnership_id) === Number(sender.partnership_id)) return { allowed: true };
-    return { allowed: false, message: "Recipient is not connected to your employer partnership" };
-  }
-
-  if (isCompanyManager(sender)) {
-    const partnership = await getCompanyPartnership(sender.partnership_id);
-    if (!partnership) return { allowed: false, message: "Company account is not linked to a partnership" };
-    if (recipient.role === "employee" && Number(recipient.partnership_id) === Number(sender.partnership_id)) return { allowed: true };
-    if (isHbtUser(recipient) && Number(recipient.team_id) === Number(partnership.team_id)) return { allowed: true };
-    return { allowed: false, message: "Recipient is not connected to your company partnership" };
-  }
-
-  if (isHbtUser(sender)) {
-    if (isHbtUser(recipient) && Number(recipient.team_id) === Number(sender.team_id)) return { allowed: true };
-    if (recipient.role === "employee") {
-      const partnership = await getCompanyPartnership(recipient.partnership_id);
-      if (partnership && Number(partnership.team_id) === Number(sender.team_id)) return { allowed: true };
-    }
-    if (isCompanyManager(recipient)) {
-      const partnership = await getCompanyPartnership(recipient.partnership_id);
-      if (partnership && Number(partnership.team_id) === Number(sender.team_id)) return { allowed: true };
-    }
-    return { allowed: false, message: "Recipient is not connected to your HBT team" };
-  }
-
-  return { allowed: false, message: "You are not allowed to message this recipient" };
-};
-
-const buildThreadMetadata = async (sender, recipient) => {
-  let employeeId = null;
-  let partnershipId = null;
-  let hbtTeamId = null;
-  let assignedMemberId = null;
-
-  if (sender.role === "employee") {
-    employeeId = sender.id;
-    partnershipId = sender.partnership_id;
-  }
-  if (recipient.role === "employee") {
-    employeeId = recipient.id;
-    partnershipId = recipient.partnership_id;
-  }
-  if (isCompanyManager(sender)) partnershipId = sender.partnership_id;
-  if (isCompanyManager(recipient)) partnershipId = recipient.partnership_id;
-  if (isHbtUser(sender)) {
-    hbtTeamId = sender.team_id;
-    assignedMemberId = sender.id;
-  }
-  if (isHbtUser(recipient)) {
-    hbtTeamId = recipient.team_id;
-    assignedMemberId = recipient.id;
-  }
-  if (!hbtTeamId && partnershipId) {
-    const partnership = await getCompanyPartnership(partnershipId);
-    hbtTeamId = partnership?.team_id || null;
-  }
-  if (isAdmin(sender) || isAdmin(recipient)) {
-    hbtTeamId = null;
-    assignedMemberId = isHbtUser(sender) ? sender.id : isHbtUser(recipient) ? recipient.id : null;
-  }
-  return { employeeId, partnershipId, hbtTeamId, assignedMemberId };
-};
-
 const createThread = async (req, res) => {
   const connection = await pool.getConnection();
   try {
@@ -381,14 +427,31 @@ const createThread = async (req, res) => {
 
     const metadata = await buildThreadMetadata(user, recipient);
     await connection.beginTransaction();
-    const [threadResult] = await connection.query(
-      `INSERT INTO message_threads (subject, employee_id, hbt_team_id, partnership_id, assigned_member_id, recipient_id, status, created_by) VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
-      [subject.trim(), metadata.employeeId, metadata.hbtTeamId, metadata.partnershipId, metadata.assignedMemberId, recipient.id, user.id]
-    );
-    const threadId = threadResult.insertId;
+
+    const existingThread = await findExistingOneToOneThread(user.id, recipient.id, connection);
+    let threadId = existingThread?.id || null;
+    let reusedThread = Boolean(threadId);
+
+    if (!threadId) {
+      const [threadResult] = await connection.query(
+        `INSERT INTO message_threads (subject, employee_id, hbt_team_id, partnership_id, assigned_member_id, recipient_id, status, created_by) VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
+        [subject.trim(), metadata.employeeId, metadata.hbtTeamId, metadata.partnershipId, metadata.assignedMemberId, recipient.id, user.id]
+      );
+      threadId = threadResult.insertId;
+    }
+
     await connection.query(`INSERT INTO messages (thread_id, sender_id, message_body, is_read) VALUES (?, ?, ?, 0)`, [threadId, user.id, message_body.trim()]);
+    await connection.query(`UPDATE message_threads SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [threadId]);
     await connection.commit();
-    return res.status(201).json({ status: "success", message: "Message thread created successfully", thread_id: threadId });
+
+    await notifyMessageRecipient({ sender: user, recipient, threadId, messageBody: message_body });
+
+    return res.status(reusedThread ? 200 : 201).json({
+      status: "success",
+      message: reusedThread ? "Message added to existing conversation" : "Message thread created successfully",
+      thread_id: threadId,
+      reused_thread: reusedThread,
+    });
   } catch (error) {
     await connection.rollback();
     return res.status(500).json({ status: "error", message: "Failed to create message thread", error: error.message });
@@ -405,8 +468,13 @@ const replyToThread = async (req, res) => {
     if (!message_body || !message_body.trim()) return res.status(400).json({ status: "error", message: "Message body is required" });
     const thread = await getThreadForAccess(id, user);
     if (!thread) return res.status(404).json({ status: "error", message: "Thread not found or access denied" });
+
     await pool.query(`INSERT INTO messages (thread_id, sender_id, message_body, is_read) VALUES (?, ?, ?, 0)`, [id, user.id, message_body.trim()]);
     await pool.query(`UPDATE message_threads SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [id]);
+
+    const recipient = await getThreadOtherUser(thread, user);
+    if (recipient) await notifyMessageRecipient({ sender: user, recipient, threadId: id, messageBody: message_body });
+
     return res.status(201).json({ status: "success", message: "Reply sent successfully" });
   } catch (error) {
     return res.status(500).json({ status: "error", message: "Failed to send reply", error: error.message });
