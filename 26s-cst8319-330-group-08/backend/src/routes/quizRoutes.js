@@ -4,6 +4,7 @@ const router = express.Router();
 const pool = require("../config/db");
 const authMiddleware = require("../middleware/authMiddleware");
 const quizController = require("../controllers/quizController");
+const { ensureAdvancedLeadTables, calculateReadinessForSubmission } = require("../services/readinessService");
 
 const adminOrHbtOnly = (req, res, next) => {
   if (
@@ -31,8 +32,39 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
+const submitQuizWithReadiness = async (req, res, next) => {
+  const originalJson = res.json.bind(res);
+
+  res.json = async (body) => {
+    if (res.statusCode === 201 && body?.submission_id) {
+      const connection = await pool.getConnection();
+      try {
+        await connection.beginTransaction();
+        const readiness = await calculateReadinessForSubmission(connection, body.submission_id);
+        await connection.commit();
+        return originalJson({ ...body, readiness });
+      } catch (error) {
+        await connection.rollback();
+        return originalJson({
+          ...body,
+          readiness_warning: "Quiz saved, but readiness score could not be calculated automatically.",
+          readiness_error: error.message,
+        });
+      } finally {
+        connection.release();
+      }
+    }
+
+    return originalJson(body);
+  };
+
+  return quizController.submitQuiz(req, res, next);
+};
+
 const latestQuizSubmissionsOnly = async (req, res) => {
   try {
+    await ensureAdvancedLeadTables();
+
     const user = req.user;
     let whereClause = "";
     const params = [];
@@ -55,13 +87,24 @@ const latestQuizSubmissionsOnly = async (req, res) => {
         COALESCE(qs.email, u.email, '') AS employee_email,
         e.name AS company_name,
         h.name AS team_name,
-        p.slug AS partnership_slug
+        p.slug AS partnership_slug,
+        ers.score AS readiness_score,
+        ers.level AS readiness_level,
+        ers.priority AS readiness_priority,
+        ers.summary AS readiness_summary,
+        lp.id AS lead_id,
+        lp.stage AS lead_stage,
+        lp.priority AS lead_priority,
+        lp.next_action AS lead_next_action,
+        lp.follow_up_due_at AS lead_follow_up_due_at
        FROM quiz_submissions qs
        LEFT JOIN quizzes q ON qs.quiz_id = q.id
        LEFT JOIN users u ON qs.user_id = u.id
        LEFT JOIN partnerships p ON qs.partnership_id = p.id
        LEFT JOIN employers e ON p.employer_id = e.id
        LEFT JOIN home_buying_teams h ON p.team_id = h.id
+       LEFT JOIN employee_readiness_scores ers ON ers.latest_submission_id = qs.id
+       LEFT JOIN lead_pipeline lp ON lp.employee_user_id = qs.user_id
        ${whereClause}
        ORDER BY qs.submitted_at DESC, qs.id DESC`,
       params
@@ -201,6 +244,6 @@ router.delete(
 /*
   Employee quiz submit
 */
-router.post("/submit", authMiddleware, quizController.submitQuiz);
+router.post("/submit", authMiddleware, submitQuizWithReadiness);
 
 module.exports = router;
