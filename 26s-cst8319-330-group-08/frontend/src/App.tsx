@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -165,6 +166,7 @@ function App() {
       <FloatingThemeControl />
       <MobileStickyCTA />
       <FooterShell />
+      <SpeedInsights />
     </BrowserRouter>
   );
 }
