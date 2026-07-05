@@ -39,6 +39,7 @@ const advisorAvailabilityRoutes = require("./routes/advisorAvailabilityRoutes");
 const companyManagerRoutes = require("./routes/companyManagerRoutes");
 const companyMortgageRoutes = require("./routes/companyMortgageRoutes");
 const leadProgressRoutes = require("./routes/leadProgressRoutes");
+const hbtTaskRoutes = require("./routes/hbtTaskRoutes");
 
 const app = express();
 const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -132,6 +133,7 @@ app.use("/api/advisor-availability", advisorAvailabilityRoutes);
 app.use("/api/company-manager", companyManagerRoutes);
 app.use("/api/company-mortgage", companyMortgageRoutes);
 app.use("/api/lead-progress", leadProgressRoutes);
+app.use("/api/hbt-tasks", hbtTaskRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
