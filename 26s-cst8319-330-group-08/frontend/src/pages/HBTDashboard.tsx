@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 import ChatWidget from "../components/ChatWidget";
 
@@ -39,7 +39,6 @@ const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const toTime = (value?: string) => (value ? value.slice(0, 5) : "--:--");
 
 function HBTDashboard() {
-  const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [availability, setAvailability] = useState<AvailabilityRow[]>([]);
@@ -73,12 +72,6 @@ function HBTDashboard() {
       .then((payload) => setAppointments(Array.isArray(payload) ? payload : []))
       .catch(() => setAppointments([]));
   }, [token]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    navigate("/login");
-  };
 
   const appointmentStats = useMemo(() => {
     return {
@@ -130,23 +123,12 @@ function HBTDashboard() {
         <section className="theme-panel relative overflow-hidden">
           <img src={dashboardImage} alt="Team meeting" className="absolute inset-0 h-full w-full object-cover opacity-20" />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-indigo-950/95 to-violet-950/70" />
-          <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-200">Home Buying Team Control Center</p>
-              <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">HBT Dashboard</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-violet-100 md:text-base">
-                Welcome, <strong className="text-white">{user.full_name || "HBT Member"}</strong>. Manage partnerships, employees, communication, appointments, availability, resources, events, and notifications from one command center.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Link to="/hbt/messages" className="rounded-full bg-white px-4 py-2 text-sm font-black text-violet-800 shadow-md transition hover:-translate-y-0.5 hover:bg-violet-50">Messages</Link>
-              <Link to="/notifications" className="relative rounded-full bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-md transition hover:-translate-y-0.5 hover:bg-blue-700">
-                Notifications
-                {unreadCount > 0 && <span className="absolute -right-2 -top-2 rounded-full bg-red-600 px-2 py-0.5 text-xs font-black text-white">{unreadCount}</span>}
-              </Link>
-              <Link to="/hbt/appointments" className="rounded-full border border-white/30 px-4 py-2 text-sm font-black text-white hover:bg-white/10">Appointments</Link>
-              <button onClick={handleLogout} className="rounded-full bg-red-600 px-4 py-2 text-sm font-black text-white shadow-md transition hover:-translate-y-0.5 hover:bg-red-700">Logout</button>
-            </div>
+          <div className="relative">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-200">Home Buying Team Control Center</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">HBT Dashboard</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-violet-100 md:text-base">
+              Welcome, <strong className="text-white">{user.full_name || "HBT Member"}</strong>. Manage partnerships, employees, communication, appointments, availability, resources, events, and notifications from one command center.
+            </p>
           </div>
         </section>
 
