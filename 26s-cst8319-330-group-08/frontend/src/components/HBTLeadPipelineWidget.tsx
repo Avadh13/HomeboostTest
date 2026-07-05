@@ -35,7 +35,7 @@ function HBTLeadPipelineWidget() {
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const token = localStorage.getItem("token");
-  const shouldShow = pathname === "/hbt/member-dashboard" && ["hbt_admin", "hbt_member", "admin", "super_admin"].includes(user?.role) && token;
+  const shouldShow = Boolean(pathname === "/hbt/member-dashboard" && ["hbt_admin", "hbt_member", "admin", "super_admin"].includes(user?.role) && token);
 
   useEffect(() => {
     if (!shouldShow) return;
