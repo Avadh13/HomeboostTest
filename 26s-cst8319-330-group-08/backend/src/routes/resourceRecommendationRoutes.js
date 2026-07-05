@@ -9,6 +9,28 @@ const isAdmin = (user) => adminRoles.includes(user?.role);
 const isHbt = (user) => hbtRoles.includes(user?.role);
 
 const ensureRecommendationTables = async (connection = pool) => {
+  await connection.query(`CREATE TABLE IF NOT EXISTS employee_readiness_scores (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    partnership_id INT NULL,
+    quiz_id INT NULL,
+    latest_submission_id INT NULL,
+    score INT NOT NULL DEFAULT 0,
+    level VARCHAR(60) NOT NULL DEFAULT 'Needs Preparation',
+    priority VARCHAR(20) NOT NULL DEFAULT 'warm',
+    summary TEXT NULL,
+    risk_factors JSON NULL,
+    recommendations JSON NULL,
+    calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_employee_readiness_user (user_id),
+    INDEX idx_employee_readiness_partnership (partnership_id),
+    INDEX idx_employee_readiness_submission (latest_submission_id),
+    INDEX idx_employee_readiness_level (level),
+    INDEX idx_employee_readiness_priority (priority)
+  )`);
+
   await connection.query(`CREATE TABLE IF NOT EXISTS employee_activity_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -202,9 +224,9 @@ router.post("/:resourceId/view", protect, async (req, res) => {
       [req.user.id, req.user.partnership_id || null, JSON.stringify({ resource_id: resourceId })]
     );
 
-    return res.json({ status: "success", message: "Resource view tracked" });
+    return res.json({ status: "success", message: "Resource view recorded" });
   } catch (error) {
-    return res.status(500).json({ status: "error", message: "Failed to track resource view", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to record resource view", error: error.message });
   }
 });
 
@@ -244,6 +266,7 @@ router.post("/admin/rules", protect, async (req, res) => {
 router.put("/admin/rules/:id", protect, async (req, res) => {
   try {
     if (!isAdmin(req.user) && !isHbt(req.user)) return res.status(403).json({ status: "error", message: "Admin or HBT access required" });
+    await ensureRecommendationTables();
     const { resource_id, readiness_level, priority, keyword, rule_label, is_active } = req.body;
     await pool.query(
       `UPDATE resource_recommendation_rules
@@ -260,6 +283,7 @@ router.put("/admin/rules/:id", protect, async (req, res) => {
 router.delete("/admin/rules/:id", protect, async (req, res) => {
   try {
     if (!isAdmin(req.user) && !isHbt(req.user)) return res.status(403).json({ status: "error", message: "Admin or HBT access required" });
+    await ensureRecommendationTables();
     await pool.query("DELETE FROM resource_recommendation_rules WHERE id = ?", [req.params.id]);
     return res.json({ status: "success", message: "Recommendation rule deleted" });
   } catch (error) {
