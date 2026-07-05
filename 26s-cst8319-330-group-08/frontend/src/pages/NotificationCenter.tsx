@@ -18,6 +18,8 @@ type NotificationCenterProps = {
 
 const typeClasses: Record<string, string> = {
   appointment: "border-blue-200 bg-blue-50 text-blue-800",
+  message: "border-indigo-200 bg-indigo-50 text-indigo-800",
+  service_request: "border-violet-200 bg-violet-50 text-violet-800",
   success: "border-emerald-200 bg-emerald-50 text-emerald-800",
   warning: "border-amber-200 bg-amber-50 text-amber-800",
   system: "border-purple-200 bg-purple-50 text-purple-800",
@@ -26,6 +28,8 @@ const typeClasses: Record<string, string> = {
 
 const typeIcons: Record<string, string> = {
   appointment: "📆",
+  message: "💬",
+  service_request: "🏡",
   success: "✓",
   warning: "!",
   system: "⚙",
@@ -49,32 +53,36 @@ function NotificationCenter({ embedded = false }: NotificationCenterProps) {
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  const headers = { Authorization: `Bearer ${token}` };
+  const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
-  const loadNotifications = async () => {
-    setLoading(true);
+  const loadNotifications = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/notifications`, { headers });
       const data = await response.json();
 
       if (!response.ok) {
-        setNotice({ type: "error", message: data.message || "Could not load notifications." });
-        setNotifications([]);
+        if (!silent) {
+          setNotice({ type: "error", message: data.message || "Could not load notifications." });
+          setNotifications([]);
+        }
         return;
       }
 
       setNotifications(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Notifications load failed:", error);
-      setNotice({ type: "error", message: "Could not load notifications." });
+      if (!silent) setNotice({ type: "error", message: "Could not load notifications." });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadNotifications();
-  }, []);
+    const timer = window.setInterval(() => loadNotifications(true), 15_000);
+    return () => window.clearInterval(timer);
+  }, [token]);
 
   const markRead = async (notification: Notification, shouldNavigate = false) => {
     try {
@@ -116,7 +124,7 @@ function NotificationCenter({ embedded = false }: NotificationCenterProps) {
             <div>
               <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-200">Alerts Center</p>
               <h1 className="mt-2 text-3xl font-black md:text-4xl">Updates for {user.full_name || "your account"}</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-blue-100 md:text-base">Appointment requests, meeting links, advisor updates, and system activity appear here.</p>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-blue-100 md:text-base">Messages, appointment requests, meeting links, advisor updates, and system activity appear here automatically.</p>
             </div>
             <div className="rounded-2xl bg-white/10 px-5 py-4 text-center backdrop-blur">
               <p className="text-4xl font-black">{unreadCount}</p>
@@ -131,11 +139,11 @@ function NotificationCenter({ embedded = false }: NotificationCenterProps) {
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-2xl font-black text-slate-950">Recent alerts</h2>
-              <p className="text-sm text-slate-500">Newest updates first.</p>
+              <p className="text-sm text-slate-500">Newest updates first. This list refreshes automatically.</p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <button onClick={loadNotifications} className="rounded-full bg-slate-100 px-5 py-2.5 font-bold text-slate-700 hover:bg-slate-200">Refresh</button>
-              <button onClick={markAllRead} className="rounded-full bg-blue-600 px-5 py-2.5 font-bold text-white hover:bg-blue-700">Mark all read</button>
+              <button onClick={() => loadNotifications()} className="rounded-full bg-slate-100 px-5 py-2.5 font-bold text-slate-700 hover:bg-slate-200">Refresh</button>
+              <button onClick={markAllRead} disabled={unreadCount === 0} className="rounded-full bg-blue-600 px-5 py-2.5 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Mark all read</button>
             </div>
           </div>
 
@@ -162,7 +170,7 @@ function NotificationCenter({ embedded = false }: NotificationCenterProps) {
                       </div>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-3">
-                          <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${typeClasses[notification.type] || typeClasses.info}`}>{notification.type}</span>
+                          <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${typeClasses[notification.type] || typeClasses.info}`}>{notification.type.replace("_", " ")}</span>
                           {Number(notification.is_read) === 0 && <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-black text-white">New</span>}
                         </div>
                         <h3 className="mt-3 text-xl font-black text-slate-950">{notification.title}</h3>
