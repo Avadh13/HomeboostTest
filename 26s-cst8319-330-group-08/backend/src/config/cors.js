@@ -51,7 +51,8 @@ const isAllowedVercelPreview = (origin) => {
 };
 
 const isAllowedCodespacesOrigin = (origin) => {
-  return process.env.ALLOW_CODESPACES_ORIGINS === "true" && origin.startsWith("https://") && origin.endsWith(".app.github.dev");
+  if (process.env.ALLOW_CODESPACES_ORIGINS === "false") return false;
+  return origin.startsWith("https://") && origin.endsWith(".app.github.dev");
 };
 
 const corsOptions = {
