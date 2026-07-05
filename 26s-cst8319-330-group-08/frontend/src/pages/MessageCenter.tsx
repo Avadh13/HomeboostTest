@@ -233,7 +233,7 @@ function ProfileDetailsModal({ person, onClose }: { person: PersonPreview; onClo
           </div>
 
           <div className="mt-6 overflow-hidden border-y border-neutral-800">
-            {settingRows.map((row, index) => (
+            {settingRows.map((row) => (
               <button key={row.label} className="flex w-full items-center gap-6 border-b border-neutral-800 px-6 py-6 text-left last:border-b-0 hover:bg-white/[0.03]">
                 <span className="w-8 shrink-0 text-3xl text-neutral-500">{row.icon}</span>
                 <span className="flex-1 text-xl font-semibold text-neutral-100">{row.label}</span>
