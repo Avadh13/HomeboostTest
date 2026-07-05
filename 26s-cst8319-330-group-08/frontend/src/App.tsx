@@ -62,6 +62,8 @@ import PartnershipMortgageServicesShell from "./components/PartnershipMortgageSe
 import MobileStickyCTA from "./components/MobileStickyCTA";
 import FloatingThemeControl from "./components/FloatingThemeControl";
 import ScrollToTop from "./components/ScrollToTop";
+import MortgageReadinessWidget from "./components/MortgageReadinessWidget";
+import HBTLeadPipelineWidget from "./components/HBTLeadPipelineWidget";
 
 const localNavbarExactPaths = new Set([
   "/",
@@ -161,6 +163,8 @@ function App() {
         <Route path="/:slug" element={<PartnershipLanding />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      <MortgageReadinessWidget />
+      <HBTLeadPipelineWidget />
       <MortgageServicesShell />
       <PartnershipMortgageServicesShell />
       <FloatingThemeControl />
