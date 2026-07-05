@@ -7,6 +7,7 @@ import { useToast } from "../components/ToastProvider";
 type Thread = {
   id: number;
   subject: string;
+  employee_id?: number | null;
   employee_name?: string | null;
   employee_email?: string | null;
   company_name?: string | null;
@@ -22,6 +23,8 @@ type Thread = {
   status: string;
   last_message?: string | null;
   last_message_at?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
   unread_count?: number;
 };
 
@@ -34,31 +37,19 @@ type Message = {
   created_at: string;
 };
 
-type ThreadDetails = { thread: Thread; messages: Message[] };
-
 type ContactUser = {
   id: number;
   full_name: string;
   email: string;
   role: string;
-  team_id?: number | null;
-  partnership_id?: number | null;
-  company_name?: string | null;
-  hbt_team_name?: string | null;
-  partnership_slug?: string | null;
   title?: string | null;
   phone?: string | null;
   photo_url?: string | null;
+  company_name?: string | null;
+  hbt_team_name?: string | null;
+  partnership_slug?: string | null;
   is_online?: boolean;
-  status_label?: string | null;
   last_seen_at?: string | null;
-};
-
-type CurrentUser = {
-  id?: number;
-  full_name?: string;
-  email?: string;
-  role?: string;
 };
 
 type PersonPreview = {
@@ -68,20 +59,19 @@ type PersonPreview = {
   role?: string | null;
   title?: string | null;
   phone?: string | null;
+  photo_url?: string | null;
   company_name?: string | null;
   hbt_team_name?: string | null;
   partnership_slug?: string | null;
-  photo_url?: string | null;
   is_online?: boolean;
-  status_label?: string | null;
   last_seen_at?: string | null;
 };
 
-type MessageCenterProps = {
-  embedded?: boolean;
-};
+type ThreadDetails = { thread: Thread; messages: Message[] };
 
-const readUser = (): CurrentUser => {
+type MessageCenterProps = { embedded?: boolean };
+
+const readUser = () => {
   try {
     return JSON.parse(localStorage.getItem("user") || "{}");
   } catch {
@@ -90,38 +80,11 @@ const readUser = (): CurrentUser => {
 };
 
 const roleLabel = (role?: string | null) => (role || "user").replace(/_/g, " ");
-
-const initials = (name?: string | null) => {
-  const value = (name || "User").trim();
-  return value.charAt(0).toUpperCase() || "U";
-};
-
-const formatTime = (value?: string | null) => {
-  if (!value) return "";
-  return new Date(value).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-};
-
-const formatDate = (value?: string | null) => {
-  if (!value) return "";
-  return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-};
-
-const formatFullDate = (value?: string | null) => {
-  if (!value) return "No date";
-  return new Date(value).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-};
-
-const getLastSeenLabel = (person: PersonPreview) => {
-  if (person.is_online) return "Online";
-  if (!person.last_seen_at) return "Offline";
-  return `Last seen ${formatFullDate(person.last_seen_at)}`;
-};
+const initials = (name?: string | null) => (name || "User").trim().charAt(0).toUpperCase() || "U";
+const formatTime = (value?: string | null) => value ? new Date(value).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : "";
+const formatDate = (value?: string | null) => value ? new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+const formatFullDate = (value?: string | null) => value ? new Date(value).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "Offline";
+const lastSeenLabel = (person: PersonPreview) => person.is_online ? "Online" : person.last_seen_at ? `Last seen ${formatFullDate(person.last_seen_at)}` : "Offline";
 
 const getRoleMeta = (role?: string) => {
   if (role === "employee") return { title: "Messages", subtitle: "Private chats with your advisor, company contact, or support.", homePath: "/employee-portal" };
@@ -131,115 +94,70 @@ const getRoleMeta = (role?: string) => {
   return { title: "Messages", subtitle: "Private platform support conversations.", homePath: "/admin" };
 };
 
-type AvatarProps = {
-  person: PersonPreview;
-  size?: "sm" | "md" | "lg";
-  showStatus?: boolean;
-};
-
-function ProfileAvatar({ person, size = "md", showStatus = true }: AvatarProps) {
+function Avatar({ person, size = "md" }: { person: PersonPreview; size?: "sm" | "md" | "lg" }) {
   const sizeClass = size === "lg" ? "h-14 w-14" : size === "sm" ? "h-10 w-10" : "h-12 w-12";
-  const textClass = size === "lg" ? "text-2xl" : size === "sm" ? "text-base" : "text-xl";
-  const fallbackClass = person.photo_url ? "bg-slate-100 text-white" : "bg-blue-100 text-blue-700 ring-1 ring-blue-200";
-
   return (
-    <div className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full ${fallbackClass} font-black shadow-sm`}>
-      {person.photo_url ? <img src={person.photo_url} alt={person.name} className="h-full w-full object-cover" /> : <span className={`${textClass} leading-none`}>{initials(person.name)}</span>}
-      {showStatus && <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white ${person.is_online ? "bg-emerald-500" : "bg-slate-400"}`} />}
+    <div className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-xl font-black text-blue-700 ring-1 ring-blue-200`}>
+      {person.photo_url ? <img src={person.photo_url} alt={person.name} className="h-full w-full object-cover" /> : initials(person.name)}
+      <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white ${person.is_online ? "bg-emerald-500" : "bg-slate-400"}`} />
     </div>
   );
 }
 
-function ProfileDetailsModal({ person, onClose }: { person: PersonPreview; onClose: () => void }) {
-  const contactLine = person.phone || person.email || roleLabel(person.role);
-  const profileRows = [
-    { icon: "✉", label: "Email", value: person.email || "Not provided" },
-    { icon: "👤", label: "Role", value: roleLabel(person.role) },
-    { icon: "💼", label: "Title", value: person.title || "Not provided" },
-    { icon: "🏢", label: "Company", value: person.company_name || "Not provided" },
-    { icon: "🏠", label: "HBT Team", value: person.hbt_team_name || "Not provided" },
-    { icon: "🔗", label: "Partnership", value: person.partnership_slug ? `/${person.partnership_slug}` : "Not provided" },
-    { icon: "●", label: "Status", value: getLastSeenLabel(person) },
-  ];
-
-  const quickActions = [
-    { icon: "☎", label: "Voice", href: person.phone ? `tel:${person.phone}` : person.email ? `mailto:${person.email}` : undefined },
-    { icon: "▣", label: "Video", href: undefined },
-    { icon: "⌕", label: "Search", href: undefined },
-  ];
-
-  const settingRows = [
-    { icon: "▧", label: "Media, links and docs", value: "0" },
-    { icon: "☆", label: "Starred messages" },
-    { icon: "🔔", label: "Notification settings" },
-    { icon: "◌", label: "Disappearing messages" },
+function ContactInfoPopup({ person, onClose }: { person: PersonPreview; onClose: () => void }) {
+  const rows = [
+    ["✉", "Email", person.email || "Not provided"],
+    ["👤", "Role", roleLabel(person.role)],
+    ["💼", "Title", person.title || "Not provided"],
+    ["🏢", "Company", person.company_name || "Not provided"],
+    ["🏠", "HBT Team", person.hbt_team_name || "Not provided"],
+    ["●", "Status", lastSeenLabel(person)],
   ];
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm" onClick={onClose} role="dialog" aria-modal="true">
-      <section className="flex max-h-[86dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white text-slate-950 shadow-2xl shadow-slate-950/30" onClick={(event) => event.stopPropagation()}>
-        <header className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur md:px-6">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm" onClick={onClose}>
+      <section className="flex max-h-[86dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white text-slate-950 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <div className="flex items-center gap-3">
-            <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-2xl font-light leading-none text-slate-700 transition hover:bg-slate-200" aria-label="Close contact info">
-              ×
-            </button>
-            <h2 className="text-xl font-black tracking-tight text-slate-950">Contact info</h2>
+            <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-2xl text-slate-700 hover:bg-slate-200">×</button>
+            <h2 className="text-xl font-black">Contact info</h2>
           </div>
-          <button className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-violet-600 text-lg text-white shadow-md shadow-blue-500/20 transition hover:-translate-y-0.5" title="Edit contact">
-            ✎
-          </button>
+          <button className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-violet-600 text-white">✎</button>
         </header>
 
-        <div className="flex-1 overflow-y-auto bg-gradient-to-b from-blue-50/70 via-white to-violet-50/70 px-5 pb-6 md:px-6">
+        <div className="flex-1 overflow-y-auto bg-gradient-to-b from-blue-50/70 via-white to-violet-50/70 px-5 pb-6">
           <div className="flex flex-col items-center pt-7 text-center">
-            <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-600 to-violet-600 text-5xl font-black text-white shadow-xl shadow-blue-500/25 ring-4 ring-white md:h-32 md:w-32">
-              {person.photo_url ? <img src={person.photo_url} alt={person.name} className="h-full w-full object-cover" /> : <span>{initials(person.name)}</span>}
+            <div className="relative flex h-32 w-32 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-600 to-violet-600 text-5xl font-black text-white shadow-xl shadow-blue-500/25 ring-4 ring-white">
+              {person.photo_url ? <img src={person.photo_url} alt={person.name} className="h-full w-full object-cover" /> : initials(person.name)}
               <span className={`absolute bottom-3 right-3 h-4 w-4 rounded-full border-[3px] border-white ${person.is_online ? "bg-emerald-500" : "bg-slate-400"}`} />
             </div>
+            <h1 className="mt-4 text-3xl font-black">{person.name}</h1>
+            <p className="mt-1 text-sm font-bold text-slate-500">{person.phone || person.email || roleLabel(person.role)}</p>
+            <p className={`mt-1 text-xs font-black ${person.is_online ? "text-emerald-600" : "text-slate-400"}`}>{lastSeenLabel(person)}</p>
 
-            <h1 className="mt-4 max-w-xl break-words text-2xl font-black text-slate-950 md:text-3xl">{person.name}</h1>
-            <p className="mt-1 max-w-xl break-words text-sm font-bold text-slate-500 md:text-base">{contactLine}</p>
-            <p className={`mt-1 text-xs font-black ${person.is_online ? "text-emerald-600" : "text-slate-400"}`}>{getLastSeenLabel(person)}</p>
-
-            <div className="mt-5 flex items-center justify-center gap-4">
-              {quickActions.map((action) => {
-                const circle = (
-                  <span className={`flex h-14 w-16 items-center justify-center rounded-[1.5rem] text-2xl transition ${action.href ? "bg-white text-blue-700 shadow-lg shadow-slate-200 ring-1 ring-slate-100 hover:-translate-y-0.5 hover:bg-blue-50" : "bg-slate-100 text-slate-400 ring-1 ring-slate-200"}`}>{action.icon}</span>
-                );
-
-                return (
-                  <div key={action.label} className="flex flex-col items-center gap-2">
-                    {action.href ? <a href={action.href}>{circle}</a> : circle}
-                    <span className="text-xs font-black text-slate-700">{action.label}</span>
-                  </div>
-                );
-              })}
+            <div className="mt-5 flex gap-4">
+              {[["☎", "Voice"], ["▣", "Video"], ["⌕", "Search"]].map(([icon, label]) => (
+                <div key={label} className="flex flex-col items-center gap-2">
+                  <span className="flex h-14 w-16 items-center justify-center rounded-[1.5rem] bg-white text-2xl text-blue-700 shadow ring-1 ring-slate-100">{icon}</span>
+                  <span className="text-xs font-black text-slate-700">{label}</span>
+                </div>
+              ))}
             </div>
           </div>
 
           <div className="mt-8 border-t border-slate-200 pt-5">
             <p className="text-sm font-black text-slate-500">About</p>
             <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-              {profileRows.map((row, index) => (
-                <div key={row.label} className={`flex gap-4 px-5 py-4 ${index !== profileRows.length - 1 ? "border-b border-slate-100" : ""}`}>
-                  <span className="w-7 shrink-0 text-xl text-slate-400">{row.icon}</span>
+              {rows.map(([icon, label, value], index) => (
+                <div key={label} className={`flex gap-4 px-5 py-4 ${index !== rows.length - 1 ? "border-b border-slate-100" : ""}`}>
+                  <span className="w-7 text-xl text-slate-400">{icon}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">{row.label}</p>
-                    <p className="mt-1 break-words text-sm font-bold text-slate-800">{row.value}</p>
+                    <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</p>
+                    <p className="mt-1 break-words text-sm font-bold text-slate-800">{value}</p>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-            {settingRows.map((row) => (
-              <button key={row.label} className="flex w-full items-center gap-4 border-b border-slate-100 px-5 py-4 text-left last:border-b-0 hover:bg-slate-50">
-                <span className="w-7 shrink-0 text-xl text-slate-400">{row.icon}</span>
-                <span className="flex-1 text-sm font-black text-slate-800">{row.label}</span>
-                {row.value && <span className="text-sm font-black text-slate-400">{row.value}</span>}
-              </button>
-            ))}
           </div>
         </div>
       </section>
@@ -286,7 +204,6 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
     partnership_slug: contact.partnership_slug,
     photo_url: contact.photo_url || null,
     is_online: Boolean(contact.is_online),
-    status_label: contact.status_label,
     last_seen_at: contact.last_seen_at,
   });
 
@@ -294,38 +211,29 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
     const otherId = Number(thread.created_by) === Number(user.id) ? thread.recipient_id : thread.created_by;
     const contact = otherId ? contactById.get(Number(otherId)) : undefined;
     if (contact) return personFromContact(contact);
-
-    if (Number(thread.created_by) === Number(user.id)) {
-      return {
-        id: thread.recipient_id,
-        name: thread.recipient_name || "Recipient",
-        email: thread.recipient_email,
-        role: thread.recipient_role,
-        company_name: thread.company_name,
-        photo_url: null,
-        is_online: false,
-      };
-    }
-
-    return {
-      id: thread.created_by,
-      name: thread.created_by_name || "Sender",
-      email: thread.created_by_email,
-      role: thread.created_by_role,
-      company_name: thread.company_name,
-      photo_url: null,
-      is_online: false,
-    };
+    if (Number(thread.created_by) === Number(user.id)) return { id: thread.recipient_id, name: thread.recipient_name || "Recipient", email: thread.recipient_email, role: thread.recipient_role };
+    return { id: thread.created_by, name: thread.created_by_name || thread.employee_name || "Sender", email: thread.created_by_email || thread.employee_email, role: thread.created_by_role };
   };
 
   const selectedRecipient = contacts.find((contact) => String(contact.id) === selectedRecipientId);
 
   const filteredThreads = useMemo(() => {
     const search = searchText.toLowerCase().trim();
-    return threads.filter((thread) => {
-      const other = getOtherPerson(thread);
-      return !search || [thread.subject, other.name, other.email, other.company_name, thread.hbt_team_name, thread.last_message].filter(Boolean).join(" ").toLowerCase().includes(search);
-    });
+    const seenContacts = new Set<string>();
+
+    return [...threads]
+      .sort((left, right) => new Date(right.last_message_at || right.updated_at || right.created_at || 0).getTime() - new Date(left.last_message_at || left.updated_at || left.created_at || 0).getTime())
+      .filter((thread) => {
+        const other = getOtherPerson(thread);
+        const searchable = [thread.subject, other.name, other.email, other.company_name, thread.hbt_team_name, thread.last_message].filter(Boolean).join(" ").toLowerCase();
+        if (search && !searchable.includes(search)) return false;
+
+        const contactKey = String(other.id || other.email || other.name || thread.id).toLowerCase();
+        if (seenContacts.has(contactKey)) return false;
+
+        seenContacts.add(contactKey);
+        return true;
+      });
   }, [threads, searchText, user.id, contactById]);
 
   const unreadTotal = threads.reduce((sum, thread) => sum + Number(thread.unread_count || 0), 0);
@@ -388,44 +296,25 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
     updatePresence();
     loadThreads();
     loadContacts();
-
     const presenceTimer = window.setInterval(updatePresence, 60_000);
-    const refreshTimer = window.setInterval(() => {
-      loadThreads();
-      loadContacts();
-    }, 90_000);
-
-    return () => {
-      window.clearInterval(presenceTimer);
-      window.clearInterval(refreshTimer);
-    };
+    const refreshTimer = window.setInterval(() => { loadThreads(); loadContacts(); }, 90_000);
+    return () => { window.clearInterval(presenceTimer); window.clearInterval(refreshTimer); };
   }, []);
 
   const createThread = async (event: FormEvent) => {
     event.preventDefault();
-    if (!selectedRecipient) {
-      toast.warning("Please select one person to message.");
-      return;
-    }
-    if (!messageBody.trim()) {
-      toast.warning("Message is required.");
-      return;
-    }
-
-    const finalSubject = subject.trim() || `Chat with ${selectedRecipient.full_name}`;
+    if (!selectedRecipient) return toast.warning("Please select one person to message.");
+    if (!messageBody.trim()) return toast.warning("Message is required.");
 
     try {
       setSaving(true);
       const response = await fetch(`${API_BASE_URL}/messages/threads`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ subject: finalSubject, message_body: messageBody.trim(), recipient_id: selectedRecipient.id }),
+        body: JSON.stringify({ subject: subject.trim() || `Chat with ${selectedRecipient.full_name}`, message_body: messageBody.trim(), recipient_id: selectedRecipient.id }),
       });
       const data = await response.json();
-      if (!response.ok) {
-        toast.error(data.message || "Failed to create conversation.");
-        return;
-      }
+      if (!response.ok) return toast.error(data.message || "Failed to create conversation.");
       setSubject("");
       setMessageBody("");
       setSelectedRecipientId("");
@@ -442,10 +331,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
 
   const sendReply = async (event: FormEvent) => {
     event.preventDefault();
-    if (!selected || !replyBody.trim()) {
-      toast.warning("Reply message is required.");
-      return;
-    }
+    if (!selected || !replyBody.trim()) return toast.warning("Reply message is required.");
 
     try {
       setSaving(true);
@@ -455,10 +341,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
         body: JSON.stringify({ message_body: replyBody.trim() }),
       });
       const data = await response.json();
-      if (!response.ok) {
-        toast.error(data.message || "Failed to send reply.");
-        return;
-      }
+      if (!response.ok) return toast.error(data.message || "Failed to send reply.");
       setReplyBody("");
       await loadThreadDetails(selected.thread.id);
     } catch {
@@ -473,10 +356,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
     try {
       const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, { method: "DELETE", headers: authHeaders });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        toast.error(data.message || "Failed to delete message.");
-        return;
-      }
+      if (!response.ok) return toast.error(data.message || "Failed to delete message.");
       await loadThreadDetails(selected.thread.id);
       toast.success("Message deleted.");
     } catch {
@@ -489,10 +369,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
     try {
       const response = await fetch(`${API_BASE_URL}/messages/threads/${threadId}`, { method: "DELETE", headers: authHeaders });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        toast.error(data.message || "Failed to delete conversation.");
-        return;
-      }
+      if (!response.ok) return toast.error(data.message || "Failed to delete conversation.");
       setSelected(null);
       await loadThreads();
       toast.success("Conversation deleted.");
@@ -508,7 +385,6 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
   return (
     <main className={pageClass}>
       {!embedded && <Navbar />}
-
       <section className={`mx-auto flex ${shellClass} max-w-7xl overflow-hidden bg-white shadow-2xl shadow-slate-300/60`}>
         <aside className={`${selected ? "hidden md:flex" : "flex"} w-full flex-col border-r border-slate-200 bg-white md:w-[390px]`}>
           <div className="border-b border-slate-200 bg-white p-4">
@@ -520,14 +396,12 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
               </div>
               <button onClick={() => { setSelected(null); setShowNewChat(true); }} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-2xl font-black text-white shadow-lg shadow-blue-500/30 transition hover:-translate-y-0.5 hover:bg-blue-700" title="New chat">+</button>
             </div>
-
             <div className="mt-4 flex items-center gap-2 rounded-full bg-slate-100 px-4 py-3 ring-1 ring-slate-200">
               <span className="text-slate-400">⌕</span>
               <input className="w-full bg-transparent text-sm font-semibold outline-none placeholder:text-slate-400" placeholder="Search messages" value={searchText} onChange={(event) => setSearchText(event.target.value)} />
             </div>
-
             <div className="mt-3 flex items-center justify-between text-xs font-black uppercase tracking-wide text-slate-400">
-              <span>{threads.length} chats</span>
+              <span>{filteredThreads.length} chats</span>
               {unreadTotal > 0 && <span className="rounded-full bg-red-100 px-3 py-1 text-red-700">{unreadTotal} unread</span>}
             </div>
           </div>
@@ -538,7 +412,6 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
                 <h2 className="font-black text-slate-950">New private chat</h2>
                 <button type="button" onClick={() => setShowNewChat(false)} className="rounded-full px-3 py-1 text-sm font-black text-slate-500 hover:bg-white">Close</button>
               </div>
-
               <select className="form-field bg-white" value={selectedRecipientId} onChange={(event) => setSelectedRecipientId(event.target.value)}>
                 <option value="">Choose one person...</option>
                 {contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.full_name} — {contact.title || roleLabel(contact.role)}{contact.company_name ? ` (${contact.company_name})` : ""}{contact.is_online ? " • Online" : " • Offline"}</option>)}
@@ -550,38 +423,34 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
           )}
 
           <div className="flex-1 overflow-y-auto bg-white">
-            {loading ? (
-              <div className="space-y-3 p-4">{[1, 2, 3, 4].map((item) => <div key={item} className="flex gap-3 rounded-2xl p-3"><div className="h-12 w-12 rounded-full bg-slate-100" /><div className="flex-1 space-y-2"><div className="h-4 w-2/3 rounded bg-slate-100" /><div className="h-3 w-full rounded bg-slate-100" /></div></div>)}</div>
-            ) : filteredThreads.length === 0 ? (
+            {loading ? <div className="p-6 text-sm font-bold text-slate-500">Loading chats...</div> : filteredThreads.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center px-8 text-center">
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl">💬</div>
                 <h2 className="text-xl font-black text-slate-950">No chats yet</h2>
                 <p className="mt-2 text-sm text-slate-500">Start a private one-to-one conversation.</p>
                 <button onClick={() => setShowNewChat(true)} className="mt-5 rounded-full bg-blue-600 px-5 py-3 text-sm font-black text-white">New chat</button>
               </div>
-            ) : (
-              filteredThreads.map((thread) => {
-                const other = getOtherPerson(thread);
-                const active = selected?.thread.id === thread.id;
-                return (
-                  <button key={thread.id} onClick={() => loadThreadDetails(thread.id)} className={`flex w-full gap-3 border-b border-slate-100 p-4 text-left transition ${active ? "bg-blue-50" : "bg-white hover:bg-slate-50"}`}>
-                    <ProfileAvatar person={other} size="md" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="truncate font-black text-slate-950">{other.name}</p>
-                        <span className="shrink-0 text-[11px] font-bold text-slate-400">{formatDate(thread.last_message_at)}</span>
-                      </div>
-                      <div className="mt-0.5 flex items-center gap-2">
-                        <span className="truncate text-xs font-semibold capitalize text-blue-600">{roleLabel(other.role)}</span>
-                        <span className={`h-1.5 w-1.5 rounded-full ${other.is_online ? "bg-emerald-500" : "bg-slate-400"}`} />
-                        <span className={`text-[11px] font-bold ${other.is_online ? "text-emerald-600" : "text-slate-400"}`}>{other.is_online ? "Online" : "Offline"}</span>
-                      </div>
-                      <p className={`mt-1 truncate text-sm ${Number(thread.unread_count || 0) > 0 ? "font-black text-slate-900" : "text-slate-500"}`}>{thread.last_message || thread.subject}</p>
+            ) : filteredThreads.map((thread) => {
+              const other = getOtherPerson(thread);
+              const active = selected?.thread.id === thread.id;
+              return (
+                <button key={thread.id} onClick={() => loadThreadDetails(thread.id)} className={`flex w-full gap-3 border-b border-slate-100 p-4 text-left transition ${active ? "bg-blue-50" : "bg-white hover:bg-slate-50"}`}>
+                  <Avatar person={other} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="truncate font-black text-slate-950">{other.name}</p>
+                      <span className="shrink-0 text-[11px] font-bold text-slate-400">{formatDate(thread.last_message_at)}</span>
                     </div>
-                  </button>
-                );
-              })
-            )}
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <span className="truncate text-xs font-semibold capitalize text-blue-600">{roleLabel(other.role)}</span>
+                      <span className={`h-1.5 w-1.5 rounded-full ${other.is_online ? "bg-emerald-500" : "bg-slate-400"}`} />
+                      <span className={`text-[11px] font-bold ${other.is_online ? "text-emerald-600" : "text-slate-400"}`}>{other.is_online ? "Online" : "Offline"}</span>
+                    </div>
+                    <p className={`mt-1 truncate text-sm ${Number(thread.unread_count || 0) > 0 ? "font-black text-slate-900" : "text-slate-500"}`}>{thread.last_message || thread.subject}</p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </aside>
 
@@ -598,11 +467,11 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
               <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <button type="button" onClick={() => setProfilePerson(selectedOther)} className="flex min-w-0 items-center gap-3 rounded-2xl p-1 text-left transition hover:bg-slate-50" title="View contact info">
                   <span onClick={(event) => { event.stopPropagation(); setSelected(null); }} className="rounded-full p-2 text-xl font-black text-slate-500 hover:bg-slate-100 md:hidden">‹</span>
-                  <ProfileAvatar person={selectedOther} size="lg" />
+                  <Avatar person={selectedOther} size="lg" />
                   <div className="min-w-0">
                     <h2 className="truncate text-base font-black text-slate-950 md:text-lg">{selectedOther.name}</h2>
                     <p className="truncate text-xs font-bold capitalize text-slate-500">{roleLabel(selectedOther.role)}{selected.thread.company_name ? ` · ${selected.thread.company_name}` : ""}</p>
-                    <p className={`text-[11px] font-black ${selectedOther.is_online ? "text-emerald-600" : "text-slate-400"}`}>{getLastSeenLabel(selectedOther)}</p>
+                    <p className={`text-[11px] font-black ${selectedOther.is_online ? "text-emerald-600" : "text-slate-400"}`}>{lastSeenLabel(selectedOther)}</p>
                   </div>
                   <span className="hidden rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 md:inline-flex">Contact info</span>
                 </button>
@@ -647,8 +516,7 @@ function MessageCenter({ embedded = false }: MessageCenterProps) {
           )}
         </section>
       </section>
-
-      {profilePerson && <ProfileDetailsModal person={profilePerson} onClose={() => setProfilePerson(null)} />}
+      {profilePerson && <ContactInfoPopup person={profilePerson} onClose={() => setProfilePerson(null)} />}
     </main>
   );
 }
