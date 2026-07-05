@@ -1,12 +1,5 @@
 const pool = require("../config/db");
 
-const READINESS_LEVELS = [
-  { min: 80, level: "Ready", priority: "hot" },
-  { min: 60, level: "Almost Ready", priority: "hot" },
-  { min: 40, level: "Needs Preparation", priority: "warm" },
-  { min: 0, level: "High Support Needed", priority: "cold" },
-];
-
 const DEFAULT_RECOMMENDATIONS = [
   "Review your HomeBoost resources and complete any missing profile details.",
   "Book an advisor appointment when you are ready for a personalized next step.",
@@ -102,7 +95,12 @@ const ensureAdvancedLeadTables = async (connection = pool) => {
   )`);
 };
 
-const classifyReadiness = (score) => READINESS_LEVELS.find((item) => score >= item.min) || READINESS_LEVELS[READINESS_LEVELS.length - 1];
+const classifyReadiness = (score) => {
+  if (score >= 80) return { level: "Ready", priority: "hot" };
+  if (score >= 60) return { level: "Almost Ready", priority: "hot" };
+  if (score >= 40) return { level: "Needs Preparation", priority: "warm" };
+  return { level: "High Support Needed", priority: "cold" };
+};
 
 const addUnique = (items, value) => {
   if (value && !items.includes(value)) items.push(value);
@@ -125,11 +123,9 @@ const analyzeAnswers = (answers = []) => {
     }
 
     if (combined.includes("credit")) {
-      if (/7[2-9]0|8\d{2}|excellent|very good/.test(combined)) {
-        score += 15;
-      } else if (/6[6-9]0|700|good/.test(combined)) {
-        score += 8;
-      } else if (/5\d{2}|6[0-4]0|poor|fair|low|not sure|unknown/.test(combined)) {
+      if (/7[2-9]0|8\d{2}|excellent|very good/.test(combined)) score += 15;
+      else if (/6[6-9]0|700|good/.test(combined)) score += 8;
+      else if (/5\d{2}|6[0-4]0|poor|fair|low|not sure|unknown/.test(combined)) {
         score -= 15;
         addUnique(riskFactors, "Credit score may need improvement or confirmation");
         addUnique(recommendations, "Review the credit improvement resource and discuss credit readiness with an advisor.");
@@ -137,9 +133,8 @@ const analyzeAnswers = (answers = []) => {
     }
 
     if (combined.includes("down payment") || combined.includes("savings") || combined.includes("saved")) {
-      if (/20%|twenty|15%|10%|yes|saved|ready/.test(combined)) {
-        score += 12;
-      } else if (/no|none|not yet|little|starting|0%/.test(combined)) {
+      if (/20%|twenty|15%|10%|yes|saved|ready/.test(combined)) score += 12;
+      else if (/no|none|not yet|little|starting|0%/.test(combined)) {
         score -= 14;
         addUnique(riskFactors, "Down payment savings may not be ready yet");
         addUnique(recommendations, "Create a down-payment savings plan and review closing-cost expectations.");
@@ -150,17 +145,13 @@ const analyzeAnswers = (answers = []) => {
       if (/now|ready|0-3|3 month|soon|immediately/.test(combined)) {
         score += 12;
         addUnique(recommendations, "Book an advisor appointment soon because the buying timeline looks active.");
-      } else if (/6 month|this year|within a year/.test(combined)) {
-        score += 6;
-      } else if (/not sure|someday|later|2 year/.test(combined)) {
-        score -= 4;
-      }
+      } else if (/6 month|this year|within a year/.test(combined)) score += 6;
+      else if (/not sure|someday|later|2 year/.test(combined)) score -= 4;
     }
 
     if (combined.includes("employment") || combined.includes("income") || combined.includes("job")) {
-      if (/full.?time|permanent|stable|salary|employed/.test(combined)) {
-        score += 8;
-      } else if (/part.?time|contract|self.?employed|temporary|unemployed|unstable/.test(combined)) {
+      if (/full.?time|permanent|stable|salary|employed/.test(combined)) score += 8;
+      else if (/part.?time|contract|self.?employed|temporary|unemployed|unstable/.test(combined)) {
         score -= 10;
         addUnique(riskFactors, "Employment or income documentation may require review");
         addUnique(recommendations, "Prepare employment and income documents before a mortgage-readiness appointment.");
@@ -168,9 +159,8 @@ const analyzeAnswers = (answers = []) => {
     }
 
     if (combined.includes("debt") || combined.includes("loan") || combined.includes("payment")) {
-      if (/low|none|manageable|paid/.test(combined)) {
-        score += 6;
-      } else if (/high|many|large|struggling|missed|late/.test(combined)) {
+      if (/low|none|manageable|paid/.test(combined)) score += 6;
+      else if (/high|many|large|struggling|missed|late/.test(combined)) {
         score -= 12;
         addUnique(riskFactors, "Debt level or payment history may affect qualification");
         addUnique(recommendations, "Review monthly debts with an advisor before starting pre-approval steps.");
@@ -204,15 +194,7 @@ const analyzeAnswers = (answers = []) => {
   }
 
   const summary = `${classification.level}: score ${score}/100. ${riskFactors.length ? "Key gaps: " + riskFactors.join("; ") + "." : "The employee appears ready for a focused advisor conversation."}`;
-
-  return {
-    score,
-    level: classification.level,
-    priority: classification.priority,
-    summary,
-    riskFactors,
-    recommendations,
-  };
+  return { score, level: classification.level, priority: classification.priority, summary, riskFactors, recommendations };
 };
 
 const getFollowUpExpression = (priority) => {
@@ -233,9 +215,7 @@ const calculateReadinessForSubmission = async (connection, submissionId) => {
     [submissionId]
   );
 
-  if (submissions.length === 0 || !submissions[0].user_id) {
-    return null;
-  }
+  if (submissions.length === 0 || !submissions[0].user_id) return null;
 
   const submission = submissions[0];
   const [answers] = await connection.query(
@@ -252,7 +232,7 @@ const calculateReadinessForSubmission = async (connection, submissionId) => {
   await connection.query(
     `INSERT INTO employee_readiness_scores
      (user_id, partnership_id, quiz_id, latest_submission_id, score, level, priority, summary, risk_factors, recommendations, calculated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), NOW())
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
      ON DUPLICATE KEY UPDATE
        partnership_id = VALUES(partnership_id),
        quiz_id = VALUES(quiz_id),
@@ -279,10 +259,7 @@ const calculateReadinessForSubmission = async (connection, submissionId) => {
     ]
   );
 
-  const [[scoreRow]] = await connection.query(
-    `SELECT id FROM employee_readiness_scores WHERE user_id = ? LIMIT 1`,
-    [submission.user_id]
-  );
+  const [[scoreRow]] = await connection.query(`SELECT id FROM employee_readiness_scores WHERE user_id = ? LIMIT 1`, [submission.user_id]);
 
   await connection.query(`DELETE FROM employee_recommendations WHERE user_id = ?`, [submission.user_id]);
   for (const recommendation of result.recommendations) {
@@ -318,30 +295,12 @@ const calculateReadinessForSubmission = async (connection, submissionId) => {
        priority = VALUES(priority),
        status = CASE WHEN status IN ('closed', 'not_interested') THEN status ELSE 'open' END,
        next_action = VALUES(next_action),
-       follow_up_due_at = CASE
-         WHEN follow_up_due_at IS NULL OR follow_up_due_at < NOW() THEN VALUES(follow_up_due_at)
-         ELSE follow_up_due_at
-       END,
+       follow_up_due_at = CASE WHEN follow_up_due_at IS NULL OR follow_up_due_at < NOW() THEN VALUES(follow_up_due_at) ELSE follow_up_due_at END,
        updated_at = CURRENT_TIMESTAMP`,
-    [
-      submission.user_id,
-      submission.partnership_id || null,
-      assignment?.team_member_user_id || null,
-      scoreRow?.id || null,
-      submissionId,
-      result.priority,
-      nextAction,
-    ]
+    [submission.user_id, submission.partnership_id || null, assignment?.team_member_user_id || null, scoreRow?.id || null, submissionId, result.priority, nextAction]
   );
 
-  return {
-    ...result,
-    readiness_score_id: scoreRow?.id || null,
-  };
+  return { ...result, readiness_score_id: scoreRow?.id || null };
 };
 
-module.exports = {
-  ensureAdvancedLeadTables,
-  analyzeAnswers,
-  calculateReadinessForSubmission,
-};
+module.exports = { ensureAdvancedLeadTables, analyzeAnswers, calculateReadinessForSubmission };
