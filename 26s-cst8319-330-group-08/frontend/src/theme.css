@@ -1,3 +1,33 @@
+body,
+button,
+input,
+textarea,
+select {
+  font-family: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+body {
+  letter-spacing: -0.012em;
+}
+
+h1,
+h2,
+h3,
+h4,
+.tracking-tight {
+  letter-spacing: -0.045em;
+}
+
+.font-black {
+  font-weight: 800 !important;
+}
+
+.eyebrow,
+.status-pill,
+.uppercase {
+  letter-spacing: 0.12em;
+}
+
 html[data-theme="dark"] .bg-white,
 html[data-theme="dark"] .bg-white\/90,
 html[data-theme="dark"] .bg-white\/95,
