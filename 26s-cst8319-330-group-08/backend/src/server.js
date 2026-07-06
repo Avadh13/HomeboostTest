@@ -46,6 +46,8 @@ const resourceRecommendationRoutes = require("./routes/resourceRecommendationRou
 const companyAnalyticsRoutes = require("./routes/companyAnalyticsRoutes");
 const documentRoutes = require("./routes/documentRoutes");
 const automationRoutes = require("./routes/automationRoutes");
+const hbtSignupRoutes = require("./routes/hbtSignupRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 const app = express();
 const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -63,6 +65,7 @@ app.use((req, res, next) => {
 });
 app.use(cors(corsOptions));
 app.use(apiLimiter);
+app.post("/api/payments/stripe-webhook", express.raw({ type: "application/json" }), paymentRoutes.handleStripeWebhook);
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use("/uploads", express.static(uploadsDir));
@@ -146,6 +149,8 @@ app.use("/api/resource-recommendations", resourceRecommendationRoutes);
 app.use("/api/company-analytics", companyAnalyticsRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/automation", automationRoutes);
+app.use("/api/hbt-signup", hbtSignupRoutes);
+app.use("/api/payments", paymentRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
