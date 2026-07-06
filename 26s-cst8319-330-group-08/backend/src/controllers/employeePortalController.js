@@ -1,7 +1,9 @@
 const pool = require("../config/db");
+const { ensurePortalSettingsTable } = require("../routes/portalBrandingRoutes");
 
 exports.getEmployeePortalData = async (req, res) => {
   try {
+    await ensurePortalSettingsTable();
     const userId = req.user.id;
 
     const [users] = await pool.query(
@@ -13,9 +15,13 @@ exports.getEmployeePortalData = async (req, res) => {
          u.partnership_id,
          p.slug AS partnership_slug,
          e.name AS employer_name,
-         e.logo_url AS employer_logo_url,
-         e.brand_primary_color,
-         e.brand_secondary_color,
+         COALESCE(pps.logo_url, e.logo_url) AS employer_logo_url,
+         COALESCE(pps.primary_color, e.brand_primary_color) AS brand_primary_color,
+         COALESCE(pps.secondary_color, e.brand_secondary_color) AS brand_secondary_color,
+         COALESCE(pps.portal_title, CONCAT(e.name, ' Home Buying Portal')) AS portal_title,
+         pps.welcome_message,
+         pps.prompt_text,
+         pps.footer_text,
          h.id AS team_id,
          h.name AS team_name,
          h.description AS team_description,
@@ -27,6 +33,7 @@ exports.getEmployeePortalData = async (req, res) => {
        JOIN partnerships p ON u.partnership_id = p.id
        JOIN employers e ON p.employer_id = e.id
        JOIN home_buying_teams h ON p.team_id = h.id
+       LEFT JOIN partnership_portal_settings pps ON pps.partnership_id = p.id AND pps.is_published = 1
        WHERE u.id = ?
        LIMIT 1`,
       [userId]
