@@ -53,6 +53,7 @@ const journeyRoutes = require("./routes/journeyRoutes");
 const quizJourneyRoutes = require("./routes/quizJourneyRoutes");
 const inviteRoutes = require("./routes/inviteRoutes");
 const portalBrandingRoutes = require("./routes/portalBrandingRoutes");
+const employerApprovalRoutes = require("./routes/employerApprovalRoutes");
 
 const app = express();
 const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -75,31 +76,21 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use("/uploads", express.static(uploadsDir));
 
-app.get("/", (req, res) => {
-  res.send("HomeBoost backend is running");
-});
-
-app.get("/api/health", (req, res) => {
-  res.json({ status: "success", message: "Backend API is working" });
-});
+app.get("/", (req, res) => res.send("HomeBoost backend is running"));
+app.get("/api/health", (req, res) => res.json({ status: "success", message: "Backend API is working" }));
 
 if (!isProduction || process.env.ENABLE_DIAGNOSTIC_ROUTES === "true") {
   app.get("/api/test-db", async (req, res, next) => {
     try {
       const [rows] = await pool.query("SELECT 1 + 1 AS result");
       res.json({ status: "success", message: "Database connected successfully", result: rows[0].result });
-    } catch (error) {
-      next(error);
-    }
+    } catch (error) { next(error); }
   });
-
   app.get("/api/test-tables", async (req, res, next) => {
     try {
       const [tables] = await pool.query("SHOW TABLES");
       res.json({ status: "success", message: "Tables loaded successfully", tables });
-    } catch (error) {
-      next(error);
-    }
+    } catch (error) { next(error); }
   });
 }
 
@@ -148,15 +139,10 @@ app.use("/api/journeys", journeyRoutes);
 app.use("/api/quiz-journey-rules", quizJourneyRoutes);
 app.use("/api/invites", inviteRoutes);
 app.use("/api/portal-branding", portalBrandingRoutes);
+app.use("/api/employer-approval", employerApprovalRoutes);
 
-app.use((req, res) => {
-  res.status(404).json({ status: "error", message: "API route not found", path: req.originalUrl });
-});
-
+app.use((req, res) => res.status(404).json({ status: "error", message: "API route not found", path: req.originalUrl }));
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`Backend running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
