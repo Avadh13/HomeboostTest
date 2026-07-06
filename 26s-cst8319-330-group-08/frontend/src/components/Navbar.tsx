@@ -99,10 +99,9 @@ function Navbar() {
   };
 
   const publicLinks: NavLinkItem[] = [
-    { to: "/", label: "Home" },
-    { to: "/pricing", label: "Pricing" },
-    { to: "/partners", label: "Employer Portals", shortLabel: "Portals" },
-    { to: "/contact", label: "Contact" },
+    { to: "/", label: "Program" },
+    { to: "/hbt-signup", label: "Sign Up" },
+    { to: "/contact", label: "Book Discovery Call", shortLabel: "Discovery" },
   ];
 
   const employeeLinks: NavLinkItem[] = [
@@ -198,8 +197,8 @@ function Navbar() {
         <div className="hidden shrink-0 items-center gap-2 lg:flex xl:gap-3">
           {!isLoggedIn ? (
             <>
-              <Link to="/login" className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100 hover:text-blue-700 xl:px-5 xl:py-2.5">Login</Link>
-              <Link to="/partners" className="btn-primary px-4 py-2.5 text-sm xl:px-6"><span className="xl:hidden">Portals</span><span className="hidden xl:inline">Find Employer Portal</span></Link>
+              <Link to="/login" className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100 hover:text-blue-700 xl:px-5 xl:py-2.5">Sign In</Link>
+              <Link to="/hbt-signup" className="btn-primary px-4 py-2.5 text-sm xl:px-6">Sign Up</Link>
             </>
           ) : (
             <>
@@ -237,8 +236,8 @@ function Navbar() {
             })}
             {!isLoggedIn ? (
               <>
-                <Link to="/login" onClick={() => setOpen(false)} className="block rounded-2xl px-4 py-3 font-black text-slate-700 hover:bg-blue-50">Login</Link>
-                <Link to="/partners" onClick={() => setOpen(false)} className="block rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-3 text-center font-black text-white">Find Employer Portal</Link>
+                <Link to="/login" onClick={() => setOpen(false)} className="block rounded-2xl px-4 py-3 font-black text-slate-700 hover:bg-blue-50">Sign In</Link>
+                <Link to="/hbt-signup" onClick={() => setOpen(false)} className="block rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-3 text-center font-black text-white">Sign Up</Link>
               </>
             ) : <button onClick={handleLogout} className="block w-full rounded-2xl bg-red-600 px-4 py-3 text-center font-black text-white">Logout</button>}
           </div>
