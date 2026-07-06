@@ -1,11 +1,9 @@
 const express = require("express");
 const pool = require("../config/db");
-const { ensureSignupTables } = require("./hbtSignupRoutes");
+const { ensureSignupTables, getCheckoutClient } = require("./hbtSignupRoutes");
 const { provisionHbtFromRegistration } = require("../services/hbtProvisionService");
 
 const router = express.Router();
-const Stripe = require("stripe");
-const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
 const handleCheckoutCompleted = async (session) => {
   await ensureSignupTables();
@@ -26,7 +24,8 @@ const handleCheckoutCompleted = async (session) => {
 
 const handleStripeWebhook = async (req, res) => {
   try {
-    if (!stripe) return res.status(400).json({ status: "error", message: "Stripe is not configured" });
+    const stripe = getCheckoutClient();
+    if (!stripe) return res.status(400).json({ status: "error", message: "Checkout provider is not configured" });
 
     let event = req.body;
     const signature = req.headers["stripe-signature"];
