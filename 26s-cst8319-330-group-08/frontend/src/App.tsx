@@ -10,6 +10,8 @@ import InviteAccept from "./pages/InviteAccept";
 import InviteCenter from "./pages/InviteCenter";
 import PortalBrandingSettings from "./pages/PortalBrandingSettings";
 import EmployerApprovalCenter from "./pages/EmployerApprovalCenter";
+import HBTJourneyBuilder from "./pages/HBTJourneyBuilder";
+import QuizJourneyRuleManager from "./pages/QuizJourneyRuleManager";
 import EmployeePortal from "./pages/EmployeePortal";
 import EmployeeAppointments from "./pages/EmployeeAppointments";
 import EmployeeJourney from "./pages/EmployeeJourney";
@@ -79,7 +81,7 @@ const localNavbarExactPaths = new Set([
   "/", "/pricing", "/contact", "/login", "/signup", "/hbt-signup", "/payment-success", "/partners", "/mortgage-request", "/profile",
   "/company/dashboard", "/company/invites", "/company/branding", "/company/employer-approval", "/company/messages",
   "/employee/messages", "/employee/appointments", "/employee/journey",
-  "/hbt/messages", "/hbt/courses", "/hbt/invites", "/hbt/branding", "/hbt/employer-approvals",
+  "/hbt/messages", "/hbt/courses", "/hbt/invites", "/hbt/branding", "/hbt/employer-approvals", "/hbt/journeys", "/hbt/quiz-journey-rules",
 ]);
 
 const localNavbarPrefixes = ["/resources", "/quiz", "/invite"];
@@ -137,6 +139,8 @@ function App() {
         <Route path="/hbt/resources" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTResources /></RoleProtectedRoute>} />
         <Route path="/hbt/events" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTEvents /></RoleProtectedRoute>} />
         <Route path="/hbt/courses" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTCourses /></RoleProtectedRoute>} />
+        <Route path="/hbt/journeys" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTJourneyBuilder /></RoleProtectedRoute>} />
+        <Route path="/hbt/quiz-journey-rules" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><QuizJourneyRuleManager /></RoleProtectedRoute>} />
         <Route path="/hbt/invites" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><InviteCenter /></RoleProtectedRoute>} />
         <Route path="/hbt/branding" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><PortalBrandingSettings /></RoleProtectedRoute>} />
         <Route path="/hbt/employer-approvals" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><EmployerApprovalCenter /></RoleProtectedRoute>} />
