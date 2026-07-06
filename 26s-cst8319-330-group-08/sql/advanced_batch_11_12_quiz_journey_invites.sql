@@ -52,12 +52,9 @@ CREATE TABLE IF NOT EXISTS invite_logs (
 );
 
 -- Existing projects may already have employee_invites without token columns.
+-- If your MySQL version does not support ADD COLUMN IF NOT EXISTS, use the backend route once; it patches columns automatically.
 ALTER TABLE employee_invites ADD COLUMN IF NOT EXISTS invite_token VARCHAR(120) NULL;
 ALTER TABLE employee_invites ADD COLUMN IF NOT EXISTS invite_code VARCHAR(40) NULL;
 ALTER TABLE employee_invites ADD COLUMN IF NOT EXISTS expires_at DATETIME NULL;
 ALTER TABLE employee_invites ADD COLUMN IF NOT EXISTS accepted_at DATETIME NULL;
 ALTER TABLE employee_invites ADD COLUMN IF NOT EXISTS last_sent_at DATETIME NULL;
-
-CREATE INDEX IF NOT EXISTS idx_employee_invites_token ON employee_invites (invite_token);
-CREATE INDEX IF NOT EXISTS idx_employee_invites_code ON employee_invites (invite_code);
-CREATE INDEX IF NOT EXISTS idx_employee_invites_expires ON employee_invites (expires_at);
