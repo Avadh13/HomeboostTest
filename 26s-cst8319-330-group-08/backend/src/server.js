@@ -50,6 +50,8 @@ const hbtSignupRoutes = require("./routes/hbtSignupRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const courseRoutes = require("./routes/courseRoutes");
 const journeyRoutes = require("./routes/journeyRoutes");
+const quizJourneyRoutes = require("./routes/quizJourneyRoutes");
+const inviteRoutes = require("./routes/inviteRoutes");
 
 const app = express();
 const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -77,22 +79,14 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({
-    status: "success",
-    message: "Backend API is working",
-  });
+  res.json({ status: "success", message: "Backend API is working" });
 });
 
 if (!isProduction || process.env.ENABLE_DIAGNOSTIC_ROUTES === "true") {
   app.get("/api/test-db", async (req, res, next) => {
     try {
       const [rows] = await pool.query("SELECT 1 + 1 AS result");
-
-      res.json({
-        status: "success",
-        message: "Database connected successfully",
-        result: rows[0].result,
-      });
+      res.json({ status: "success", message: "Database connected successfully", result: rows[0].result });
     } catch (error) {
       next(error);
     }
@@ -101,12 +95,7 @@ if (!isProduction || process.env.ENABLE_DIAGNOSTIC_ROUTES === "true") {
   app.get("/api/test-tables", async (req, res, next) => {
     try {
       const [tables] = await pool.query("SHOW TABLES");
-
-      res.json({
-        status: "success",
-        message: "Tables loaded successfully",
-        tables,
-      });
+      res.json({ status: "success", message: "Tables loaded successfully", tables });
     } catch (error) {
       next(error);
     }
@@ -155,13 +144,11 @@ app.use("/api/hbt-signup", hbtSignupRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/journeys", journeyRoutes);
+app.use("/api/quiz-journey-rules", quizJourneyRoutes);
+app.use("/api/invites", inviteRoutes);
 
 app.use((req, res) => {
-  res.status(404).json({
-    status: "error",
-    message: "API route not found",
-    path: req.originalUrl,
-  });
+  res.status(404).json({ status: "error", message: "API route not found", path: req.originalUrl });
 });
 
 app.use(errorHandler);
