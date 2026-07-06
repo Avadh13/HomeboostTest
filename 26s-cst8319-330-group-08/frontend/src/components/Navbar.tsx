@@ -85,19 +85,19 @@ function Navbar() {
 
   const companyLinks: NavLinkItem[] = [
     { to: "/company/dashboard", label: "Dashboard", shortLabel: "Dash" },
+    { to: "/company/employer-approval", label: "Approval", shortLabel: "Approve" },
     { to: "/company/invites", label: "Invites" },
     { to: "/company/branding", label: "Branding" },
     { to: "/company/messages", label: "Messages" },
-    { to: "/notifications", label: "Notifications", shortLabel: "Alerts" },
   ];
 
   const hbtAdminLinks: NavLinkItem[] = [
     { to: "/hbt/dashboard", label: "Dashboard", shortLabel: "Dash" },
+    { to: "/hbt/employer-approvals", label: "Approvals", shortLabel: "Approvals" },
     { to: "/hbt/courses", label: "Courses" },
     { to: "/hbt/invites", label: "Invites" },
     { to: "/hbt/branding", label: "Branding" },
     { to: "/hbt/companies", label: "Companies" },
-    { to: "/hbt/employees", label: "Employees" },
     { to: "/hbt/messages", label: "Messages" },
   ];
 
