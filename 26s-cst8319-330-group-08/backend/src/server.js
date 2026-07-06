@@ -44,6 +44,8 @@ const readinessRoutes = require("./routes/readinessRoutes");
 const leadPipelineRoutes = require("./routes/leadPipelineRoutes");
 const resourceRecommendationRoutes = require("./routes/resourceRecommendationRoutes");
 const companyAnalyticsRoutes = require("./routes/companyAnalyticsRoutes");
+const documentRoutes = require("./routes/documentRoutes");
+const automationRoutes = require("./routes/automationRoutes");
 
 const app = express();
 const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -142,6 +144,8 @@ app.use("/api/readiness", readinessRoutes);
 app.use("/api/lead-pipeline", leadPipelineRoutes);
 app.use("/api/resource-recommendations", resourceRecommendationRoutes);
 app.use("/api/company-analytics", companyAnalyticsRoutes);
+app.use("/api/documents", documentRoutes);
+app.use("/api/automation", automationRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
