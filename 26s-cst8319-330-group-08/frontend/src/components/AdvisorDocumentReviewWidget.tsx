@@ -9,6 +9,7 @@ type ReviewDocument = {
   employer_name?: string | null;
   document_title: string;
   original_filename?: string | null;
+  file_size_bytes?: number | null;
   status: string;
   uploaded_at: string;
 };
@@ -36,9 +37,7 @@ function AdvisorDocumentReviewWidget() {
       .catch(() => setDocuments([]));
   };
 
-  useEffect(() => {
-    loadQueue();
-  }, [shouldShow, token]);
+  useEffect(() => { loadQueue(); }, [shouldShow, token]);
 
   const updateStatus = async (documentId: number, status: string) => {
     try {
@@ -57,28 +56,24 @@ function AdvisorDocumentReviewWidget() {
   if (!shouldShow || documents.length === 0) return null;
 
   return (
-    <aside className="fixed bottom-[13rem] left-4 z-30 hidden w-[390px] rounded-[1.5rem] border border-orange-100 bg-white p-4 shadow-2xl shadow-slate-900/15 2xl:block">
+    <aside className="fixed bottom-[13rem] left-4 z-30 hidden w-[410px] rounded-[1.5rem] border border-orange-100 bg-white p-4 shadow-2xl shadow-slate-900/15 2xl:block">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Document review</p>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Secure document review</p>
           <h3 className="mt-1 text-lg font-black text-slate-950">Advisor review queue</h3>
           <p className="mt-1 text-xs font-bold text-slate-500">{documents.length} item(s) need attention</p>
         </div>
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-xl font-black text-orange-700 ring-1 ring-orange-100">
-          {documents.length}
-        </div>
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-xl font-black text-orange-700 ring-1 ring-orange-100">{documents.length}</div>
       </div>
       <div className="space-y-2">
         {documents.slice(0, 3).map((doc) => (
           <div key={doc.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <h4 className="line-clamp-1 font-black text-slate-950">{doc.employee_name}</h4>
-                <p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-500">{doc.document_title}</p>
-              </div>
+              <div className="min-w-0"><h4 className="line-clamp-1 font-black text-slate-950">{doc.employee_name}</h4><p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-500">{doc.document_title} · {doc.original_filename || "file"}</p></div>
               <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${statusTone(doc.status)}`}>{doc.status.replace(/_/g, " ")}</span>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
+              <a href={`${API_BASE_URL}/documents/${doc.id}/download`} target="_blank" rel="noreferrer" className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-700 ring-1 ring-slate-200">Download</a>
               <button disabled={loading} onClick={() => updateStatus(doc.id, "under_review")} className="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-700 disabled:opacity-60">Review</button>
               <button disabled={loading} onClick={() => updateStatus(doc.id, "approved")} className="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-black text-emerald-700 disabled:opacity-60">Approve</button>
               <button disabled={loading} onClick={() => updateStatus(doc.id, "needs_correction")} className="rounded-full bg-red-100 px-3 py-1.5 text-xs font-black text-red-700 disabled:opacity-60">Fix</button>
