@@ -54,6 +54,8 @@ const quizJourneyRoutes = require("./routes/quizJourneyRoutes");
 const inviteRoutes = require("./routes/inviteRoutes");
 const portalBrandingRoutes = require("./routes/portalBrandingRoutes");
 const employerApprovalRoutes = require("./routes/employerApprovalRoutes");
+const reportRoutes = require("./routes/reportRoutes");
+const qaRoutes = require("./routes/qaRoutes");
 
 const app = express();
 const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -140,6 +142,8 @@ app.use("/api/quiz-journey-rules", quizJourneyRoutes);
 app.use("/api/invites", inviteRoutes);
 app.use("/api/portal-branding", portalBrandingRoutes);
 app.use("/api/employer-approval", employerApprovalRoutes);
+app.use("/api/reports", reportRoutes);
+app.use("/api/qa", qaRoutes);
 
 app.use((req, res) => res.status(404).json({ status: "error", message: "API route not found", path: req.originalUrl }));
 app.use(errorHandler);
