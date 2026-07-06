@@ -48,6 +48,8 @@ const documentRoutes = require("./routes/documentRoutes");
 const automationRoutes = require("./routes/automationRoutes");
 const hbtSignupRoutes = require("./routes/hbtSignupRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const courseRoutes = require("./routes/courseRoutes");
+const journeyRoutes = require("./routes/journeyRoutes");
 
 const app = express();
 const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -151,6 +153,8 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/automation", automationRoutes);
 app.use("/api/hbt-signup", hbtSignupRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/courses", courseRoutes);
+app.use("/api/journeys", journeyRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
