@@ -65,6 +65,18 @@ function EmployeeDocumentChecklistWidget() {
     }
   };
 
+  const downloadDocument = async (documentId: number, filename?: string | null) => {
+    const response = await fetch(`${API_BASE_URL}/documents/${documentId}/download`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) return;
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename || `document-${documentId}`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   if (!shouldShow || !payload) return null;
   const nextItems = payload.checklist.slice(0, 4);
 
@@ -87,7 +99,7 @@ function EmployeeDocumentChecklistWidget() {
               <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${statusTone(item.status)}`}>{item.status.replace(/_/g, " ")}</span>
             </div>
             {item.document ? (
-              <a href={`${API_BASE_URL}/documents/${item.document.id}/download`} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-full bg-white px-3 py-1.5 text-xs font-black text-sky-700 ring-1 ring-sky-100 hover:bg-sky-50">Download</a>
+              <button onClick={() => downloadDocument(item.document!.id, item.document!.original_filename)} className="mt-2 inline-flex rounded-full bg-white px-3 py-1.5 text-xs font-black text-sky-700 ring-1 ring-sky-100 hover:bg-sky-50">Download</button>
             ) : (
               <div className="mt-2 grid gap-2">
                 <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" onChange={(event) => setSelectedFiles((current) => ({ ...current, [item.id]: event.target.files?.[0] || null }))} className="text-xs font-semibold text-slate-600" />
