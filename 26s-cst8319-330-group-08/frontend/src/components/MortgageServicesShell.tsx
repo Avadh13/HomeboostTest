@@ -3,6 +3,9 @@ import MortgageServicesSection from "./MortgageServicesSection";
 import EmployeeMortgageRequestsPanel from "./EmployeeMortgageRequestsPanel";
 import AdvisorRequestsPanel from "./AdvisorRequestsPanel";
 import CompanyBenefitSummaryPanel from "./CompanyBenefitSummaryPanel";
+import EmployeeDocumentChecklistWidget from "./EmployeeDocumentChecklistWidget";
+import AdvisorDocumentReviewWidget from "./AdvisorDocumentReviewWidget";
+import AppointmentAutomationWidget from "./AppointmentAutomationWidget";
 
 const publicPaths = ["/", "/pricing", "/contact", "/partners"];
 
@@ -10,11 +13,25 @@ function MortgageServicesShell() {
   const location = useLocation();
 
   if (location.pathname === "/employee-portal") {
-    return <EmployeeMortgageRequestsPanel />;
+    return (
+      <>
+        <EmployeeMortgageRequestsPanel />
+        <EmployeeDocumentChecklistWidget />
+      </>
+    );
   }
 
   if (location.pathname === "/hbt/member-dashboard" || location.pathname === "/hbt/dashboard") {
-    return <AdvisorRequestsPanel />;
+    return (
+      <>
+        <AdvisorRequestsPanel />
+        <AdvisorDocumentReviewWidget />
+      </>
+    );
+  }
+
+  if (location.pathname === "/hbt/appointments") {
+    return <AppointmentAutomationWidget />;
   }
 
   if (location.pathname === "/company/dashboard") {
