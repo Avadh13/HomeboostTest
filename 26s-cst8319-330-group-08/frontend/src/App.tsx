@@ -12,6 +12,8 @@ import PortalBrandingSettings from "./pages/PortalBrandingSettings";
 import EmployerApprovalCenter from "./pages/EmployerApprovalCenter";
 import HBTJourneyBuilder from "./pages/HBTJourneyBuilder";
 import QuizJourneyRuleManager from "./pages/QuizJourneyRuleManager";
+import ReportsExportCenter from "./pages/ReportsExportCenter";
+import DeploymentReadinessCenter from "./pages/DeploymentReadinessCenter";
 import EmployeePortal from "./pages/EmployeePortal";
 import EmployeeAppointments from "./pages/EmployeeAppointments";
 import EmployeeJourney from "./pages/EmployeeJourney";
@@ -79,9 +81,9 @@ import RecommendedResourcesWidget from "./components/RecommendedResourcesWidget"
 
 const localNavbarExactPaths = new Set([
   "/", "/pricing", "/contact", "/login", "/signup", "/hbt-signup", "/payment-success", "/partners", "/mortgage-request", "/profile",
-  "/company/dashboard", "/company/invites", "/company/branding", "/company/employer-approval", "/company/messages",
+  "/company/dashboard", "/company/invites", "/company/branding", "/company/employer-approval", "/company/reports", "/company/messages",
   "/employee/messages", "/employee/appointments", "/employee/journey",
-  "/hbt/messages", "/hbt/courses", "/hbt/invites", "/hbt/branding", "/hbt/employer-approvals", "/hbt/journeys", "/hbt/quiz-journey-rules",
+  "/hbt/messages", "/hbt/courses", "/hbt/invites", "/hbt/branding", "/hbt/employer-approvals", "/hbt/journeys", "/hbt/quiz-journey-rules", "/hbt/reports", "/hbt/qa",
 ]);
 
 const localNavbarPrefixes = ["/resources", "/quiz", "/invite"];
@@ -131,6 +133,7 @@ function App() {
         <Route path="/company/invites" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><InviteCenter /></RoleProtectedRoute>} />
         <Route path="/company/branding" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><PortalBrandingSettings /></RoleProtectedRoute>} />
         <Route path="/company/employer-approval" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><EmployerApprovalCenter /></RoleProtectedRoute>} />
+        <Route path="/company/reports" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><ReportsExportCenter /></RoleProtectedRoute>} />
 
         <Route path="/hbt/dashboard" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTDashboard /></RoleProtectedRoute>} />
         <Route path="/hbt/companies" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTCompanies /></RoleProtectedRoute>} />
@@ -141,6 +144,8 @@ function App() {
         <Route path="/hbt/courses" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTCourses /></RoleProtectedRoute>} />
         <Route path="/hbt/journeys" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTJourneyBuilder /></RoleProtectedRoute>} />
         <Route path="/hbt/quiz-journey-rules" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><QuizJourneyRuleManager /></RoleProtectedRoute>} />
+        <Route path="/hbt/reports" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><ReportsExportCenter /></RoleProtectedRoute>} />
+        <Route path="/hbt/qa" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><DeploymentReadinessCenter /></RoleProtectedRoute>} />
         <Route path="/hbt/invites" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><InviteCenter /></RoleProtectedRoute>} />
         <Route path="/hbt/branding" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><PortalBrandingSettings /></RoleProtectedRoute>} />
         <Route path="/hbt/employer-approvals" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><EmployerApprovalCenter /></RoleProtectedRoute>} />
@@ -170,6 +175,8 @@ function App() {
         <Route path="/admin/quizzes" element={<AdminProtectedRoute><ManageQuizzes /></AdminProtectedRoute>} />
         <Route path="/admin/quizzes/:quizId/questions" element={<AdminProtectedRoute><ManageQuizQuestions /></AdminProtectedRoute>} />
         <Route path="/admin/quiz-submissions" element={<AdminProtectedRoute><QuizSubmissions /></AdminProtectedRoute>} />
+        <Route path="/admin/reports" element={<AdminProtectedRoute><ReportsExportCenter /></AdminProtectedRoute>} />
+        <Route path="/admin/qa" element={<AdminProtectedRoute><DeploymentReadinessCenter /></AdminProtectedRoute>} />
         <Route path="/admin/messages" element={<AdminProtectedRoute><AdminLayout title="Communication Center"><MessageCenter embedded /></AdminLayout></AdminProtectedRoute>} />
         <Route path="/admin/notifications" element={<AdminProtectedRoute><AdminLayout title="Alerts Center"><NotificationCenter embedded /></AdminLayout></AdminProtectedRoute>} />
         <Route path="/admin/profile" element={<AdminProtectedRoute><AdminLayout title="My Profile"><ProfilePage embedded /></AdminLayout></AdminProtectedRoute>} />
