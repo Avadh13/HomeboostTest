@@ -51,10 +51,29 @@ CREATE TABLE IF NOT EXISTS invite_logs (
   INDEX idx_invite_logs_action (action)
 );
 
--- Existing projects may already have employee_invites without token columns.
--- If your MySQL version does not support ADD COLUMN IF NOT EXISTS, use the backend route once; it patches columns automatically.
-ALTER TABLE employee_invites ADD COLUMN IF NOT EXISTS invite_token VARCHAR(120) NULL;
-ALTER TABLE employee_invites ADD COLUMN IF NOT EXISTS invite_code VARCHAR(40) NULL;
-ALTER TABLE employee_invites ADD COLUMN IF NOT EXISTS expires_at DATETIME NULL;
-ALTER TABLE employee_invites ADD COLUMN IF NOT EXISTS accepted_at DATETIME NULL;
-ALTER TABLE employee_invites ADD COLUMN IF NOT EXISTS last_sent_at DATETIME NULL;
+DROP PROCEDURE IF EXISTS add_employee_invite_column;
+DELIMITER $$
+CREATE PROCEDURE add_employee_invite_column(IN column_name_value VARCHAR(64), IN column_definition_value VARCHAR(255))
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'employee_invites'
+      AND COLUMN_NAME = column_name_value
+  ) THEN
+    SET @statement = CONCAT('ALTER TABLE employee_invites ADD COLUMN ', column_name_value, ' ', column_definition_value);
+    PREPARE stmt FROM @statement;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END$$
+DELIMITER ;
+
+CALL add_employee_invite_column('invite_token', 'VARCHAR(120) NULL');
+CALL add_employee_invite_column('invite_code', 'VARCHAR(40) NULL');
+CALL add_employee_invite_column('expires_at', 'DATETIME NULL');
+CALL add_employee_invite_column('accepted_at', 'DATETIME NULL');
+CALL add_employee_invite_column('last_sent_at', 'DATETIME NULL');
+
+DROP PROCEDURE IF EXISTS add_employee_invite_column;
