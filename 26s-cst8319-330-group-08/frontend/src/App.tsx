@@ -9,6 +9,7 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import InviteAccept from "./pages/InviteAccept";
 import InviteCenter from "./pages/InviteCenter";
 import PortalBrandingSettings from "./pages/PortalBrandingSettings";
+import EmployerApprovalCenter from "./pages/EmployerApprovalCenter";
 import EmployeePortal from "./pages/EmployeePortal";
 import EmployeeAppointments from "./pages/EmployeeAppointments";
 import EmployeeJourney from "./pages/EmployeeJourney";
@@ -75,27 +76,10 @@ import CompanyROIWidget from "./components/CompanyROIWidget";
 import RecommendedResourcesWidget from "./components/RecommendedResourcesWidget";
 
 const localNavbarExactPaths = new Set([
-  "/",
-  "/pricing",
-  "/contact",
-  "/login",
-  "/signup",
-  "/hbt-signup",
-  "/payment-success",
-  "/partners",
-  "/mortgage-request",
-  "/profile",
-  "/company/dashboard",
-  "/company/invites",
-  "/company/branding",
-  "/employee/messages",
-  "/employee/appointments",
-  "/employee/journey",
-  "/company/messages",
-  "/hbt/messages",
-  "/hbt/courses",
-  "/hbt/invites",
-  "/hbt/branding",
+  "/", "/pricing", "/contact", "/login", "/signup", "/hbt-signup", "/payment-success", "/partners", "/mortgage-request", "/profile",
+  "/company/dashboard", "/company/invites", "/company/branding", "/company/employer-approval", "/company/messages",
+  "/employee/messages", "/employee/appointments", "/employee/journey",
+  "/hbt/messages", "/hbt/courses", "/hbt/invites", "/hbt/branding", "/hbt/employer-approvals",
 ]);
 
 const localNavbarPrefixes = ["/resources", "/quiz", "/invite"];
@@ -144,6 +128,7 @@ function App() {
         <Route path="/company/messages" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><MessageCenter /></RoleProtectedRoute>} />
         <Route path="/company/invites" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><InviteCenter /></RoleProtectedRoute>} />
         <Route path="/company/branding" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><PortalBrandingSettings /></RoleProtectedRoute>} />
+        <Route path="/company/employer-approval" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><EmployerApprovalCenter /></RoleProtectedRoute>} />
 
         <Route path="/hbt/dashboard" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTDashboard /></RoleProtectedRoute>} />
         <Route path="/hbt/companies" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTCompanies /></RoleProtectedRoute>} />
@@ -154,6 +139,7 @@ function App() {
         <Route path="/hbt/courses" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTCourses /></RoleProtectedRoute>} />
         <Route path="/hbt/invites" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><InviteCenter /></RoleProtectedRoute>} />
         <Route path="/hbt/branding" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><PortalBrandingSettings /></RoleProtectedRoute>} />
+        <Route path="/hbt/employer-approvals" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><EmployerApprovalCenter /></RoleProtectedRoute>} />
         <Route path="/hbt/appointments" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTAppointments /></RoleProtectedRoute>} />
         <Route path="/hbt/availability" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTAvailability /></RoleProtectedRoute>} />
         <Route path="/hbt/quiz-submissions" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTQuizSubmissions /></RoleProtectedRoute>} />
