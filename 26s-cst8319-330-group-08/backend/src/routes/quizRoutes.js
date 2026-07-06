@@ -5,30 +5,19 @@ const pool = require("../config/db");
 const authMiddleware = require("../middleware/authMiddleware");
 const quizController = require("../controllers/quizController");
 const { ensureAdvancedLeadTables, calculateReadinessForSubmission } = require("../services/readinessService");
+const { assignJourneyForSubmission } = require("../services/quizJourneyService");
 
 const adminOrHbtOnly = (req, res, next) => {
-  if (
-    !req.user ||
-    !["admin", "super_admin", "hbt_admin", "hbt_member"].includes(req.user.role)
-  ) {
-    return res.status(403).json({
-      message: "Admin or HBT access required",
-    });
+  if (!req.user || !["admin", "super_admin", "hbt_admin", "hbt_member"].includes(req.user.role)) {
+    return res.status(403).json({ message: "Admin or HBT access required" });
   }
-
   next();
 };
 
 const adminOnly = (req, res, next) => {
-  if (
-    !req.user ||
-    !["admin", "super_admin"].includes(req.user.role)
-  ) {
-    return res.status(403).json({
-      message: "Admin access required",
-    });
+  if (!req.user || !["admin", "super_admin"].includes(req.user.role)) {
+    return res.status(403).json({ message: "Admin access required" });
   }
-
   next();
 };
 
@@ -41,13 +30,14 @@ const submitQuizWithReadiness = async (req, res, next) => {
       try {
         await connection.beginTransaction();
         const readiness = await calculateReadinessForSubmission(connection, body.submission_id);
+        const journey_assignment = await assignJourneyForSubmission(connection, body.submission_id);
         await connection.commit();
-        return originalJson({ ...body, readiness });
+        return originalJson({ ...body, readiness, journey_assignment });
       } catch (error) {
         await connection.rollback();
         return originalJson({
           ...body,
-          readiness_warning: "Quiz saved, but readiness score could not be calculated automatically.",
+          readiness_warning: "Quiz saved, but readiness/journey automation could not run automatically.",
           readiness_error: error.message,
         });
       } finally {
@@ -96,7 +86,9 @@ const latestQuizSubmissionsOnly = async (req, res) => {
         lp.stage AS lead_stage,
         lp.priority AS lead_priority,
         lp.next_action AS lead_next_action,
-        lp.follow_up_due_at AS lead_follow_up_due_at
+        lp.follow_up_due_at AS lead_follow_up_due_at,
+        ej.id AS journey_assignment_id,
+        j.title AS journey_title
        FROM quiz_submissions qs
        LEFT JOIN quizzes q ON qs.quiz_id = q.id
        LEFT JOIN users u ON qs.user_id = u.id
@@ -105,6 +97,8 @@ const latestQuizSubmissionsOnly = async (req, res) => {
        LEFT JOIN home_buying_teams h ON p.team_id = h.id
        LEFT JOIN employee_readiness_scores ers ON ers.latest_submission_id = qs.id
        LEFT JOIN lead_pipeline lp ON lp.employee_user_id = qs.user_id
+       LEFT JOIN employee_journey_assignments ej ON ej.user_id = qs.user_id AND ej.status = 'active'
+       LEFT JOIN journeys j ON j.id = ej.journey_id
        ${whereClause}
        ORDER BY qs.submitted_at DESC, qs.id DESC`,
       params
@@ -118,11 +112,7 @@ const latestQuizSubmissionsOnly = async (req, res) => {
       const existing = latestMap.get(quizKey);
 
       if (!existing) {
-        latestMap.set(quizKey, {
-          ...submission,
-          is_latest_submission: true,
-          older_submission_count: 0,
-        });
+        latestMap.set(quizKey, { ...submission, is_latest_submission: true, older_submission_count: 0 });
       } else {
         existing.older_submission_count = Number(existing.older_submission_count || 0) + 1;
       }
@@ -144,106 +134,31 @@ const latestQuizSubmissionsOnly = async (req, res) => {
          ORDER BY qq.display_order ASC, qa.id ASC`,
         [submission.id]
       );
-
       submission.answers = answers;
     }
 
     return res.json(latestSubmissions);
   } catch (error) {
-    return res.status(500).json({
-      status: "error",
-      message: "Failed to load latest quiz submissions",
-      error: error.message,
-    });
+    return res.status(500).json({ status: "error", message: "Failed to load latest quiz submissions", error: error.message });
   }
 };
 
-/*
-  Quiz submissions:
-  - Admin/Super Admin can see latest submissions for all employees
-  - HBT Admin/HBT Member can see latest submissions from partnerships assigned to their team
-  - Older attempts are hidden from the follow-up queue so advisors focus on the newest quiz only
-*/
-router.get(
-  "/submissions",
-  authMiddleware,
-  adminOrHbtOnly,
-  latestQuizSubmissionsOnly
-);
+router.get("/submissions", authMiddleware, adminOrHbtOnly, latestQuizSubmissionsOnly);
+router.get("/submissions/:id", authMiddleware, adminOrHbtOnly, quizController.getQuizSubmissionDetails);
+router.put("/submissions/:id/follow-up-status", authMiddleware, adminOrHbtOnly, quizController.updateQuizSubmissionFollowUpStatus);
 
-router.get(
-  "/submissions/:id",
-  authMiddleware,
-  adminOrHbtOnly,
-  quizController.getQuizSubmissionDetails
-);
-
-router.put(
-  "/submissions/:id/follow-up-status",
-  authMiddleware,
-  adminOrHbtOnly,
-  quizController.updateQuizSubmissionFollowUpStatus
-);
-
-/*
-  Public/employee quiz reading
-*/
 router.get("/", quizController.getQuizzes);
-
 router.get("/:quizId/questions", quizController.getQuizQuestions);
 
-/*
-  Admin quiz management
-*/
 router.post("/", authMiddleware, adminOnly, quizController.createQuiz);
 router.put("/:id", authMiddleware, adminOnly, quizController.updateQuiz);
 router.delete("/:id", authMiddleware, adminOnly, quizController.deleteQuiz);
-
-router.post(
-  "/questions",
-  authMiddleware,
-  adminOnly,
-  quizController.createQuizQuestion
-);
-
-router.put(
-  "/questions/:id",
-  authMiddleware,
-  adminOnly,
-  quizController.updateQuizQuestion
-);
-
-router.delete(
-  "/questions/:id",
-  authMiddleware,
-  adminOnly,
-  quizController.deleteQuizQuestion
-);
-
-router.post(
-  "/options",
-  authMiddleware,
-  adminOnly,
-  quizController.createQuizOption
-);
-
-router.put(
-  "/options/:id",
-  authMiddleware,
-  adminOnly,
-  quizController.updateQuizOption
-);
-
-router.delete(
-  "/options/:id",
-  authMiddleware,
-  adminOnly,
-  quizController.deleteQuizOption
-);
-
-/*
-  Employee quiz submit
-*/
+router.post("/questions", authMiddleware, adminOnly, quizController.createQuizQuestion);
+router.put("/questions/:id", authMiddleware, adminOnly, quizController.updateQuizQuestion);
+router.delete("/questions/:id", authMiddleware, adminOnly, quizController.deleteQuizQuestion);
+router.post("/options", authMiddleware, adminOnly, quizController.createQuizOption);
+router.put("/options/:id", authMiddleware, adminOnly, quizController.updateQuizOption);
+router.delete("/options/:id", authMiddleware, adminOnly, quizController.deleteQuizOption);
 router.post("/submit", authMiddleware, submitQuizWithReadiness);
 
 module.exports = router;
