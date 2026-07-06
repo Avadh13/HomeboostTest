@@ -86,6 +86,7 @@ function Navbar() {
   const companyLinks: NavLinkItem[] = [
     { to: "/company/dashboard", label: "Dashboard", shortLabel: "Dash" },
     { to: "/company/employer-approval", label: "Approval", shortLabel: "Approve" },
+    { to: "/company/reports", label: "Reports" },
     { to: "/company/invites", label: "Invites" },
     { to: "/company/branding", label: "Branding" },
     { to: "/company/messages", label: "Messages" },
@@ -93,6 +94,8 @@ function Navbar() {
 
   const hbtAdminLinks: NavLinkItem[] = [
     { to: "/hbt/dashboard", label: "Dashboard", shortLabel: "Dash" },
+    { to: "/hbt/reports", label: "Reports" },
+    { to: "/hbt/qa", label: "QA" },
     { to: "/hbt/journeys", label: "Journeys" },
     { to: "/hbt/quiz-journey-rules", label: "Rules" },
     { to: "/hbt/employer-approvals", label: "Approvals", shortLabel: "Approvals" },
@@ -104,6 +107,7 @@ function Navbar() {
 
   const hbtMemberLinks: NavLinkItem[] = [
     { to: "/hbt/member-dashboard", label: "Dashboard", shortLabel: "Dash" },
+    { to: "/hbt/reports", label: "Reports" },
     { to: "/hbt/courses", label: "Courses" },
     { to: "/hbt/messages", label: "Messages" },
     { to: "/notifications", label: "Notifications", shortLabel: "Alerts" },
@@ -113,6 +117,8 @@ function Navbar() {
 
   const adminLinks: NavLinkItem[] = [
     { to: "/admin", label: "Admin" },
+    { to: "/admin/reports", label: "Reports" },
+    { to: "/admin/qa", label: "QA" },
     { to: "/admin/messages", label: "Messages" },
     { to: "/admin/notifications", label: "Notifications", shortLabel: "Alerts" },
     { to: "/admin/profile", label: "Profile" },
