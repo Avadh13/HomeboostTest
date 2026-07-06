@@ -93,11 +93,12 @@ function Navbar() {
 
   const hbtAdminLinks: NavLinkItem[] = [
     { to: "/hbt/dashboard", label: "Dashboard", shortLabel: "Dash" },
+    { to: "/hbt/journeys", label: "Journeys" },
+    { to: "/hbt/quiz-journey-rules", label: "Rules" },
     { to: "/hbt/employer-approvals", label: "Approvals", shortLabel: "Approvals" },
     { to: "/hbt/courses", label: "Courses" },
     { to: "/hbt/invites", label: "Invites" },
     { to: "/hbt/branding", label: "Branding" },
-    { to: "/hbt/companies", label: "Companies" },
     { to: "/hbt/messages", label: "Messages" },
   ];
 
