@@ -2,8 +2,16 @@ const express = require("express");
 const pool = require("../config/db");
 
 const router = express.Router();
-const Stripe = require("stripe");
-const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+
+const getCheckoutClient = () => {
+  if (!process.env.STRIPE_SECRET_KEY) return null;
+  try {
+    const Stripe = require("stripe");
+    return new Stripe(process.env.STRIPE_SECRET_KEY);
+  } catch {
+    return null;
+  }
+};
 
 const clean = (value, max = 255) => String(value || "").trim().slice(0, max);
 const appUrl = () => (process.env.FRONTEND_URL || process.env.CLIENT_URL || "http://localhost:5173").replace(/\/+$/, "");
@@ -68,6 +76,7 @@ router.post("/start", async (req, res) => {
     );
 
     const registrationId = result.insertId;
+    const stripe = getCheckoutClient();
 
     if (!stripe) {
       await pool.query("UPDATE hbt_registrations SET payment_status = 'demo_pending' WHERE id = ?", [registrationId]);
@@ -76,7 +85,7 @@ router.post("/start", async (req, res) => {
         mode: "demo",
         registration_id: registrationId,
         checkout_url: `${appUrl()}/payment-success?registration=${registrationId}&demo=1`,
-        message: "Stripe is not configured. Demo checkout link created."
+        message: "Demo checkout link created."
       });
     }
 
@@ -125,3 +134,4 @@ router.get("/status/:registrationId", async (req, res) => {
 
 module.exports = router;
 module.exports.ensureSignupTables = ensureSignupTables;
+module.exports.getCheckoutClient = getCheckoutClient;
