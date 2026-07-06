@@ -4,6 +4,8 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import HBTSignup from "./pages/HBTSignup";
+import PaymentSuccess from "./pages/PaymentSuccess";
 import EmployeePortal from "./pages/EmployeePortal";
 import EmployeeAppointments from "./pages/EmployeeAppointments";
 import NotificationCenter from "./pages/NotificationCenter";
@@ -73,6 +75,8 @@ const localNavbarExactPaths = new Set([
   "/contact",
   "/login",
   "/signup",
+  "/hbt-signup",
+  "/payment-success",
   "/partners",
   "/mortgage-request",
   "/profile",
@@ -109,6 +113,8 @@ function App() {
         <Route path="/contact" element={<Contact />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/hbt-signup" element={<HBTSignup />} />
+        <Route path="/payment-success" element={<PaymentSuccess />} />
         <Route path="/partners" element={<Partners />} />
         <Route path="/mortgage-request" element={<MortgageRequest />} />
 
