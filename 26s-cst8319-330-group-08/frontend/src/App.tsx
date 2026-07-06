@@ -8,6 +8,7 @@ import HBTSignup from "./pages/HBTSignup";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import EmployeePortal from "./pages/EmployeePortal";
 import EmployeeAppointments from "./pages/EmployeeAppointments";
+import EmployeeJourney from "./pages/EmployeeJourney";
 import NotificationCenter from "./pages/NotificationCenter";
 import PartnershipLanding from "./pages/PartnershipLanding";
 import Resources from "./pages/Resources";
@@ -32,6 +33,7 @@ import HBTQuizSubmissions from "./pages/HBTQuizSubmissions";
 import HBTEvents from "./pages/HBTEvents";
 import HBTAppointments from "./pages/HBTAppointments";
 import HBTAvailability from "./pages/HBTAvailability";
+import HBTCourses from "./pages/HBTCourses";
 
 import AdminLogin from "./admin/pages/AdminLogin";
 import AdminDashboard from "./admin/pages/AdminDashboard";
@@ -83,8 +85,10 @@ const localNavbarExactPaths = new Set([
   "/company/dashboard",
   "/employee/messages",
   "/employee/appointments",
+  "/employee/journey",
   "/company/messages",
   "/hbt/messages",
+  "/hbt/courses",
 ]);
 
 const localNavbarPrefixes = ["/resources", "/quiz"];
@@ -123,6 +127,7 @@ function App() {
 
         <Route path="/employee-portal" element={<RoleProtectedRoute allowedRoles={["employee"]}><EmployeePortal /></RoleProtectedRoute>} />
         <Route path="/employee/appointments" element={<RoleProtectedRoute allowedRoles={["employee"]}><EmployeeAppointments /></RoleProtectedRoute>} />
+        <Route path="/employee/journey" element={<RoleProtectedRoute allowedRoles={["employee"]}><EmployeeJourney /></RoleProtectedRoute>} />
         <Route path="/resources" element={<RoleProtectedRoute allowedRoles={["employee"]}><Resources /></RoleProtectedRoute>} />
         <Route path="/resources/:id" element={<RoleProtectedRoute allowedRoles={["employee"]}><ResourceDetails /></RoleProtectedRoute>} />
         <Route path="/quiz" element={<RoleProtectedRoute allowedRoles={["employee"]}><Quiz /></RoleProtectedRoute>} />
@@ -138,6 +143,7 @@ function App() {
         <Route path="/hbt/team-members" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTTeamMembers /></RoleProtectedRoute>} />
         <Route path="/hbt/resources" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTResources /></RoleProtectedRoute>} />
         <Route path="/hbt/events" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTEvents /></RoleProtectedRoute>} />
+        <Route path="/hbt/courses" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTCourses /></RoleProtectedRoute>} />
         <Route path="/hbt/appointments" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTAppointments /></RoleProtectedRoute>} />
         <Route path="/hbt/availability" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTAvailability /></RoleProtectedRoute>} />
         <Route path="/hbt/quiz-submissions" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTQuizSubmissions /></RoleProtectedRoute>} />
