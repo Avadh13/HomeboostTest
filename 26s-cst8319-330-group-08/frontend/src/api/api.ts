@@ -1,12 +1,19 @@
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
+const ensureApiPath = (value: string) => {
+  const cleaned = trimTrailingSlash(value || "");
+  if (!cleaned) return cleaned;
+  return cleaned.endsWith("/api") ? cleaned : `${cleaned}/api`;
+};
+
 const railwayFallbackApiUrl = "https://tender-laughter-production-7cd3.up.railway.app/api";
 const localFallbackApiUrl = "http://localhost:5000/api";
 
-const envApiUrl =
+const envApiUrl = ensureApiPath(
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
-  "";
+  ""
+);
 
 const browserHostname = typeof window !== "undefined" ? window.location.hostname : "";
 const browserOrigin = typeof window !== "undefined" ? window.location.origin : "";
@@ -17,7 +24,7 @@ const useCodespaceBackend = import.meta.env.VITE_USE_CODESPACE_BACKEND === "true
 
 const codespaceBackendApiUrl =
   browserOrigin && isCodespacesBrowser
-    ? `${browserOrigin.replace(/-\d+\.app\.github\.dev$/, "-5000.app.github.dev")}/api`
+    ? ensureApiPath(browserOrigin.replace(/-\d+\.app\.github\.dev$/, "-5000.app.github.dev"))
     : "";
 
 const getApiBaseUrl = () => {
