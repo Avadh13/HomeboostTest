@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 import Navbar from "../components/Navbar";
@@ -12,6 +11,10 @@ type SignupForm = {
   role_title: string;
   website_url: string;
   notes: string;
+};
+
+type SubmitEventLike = {
+  preventDefault: () => void;
 };
 
 const initialForm: SignupForm = {
@@ -32,7 +35,7 @@ function HBTSignup() {
 
   const update = (field: keyof SignupForm, value: string) => setForm((current) => ({ ...current, [field]: value }));
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEventLike) => {
     event.preventDefault();
     setLoading(true);
     setError("");
