@@ -30,7 +30,6 @@ import MessageCenter from "./pages/MessageCenter";
 import ProfilePage from "./pages/Profile";
 import MortgageRequest from "./pages/MortgageRequest";
 import CompanyDashboard from "./pages/CompanyDashboard";
-
 import HBTDashboard from "./pages/HBTDashboard";
 import HBTMemberDashboard from "./pages/HBTMemberDashboard";
 import HBTTeamMembers from "./pages/HBTTeamMembers";
@@ -51,6 +50,7 @@ import ManagePages from "./admin/pages/ManagePages";
 import ManageSections from "./admin/pages/ManageSections";
 import ManageCards from "./admin/pages/ManageCards";
 import ManagePricing from "./admin/pages/ManagePricing";
+import ManagePayments from "./admin/pages/ManagePayments";
 import ContactMessages from "./admin/pages/ContactMessages";
 import ManageFAQs from "./admin/pages/ManageFAQs";
 import ManageQuizzes from "./admin/pages/ManageQuizzes";
@@ -63,7 +63,6 @@ import AdminAppointments from "./admin/pages/AdminAppointments";
 import ManageFooter from "./admin/pages/ManageFooter";
 import ManageMortgageServices from "./admin/pages/ManageMortgageServices";
 import ManageServiceRequests from "./admin/pages/ManageServiceRequests";
-
 import AdminProtectedRoute from "./admin/components/AdminProtectedRoute";
 import AdminLayout from "./admin/components/AdminLayout";
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
@@ -79,15 +78,10 @@ import HBTLeadPipelineWidget from "./components/HBTLeadPipelineWidget";
 import CompanyROIWidget from "./components/CompanyROIWidget";
 import RecommendedResourcesWidget from "./components/RecommendedResourcesWidget";
 
-const localNavbarExactPaths = new Set([
-  "/", "/pricing", "/contact", "/login", "/signup", "/hbt-signup", "/payment-success", "/partners", "/mortgage-request", "/profile",
-  "/company/dashboard", "/company/invites", "/company/branding", "/company/employer-approval", "/company/reports", "/company/messages",
-  "/employee/messages", "/employee/appointments", "/employee/journey",
-  "/hbt/messages", "/hbt/courses", "/hbt/invites", "/hbt/branding", "/hbt/employer-approvals", "/hbt/journeys", "/hbt/quiz-journey-rules", "/hbt/reports", "/hbt/qa",
-]);
-
+const localNavbarExactPaths = new Set(["/", "/pricing", "/contact", "/login", "/signup", "/hbt-signup", "/payment-success", "/partners", "/mortgage-request", "/profile", "/company/dashboard", "/company/invites", "/company/branding", "/company/employer-approval", "/company/reports", "/company/messages", "/employee/messages", "/employee/appointments", "/employee/journey", "/hbt/messages", "/hbt/courses", "/hbt/invites", "/hbt/branding", "/hbt/employer-approvals", "/hbt/journeys", "/hbt/quiz-journey-rules", "/hbt/reports", "/hbt/qa"]);
 const localNavbarPrefixes = ["/resources", "/quiz", "/invite"];
 const globalNavbarSingleSegmentPaths = new Set(["/employee-portal", "/notifications"]);
+const allRoles = ["admin", "super_admin", "hbt_admin", "hbt_member", "employee", "company_admin", "company"];
 
 function GlobalNavbarGate() {
   const { pathname } = useLocation();
@@ -115,10 +109,8 @@ function App() {
         <Route path="/invite/:token" element={<InviteAccept />} />
         <Route path="/partners" element={<Partners />} />
         <Route path="/mortgage-request" element={<MortgageRequest />} />
-
-        <Route path="/profile" element={<RoleProtectedRoute allowedRoles={["admin", "super_admin", "hbt_admin", "hbt_member", "employee", "company_admin", "company"]}><ProfilePage /></RoleProtectedRoute>} />
-        <Route path="/notifications" element={<RoleProtectedRoute allowedRoles={["admin", "super_admin", "hbt_admin", "hbt_member", "employee", "company_admin", "company"]}><NotificationCenter /></RoleProtectedRoute>} />
-
+        <Route path="/profile" element={<RoleProtectedRoute allowedRoles={allRoles}><ProfilePage /></RoleProtectedRoute>} />
+        <Route path="/notifications" element={<RoleProtectedRoute allowedRoles={allRoles}><NotificationCenter /></RoleProtectedRoute>} />
         <Route path="/employee-portal" element={<RoleProtectedRoute allowedRoles={["employee"]}><EmployeePortal /></RoleProtectedRoute>} />
         <Route path="/employee/appointments" element={<RoleProtectedRoute allowedRoles={["employee"]}><EmployeeAppointments /></RoleProtectedRoute>} />
         <Route path="/employee/journey" element={<RoleProtectedRoute allowedRoles={["employee"]}><EmployeeJourney /></RoleProtectedRoute>} />
@@ -127,14 +119,12 @@ function App() {
         <Route path="/quiz" element={<RoleProtectedRoute allowedRoles={["employee"]}><Quiz /></RoleProtectedRoute>} />
         <Route path="/quiz/:quizId" element={<RoleProtectedRoute allowedRoles={["employee"]}><Quiz /></RoleProtectedRoute>} />
         <Route path="/employee/messages" element={<RoleProtectedRoute allowedRoles={["employee"]}><MessageCenter /></RoleProtectedRoute>} />
-
         <Route path="/company/dashboard" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><CompanyDashboard /></RoleProtectedRoute>} />
         <Route path="/company/messages" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><MessageCenter /></RoleProtectedRoute>} />
         <Route path="/company/invites" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><InviteCenter /></RoleProtectedRoute>} />
         <Route path="/company/branding" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><PortalBrandingSettings /></RoleProtectedRoute>} />
         <Route path="/company/employer-approval" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><EmployerApprovalCenter /></RoleProtectedRoute>} />
         <Route path="/company/reports" element={<RoleProtectedRoute allowedRoles={["company_admin", "company"]}><ReportsExportCenter /></RoleProtectedRoute>} />
-
         <Route path="/hbt/dashboard" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTDashboard /></RoleProtectedRoute>} />
         <Route path="/hbt/companies" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTCompanies /></RoleProtectedRoute>} />
         <Route path="/hbt/employees" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><HBTEmployees /></RoleProtectedRoute>} />
@@ -154,7 +144,6 @@ function App() {
         <Route path="/hbt/quiz-submissions" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTQuizSubmissions /></RoleProtectedRoute>} />
         <Route path="/hbt/messages" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><MessageCenter /></RoleProtectedRoute>} />
         <Route path="/hbt/member-dashboard" element={<RoleProtectedRoute allowedRoles={["hbt_member"]}><HBTMemberDashboard /></RoleProtectedRoute>} />
-
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
         <Route path="/admin/builder" element={<AdminProtectedRoute><AdminBuilder /></AdminProtectedRoute>} />
@@ -167,6 +156,7 @@ function App() {
         <Route path="/admin/sections" element={<AdminProtectedRoute><ManageSections /></AdminProtectedRoute>} />
         <Route path="/admin/cards" element={<AdminProtectedRoute><ManageCards /></AdminProtectedRoute>} />
         <Route path="/admin/pricing" element={<AdminProtectedRoute><ManagePricing /></AdminProtectedRoute>} />
+        <Route path="/admin/payments" element={<AdminProtectedRoute><ManagePayments /></AdminProtectedRoute>} />
         <Route path="/admin/footer" element={<AdminProtectedRoute><ManageFooter /></AdminProtectedRoute>} />
         <Route path="/admin/mortgage-services" element={<AdminProtectedRoute><ManageMortgageServices /></AdminProtectedRoute>} />
         <Route path="/admin/service-requests" element={<AdminProtectedRoute><ManageServiceRequests /></AdminProtectedRoute>} />
@@ -180,20 +170,10 @@ function App() {
         <Route path="/admin/messages" element={<AdminProtectedRoute><AdminLayout title="Communication Center"><MessageCenter embedded /></AdminLayout></AdminProtectedRoute>} />
         <Route path="/admin/notifications" element={<AdminProtectedRoute><AdminLayout title="Alerts Center"><NotificationCenter embedded /></AdminLayout></AdminProtectedRoute>} />
         <Route path="/admin/profile" element={<AdminProtectedRoute><AdminLayout title="My Profile"><ProfilePage embedded /></AdminLayout></AdminProtectedRoute>} />
-
         <Route path="/:slug" element={<PartnershipLanding />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <MortgageReadinessWidget />
-      <RecommendedResourcesWidget />
-      <HBTLeadPipelineWidget />
-      <CompanyROIWidget />
-      <MortgageServicesShell />
-      <PartnershipMortgageServicesShell />
-      <FloatingThemeControl />
-      <MobileStickyCTA />
-      <FooterShell />
-      <SpeedInsights />
+      <MortgageReadinessWidget /><RecommendedResourcesWidget /><HBTLeadPipelineWidget /><CompanyROIWidget /><MortgageServicesShell /><PartnershipMortgageServicesShell /><FloatingThemeControl /><MobileStickyCTA /><FooterShell /><SpeedInsights />
     </BrowserRouter>
   );
 }
