@@ -79,7 +79,13 @@ router.post("/start", async (req, res) => {
     const stripe = getCheckoutClient();
 
     if (!stripe) {
-      await pool.query("UPDATE hbt_registrations SET payment_status = 'demo_pending' WHERE id = ?", [registrationId]);
+      const demoSessionId = `demo_registration_${registrationId}`;
+      await pool.query("UPDATE hbt_registrations SET payment_status = 'demo_pending', checkout_session_id = ? WHERE id = ?", [demoSessionId, registrationId]);
+      await pool.query(
+        `INSERT INTO payments (registration_id, provider, provider_session_id, amount_cents, currency, status)
+         VALUES (?, 'demo', ?, ?, ?, 'demo_pending')`,
+        [registrationId, demoSessionId, amountCents(), currency()]
+      );
       return res.status(201).json({
         status: "success",
         mode: "demo",
