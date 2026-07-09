@@ -19,7 +19,10 @@ type EmployeeMortgageRequestsPanelProps = {
 };
 
 const statusSteps = ["new", "contacted", "in_review", "appointment_booked", "documents_requested", "completed"];
-const formatStatus = (status?: string | null) => (status || "new").replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const statusLabels: Record<string, string> = {
+  appointment_booked: "Follow-up Started",
+};
+const formatStatus = (status?: string | null) => statusLabels[status || ""] || (status || "new").replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—");
 
 const statusBadge = (status?: string | null) => {
@@ -101,7 +104,6 @@ function EmployeeMortgageRequestsPanel({ primary = "#2563eb" }: EmployeeMortgage
                   <Link to={request.message_thread_id ? "/employee/messages" : "/mortgage-request"} className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-black text-white hover:bg-indigo-700">
                     {request.message_thread_id ? "Open Advisor Chat" : "Update Request"}
                   </Link>
-                  <Link to="/employee/appointments" className="rounded-full bg-white px-4 py-2 text-sm font-black text-slate-700 ring-1 ring-slate-200 hover:bg-blue-50">Book Appointment</Link>
                 </div>
               </article>
             );
