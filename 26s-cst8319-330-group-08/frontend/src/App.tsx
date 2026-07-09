@@ -15,7 +15,6 @@ import QuizJourneyRuleManager from "./pages/QuizJourneyRuleManager";
 import ReportsExportCenter from "./pages/ReportsExportCenter";
 import DeploymentReadinessCenter from "./pages/DeploymentReadinessCenter";
 import EmployeePortal from "./pages/EmployeePortal";
-import EmployeeAppointments from "./pages/EmployeeAppointments";
 import EmployeeJourney from "./pages/EmployeeJourney";
 import NotificationCenter from "./pages/NotificationCenter";
 import PartnershipLanding from "./pages/PartnershipLanding";
@@ -38,8 +37,6 @@ import HBTEmployees from "./pages/HBTEmployees";
 import HBTResources from "./pages/HBTResources";
 import HBTQuizSubmissions from "./pages/HBTQuizSubmissions";
 import HBTEvents from "./pages/HBTEvents";
-import HBTAppointments from "./pages/HBTAppointments";
-import HBTAvailability from "./pages/HBTAvailability";
 import HBTCourses from "./pages/HBTCourses";
 
 import AdminLogin from "./admin/pages/AdminLogin";
@@ -59,7 +56,6 @@ import ManageHBTs from "./admin/pages/ManageHBTs";
 import QuizSubmissions from "./admin/pages/QuizSubmissions";
 import AdminPartnerships from "./admin/pages/AdminPartnerships";
 import AdminBuilder from "./admin/pages/AdminBuilder";
-import AdminAppointments from "./admin/pages/AdminAppointments";
 import ManageFooter from "./admin/pages/ManageFooter";
 import ManageMortgageServices from "./admin/pages/ManageMortgageServices";
 import ManageServiceRequests from "./admin/pages/ManageServiceRequests";
@@ -78,7 +74,7 @@ import HBTLeadPipelineWidget from "./components/HBTLeadPipelineWidget";
 import CompanyROIWidget from "./components/CompanyROIWidget";
 import RecommendedResourcesWidget from "./components/RecommendedResourcesWidget";
 
-const localNavbarExactPaths = new Set(["/", "/pricing", "/contact", "/login", "/signup", "/hbt-signup", "/payment-success", "/partners", "/mortgage-request", "/profile", "/company/dashboard", "/company/invites", "/company/branding", "/company/employer-approval", "/company/reports", "/company/messages", "/employee/messages", "/employee/appointments", "/employee/journey", "/hbt/messages", "/hbt/courses", "/hbt/invites", "/hbt/branding", "/hbt/employer-approvals", "/hbt/journeys", "/hbt/quiz-journey-rules", "/hbt/reports", "/hbt/qa"]);
+const localNavbarExactPaths = new Set(["/", "/pricing", "/contact", "/login", "/signup", "/hbt-signup", "/payment-success", "/partners", "/mortgage-request", "/profile", "/company/dashboard", "/company/invites", "/company/branding", "/company/employer-approval", "/company/reports", "/company/messages", "/employee/messages", "/employee/journey", "/hbt/messages", "/hbt/courses", "/hbt/invites", "/hbt/branding", "/hbt/employer-approvals", "/hbt/journeys", "/hbt/quiz-journey-rules", "/hbt/reports", "/hbt/qa"]);
 const localNavbarPrefixes = ["/resources", "/quiz", "/invite"];
 const globalNavbarSingleSegmentPaths = new Set(["/employee-portal", "/notifications"]);
 const allRoles = ["admin", "super_admin", "hbt_admin", "hbt_member", "employee", "company_admin", "company"];
@@ -112,7 +108,6 @@ function App() {
         <Route path="/profile" element={<RoleProtectedRoute allowedRoles={allRoles}><ProfilePage /></RoleProtectedRoute>} />
         <Route path="/notifications" element={<RoleProtectedRoute allowedRoles={allRoles}><NotificationCenter /></RoleProtectedRoute>} />
         <Route path="/employee-portal" element={<RoleProtectedRoute allowedRoles={["employee"]}><EmployeePortal /></RoleProtectedRoute>} />
-        <Route path="/employee/appointments" element={<RoleProtectedRoute allowedRoles={["employee"]}><EmployeeAppointments /></RoleProtectedRoute>} />
         <Route path="/employee/journey" element={<RoleProtectedRoute allowedRoles={["employee"]}><EmployeeJourney /></RoleProtectedRoute>} />
         <Route path="/resources" element={<RoleProtectedRoute allowedRoles={["employee"]}><Resources /></RoleProtectedRoute>} />
         <Route path="/resources/:id" element={<RoleProtectedRoute allowedRoles={["employee"]}><ResourceDetails /></RoleProtectedRoute>} />
@@ -139,8 +134,6 @@ function App() {
         <Route path="/hbt/invites" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><InviteCenter /></RoleProtectedRoute>} />
         <Route path="/hbt/branding" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><PortalBrandingSettings /></RoleProtectedRoute>} />
         <Route path="/hbt/employer-approvals" element={<RoleProtectedRoute allowedRoles={["hbt_admin"]}><EmployerApprovalCenter /></RoleProtectedRoute>} />
-        <Route path="/hbt/appointments" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTAppointments /></RoleProtectedRoute>} />
-        <Route path="/hbt/availability" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTAvailability /></RoleProtectedRoute>} />
         <Route path="/hbt/quiz-submissions" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><HBTQuizSubmissions /></RoleProtectedRoute>} />
         <Route path="/hbt/messages" element={<RoleProtectedRoute allowedRoles={["hbt_admin", "hbt_member"]}><MessageCenter /></RoleProtectedRoute>} />
         <Route path="/hbt/member-dashboard" element={<RoleProtectedRoute allowedRoles={["hbt_member"]}><HBTMemberDashboard /></RoleProtectedRoute>} />
@@ -149,7 +142,6 @@ function App() {
         <Route path="/admin/builder" element={<AdminProtectedRoute><AdminBuilder /></AdminProtectedRoute>} />
         <Route path="/admin/hbts" element={<AdminProtectedRoute><ManageHBTs /></AdminProtectedRoute>} />
         <Route path="/admin/partnerships" element={<AdminProtectedRoute><AdminPartnerships /></AdminProtectedRoute>} />
-        <Route path="/admin/appointments" element={<AdminProtectedRoute><AdminAppointments /></AdminProtectedRoute>} />
         <Route path="/admin/resources" element={<AdminProtectedRoute><ManageResources /></AdminProtectedRoute>} />
         <Route path="/admin/users" element={<AdminProtectedRoute><ManageUsers /></AdminProtectedRoute>} />
         <Route path="/admin/pages" element={<AdminProtectedRoute><ManagePages /></AdminProtectedRoute>} />
@@ -165,7 +157,7 @@ function App() {
         <Route path="/admin/quizzes" element={<AdminProtectedRoute><ManageQuizzes /></AdminProtectedRoute>} />
         <Route path="/admin/quizzes/:quizId/questions" element={<AdminProtectedRoute><ManageQuizQuestions /></AdminProtectedRoute>} />
         <Route path="/admin/quiz-submissions" element={<AdminProtectedRoute><QuizSubmissions /></AdminProtectedRoute>} />
-        <Route path="/admin/reports" element={<AdminProtectedRoute><ReportsExportCenter /></AdminProtectedRoute>} />
+        <Route path="/admin/reports" element={<ReportsExportCenter />} />
         <Route path="/admin/qa" element={<AdminProtectedRoute><DeploymentReadinessCenter /></AdminProtectedRoute>} />
         <Route path="/admin/messages" element={<AdminProtectedRoute><AdminLayout title="Communication Center"><MessageCenter embedded /></AdminLayout></AdminProtectedRoute>} />
         <Route path="/admin/notifications" element={<AdminProtectedRoute><AdminLayout title="Alerts Center"><NotificationCenter embedded /></AdminLayout></AdminProtectedRoute>} />
