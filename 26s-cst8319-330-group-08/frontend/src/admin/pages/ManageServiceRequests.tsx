@@ -27,7 +27,7 @@ const statusOptions: Array<{ value: RequestStatus; label: string }> = [
   { value: "new", label: "New" },
   { value: "contacted", label: "Contacted" },
   { value: "in_review", label: "In Review" },
-  { value: "appointment_booked", label: "Appointment Booked" },
+  { value: "appointment_booked", label: "Follow-up Started" },
   { value: "documents_requested", label: "Documents Requested" },
   { value: "completed", label: "Completed" },
   { value: "closed", label: "Closed" },
