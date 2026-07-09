@@ -60,7 +60,7 @@ function EmployeePortal() {
       { title: "Journey", text: "Follow your assigned home-buying journey and mark steps complete.", action: "View journey", path: "/employee/journey", isReady: true },
       { title: "Learn", text: "Review employer benefit resources and home-buying education.", action: "Browse resources", path: "/resources", isReady: Boolean(data?.resources?.length) },
       { title: "Check readiness", text: "Complete a short quiz so your team can guide the right next step.", action: "Take quiz", path: "/quiz", isReady: Boolean(data?.quizzes?.length) },
-      { title: "Connect", text: "Message or book your Home Buying Team when you need support.", action: "Contact team", path: "/employee/messages", isReady: true },
+      { title: "Connect", text: "Message your Home Buying Team when you need support.", action: "Contact team", path: "/employee/messages", isReady: true },
     ],
     [data]
   );
@@ -94,7 +94,7 @@ function EmployeePortal() {
   const primary = employee.brand_primary_color || "#2563eb";
   const secondary = employee.brand_secondary_color || "#f8fafc";
   const portalTitle = employee.portal_title || `${employee.employer_name} Home Buying Portal`;
-  const welcomeMessage = employee.welcome_message || `Welcome, ${employee.full_name}. Your program is supported by ${employee.team_name}. Start with your journey, review resources, take the readiness quiz, and connect with an advisor when you are ready.`;
+  const welcomeMessage = employee.welcome_message || `Welcome, ${employee.full_name}. Your program is supported by ${employee.team_name}. Start with your journey, review resources, take the readiness quiz, and message your advisor when you are ready.`;
   const promptText = employee.prompt_text || "Not sure where to start? Open your journey or message your Home Buying Team for the next best step.";
 
   return (
@@ -125,7 +125,7 @@ function EmployeePortal() {
                 <Link to="/employee/journey" className="btn-primary" style={{ background: primary }}>View Journey</Link>
                 <Link to="/resources" className="btn-secondary">Browse Resources</Link>
                 <Link to="/quiz" className="btn-secondary">Take Readiness Quiz</Link>
-                <Link to="/employee/appointments" className="btn-dark">Request Appointment</Link>
+                <Link to="/employee/messages" className="btn-dark">Message Advisor</Link>
               </div>
             </div>
 
@@ -166,7 +166,7 @@ function EmployeePortal() {
           </section>
 
           <section className="grid gap-4 md:grid-cols-4">
-            {[["Resources", data.resources.length, "Guides, checklists, and planning tools"], ["Quizzes", data.quizzes.length, "Readiness checks and next steps"], ["Experts", data.team_members.length, "Advisors available for booking"], ["Messages", "Open", "Use Communication Center for team conversations"]].map(([label, count, text]) => (
+            {[["Resources", data.resources.length, "Guides, checklists, and planning tools"], ["Quizzes", data.quizzes.length, "Readiness checks and next steps"], ["Experts", data.team_members.length, "Advisors available for support"], ["Messages", "Open", "Use Communication Center for team conversations"]].map(([label, count, text]) => (
               <div key={label} className="metric-card"><p className="text-3xl font-black" style={{ color: primary }}>{count}</p><h3 className="mt-2 text-lg font-black">{label}</h3><p className="mt-2 text-sm text-slate-600">{text}</p></div>
             ))}
           </section>
@@ -195,10 +195,10 @@ function EmployeePortal() {
 
           <section className="overflow-hidden rounded-[2rem] bg-white shadow-2xl">
             <div className="grid gap-0 lg:grid-cols-[0.78fr_1.22fr]">
-              <div className="relative overflow-hidden p-8 text-white" style={{ background: `linear-gradient(135deg, ${primary}, #111827)` }}><p className="text-sm font-black uppercase tracking-[0.25em] text-white/75">Connect</p><h2 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">Your Home Buying Team</h2><p className="mt-4 text-base leading-relaxed text-white/80">Choose an advisor for a focused appointment or start a message in Communication Center.</p><div className="mt-7 rounded-2xl bg-white/12 p-4 backdrop-blur"><p className="text-3xl font-black">{data.team_members.length}</p><p className="text-sm font-bold text-white/75">Available experts</p></div></div>
+              <div className="relative overflow-hidden p-8 text-white" style={{ background: `linear-gradient(135deg, ${primary}, #111827)` }}><p className="text-sm font-black uppercase tracking-[0.25em] text-white/75">Connect</p><h2 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">Your Home Buying Team</h2><p className="mt-4 text-base leading-relaxed text-white/80">Choose an advisor and continue the conversation in Communication Center.</p><div className="mt-7 rounded-2xl bg-white/12 p-4 backdrop-blur"><p className="text-3xl font-black">{data.team_members.length}</p><p className="text-sm font-bold text-white/75">Available experts</p></div></div>
               <div className="bg-slate-50 p-5 md:p-7"><div className="grid gap-4">
                 {data.team_members.map((member) => (
-                  <article key={member.id} className="group rounded-[2rem] border border-slate-100 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-xl md:p-5"><div className="grid gap-5 md:grid-cols-[120px_1fr_auto] md:items-center"><div className="relative mx-auto h-28 w-28 overflow-hidden rounded-[1.5rem] bg-slate-100 md:mx-0"><img src={member.photo_url || defaultAvatar} alt={member.full_name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" /></div><div className="text-center md:text-left"><p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Home Buying advisor</p><h3 className="mt-1 text-2xl font-black text-slate-950">{member.full_name}</h3><p className="mt-1 text-base font-bold" style={{ color: primary }}>{member.title}</p><p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">{member.bio || "Ready to support your home-buying questions and next steps."}</p></div><div className="flex flex-col gap-2 md:min-w-[170px]"><Link to="/employee/appointments" className="rounded-full px-4 py-2.5 text-center text-sm font-black text-white shadow-md transition hover:-translate-y-0.5" style={{ backgroundColor: primary }}>Request appointment</Link><Link to="/employee/messages" className="rounded-full bg-indigo-600 px-4 py-2.5 text-center text-sm font-black text-white shadow-md transition hover:-translate-y-0.5 hover:bg-indigo-700">Message advisor</Link>{member.email && <a href={`mailto:${member.email}`} className="text-center text-xs font-bold text-slate-500 hover:text-slate-900">{member.email}</a>}</div></div></article>
+                  <article key={member.id} className="group rounded-[2rem] border border-slate-100 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-xl md:p-5"><div className="grid gap-5 md:grid-cols-[120px_1fr_auto] md:items-center"><div className="relative mx-auto h-28 w-28 overflow-hidden rounded-[1.5rem] bg-slate-100 md:mx-0"><img src={member.photo_url || defaultAvatar} alt={member.full_name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" /></div><div className="text-center md:text-left"><p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Home Buying advisor</p><h3 className="mt-1 text-2xl font-black text-slate-950">{member.full_name}</h3><p className="mt-1 text-base font-bold" style={{ color: primary }}>{member.title}</p><p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">{member.bio || "Ready to support your home-buying questions and next steps."}</p></div><div className="flex flex-col gap-2 md:min-w-[170px]"><Link to="/employee/messages" className="rounded-full bg-indigo-600 px-4 py-2.5 text-center text-sm font-black text-white shadow-md transition hover:-translate-y-0.5 hover:bg-indigo-700">Message advisor</Link>{member.email && <a href={`mailto:${member.email}`} className="text-center text-xs font-bold text-slate-500 hover:text-slate-900">{member.email}</a>}</div></div></article>
                 ))}
                 {data.team_members.length === 0 && <div className="rounded-3xl bg-white p-8 text-center text-slate-500 shadow-sm">Your Home Buying Team will appear here once advisors are assigned.</div>}
               </div></div>
