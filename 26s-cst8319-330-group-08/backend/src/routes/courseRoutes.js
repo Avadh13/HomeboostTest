@@ -8,6 +8,42 @@ const hbtRoles = ["hbt_admin", "hbt_member"];
 const canManage = (user) => adminRoles.includes(user?.role) || user?.role === "hbt_admin";
 const canViewHbtCourse = (user) => adminRoles.includes(user?.role) || hbtRoles.includes(user?.role);
 const clean = (value, max = 255) => String(value || "").trim().slice(0, max);
+const frontendUrl = () => (process.env.FRONTEND_URL || process.env.CLIENT_URL || "https://homeboost-test.vercel.app").replace(/\/+$/, "");
+
+const addColumnIfMissing = async (connection, tableName, columnName, definition) => {
+  const [rows] = await connection.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+    [tableName, columnName]
+  );
+  if (rows.length === 0) await connection.query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+};
+
+const seedLessons = () => [
+  {
+    moduleTitle: "Program Foundation",
+    moduleDescription: "Understand the offer, audience, and business value.",
+    lessonTitle: "Program Foundation overview",
+    minutes: 8,
+    content: `The Employee Benefit Program helps employers give staff a guided path into home buying without turning the employer into a mortgage expert.\n\nYour role as the Home Buying Team is to explain the benefit clearly, answer practical questions, and move interested employees toward the right next step.\n\nFocus on three outcomes: employer value, employee confidence, and clean follow-up. Employers care about retention and benefits. Employees care about affordability, debt, credit, down payment, and knowing who to trust.\n\nWhen presenting the program, keep it simple: this is an education-first benefit backed by real professionals. The portal handles resources, readiness quizzes, messages, progress, and reporting so the program stays organized.`,
+    resourcePath: "/resources",
+  },
+  {
+    moduleTitle: "Employer Outreach",
+    moduleDescription: "Learn how to introduce the benefit to employers.",
+    lessonTitle: "Employer Outreach overview",
+    minutes: 8,
+    content: `Employer outreach should sound like a business benefit, not a sales pitch. Lead with employee support, retention, financial wellness, and access to trusted guidance.\n\nA strong outreach conversation covers the employer problem first: employees are stressed about housing, debt, renewals, affordability, and financial planning. Then show how the program gives them structured help without adding extra work for HR.\n\nUse this basic flow: identify the employer, explain the benefit, show the portal, explain employee invite control, then confirm next steps.\n\nAvoid overpromising. Keep the message practical: the team educates, guides, and connects employees to the right mortgage/home-buying support when they are ready.`,
+    resourcePath: "/contact",
+  },
+  {
+    moduleTitle: "Employee Support Workflow",
+    moduleDescription: "Review the employee journey, resources, messaging, and follow-up.",
+    lessonTitle: "Employee Support Workflow overview",
+    minutes: 8,
+    content: `Employee support starts when the employer invites approved employees into the portal. The employee can review resources, complete quizzes, follow their journey, and message the Home Buying Team.\n\nUse readiness signals to prioritize follow-up. A hot lead may need direct guidance quickly. A warm lead may need resources and a short check-in. A cold lead may only need education for now.\n\nKeep all communication inside the message center where possible. That gives the team a cleaner record and avoids scattered follow-up.\n\nThe best workflow is simple: review quiz signals, check assigned employees, complete follow-up tasks, send useful resources, and update progress.`,
+    resourcePath: "/hbt/messages",
+  },
+];
 
 const ensureCourseTables = async (connection = pool) => {
   await connection.query(`CREATE TABLE IF NOT EXISTS courses (
@@ -53,6 +89,12 @@ const ensureCourseTables = async (connection = pool) => {
     INDEX idx_course_lessons_active (is_active)
   )`);
 
+  await addColumnIfMissing(connection, "course_lessons", "lesson_type", "VARCHAR(40) DEFAULT 'article'");
+  await addColumnIfMissing(connection, "course_lessons", "content", "TEXT NULL");
+  await addColumnIfMissing(connection, "course_lessons", "video_url", "VARCHAR(500) NULL");
+  await addColumnIfMissing(connection, "course_lessons", "resource_url", "VARCHAR(500) NULL");
+  await addColumnIfMissing(connection, "course_lessons", "estimated_minutes", "INT DEFAULT 5");
+
   await connection.query(`CREATE TABLE IF NOT EXISTS course_progress (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -71,21 +113,34 @@ const ensureCourseTables = async (connection = pool) => {
       "INSERT INTO courses (title, description, audience_role, sort_order) VALUES (?, ?, 'hbt', 1)",
       ["Home Buying Program Onboarding", "Learn how to position the Employee Benefit Program, approach employers, and support employees inside the portal."]
     );
-    const modules = [
-      ["Program Foundation", "Understand the offer, audience, and business value.", 1],
-      ["Employer Outreach", "Learn how to introduce the benefit to employers.", 2],
-      ["Employee Support Workflow", "Review the employee journey, resources, messaging, and follow-up.", 3],
-    ];
-    for (const module of modules) {
+
+    let order = 1;
+    for (const lesson of seedLessons()) {
       const [moduleResult] = await connection.query(
         "INSERT INTO course_modules (course_id, title, description, sort_order) VALUES (?, ?, ?, ?)",
-        [courseResult.insertId, module[0], module[1], module[2]]
+        [courseResult.insertId, lesson.moduleTitle, lesson.moduleDescription, order]
       );
       await connection.query(
-        "INSERT INTO course_lessons (module_id, title, content, estimated_minutes, sort_order) VALUES (?, ?, ?, ?, ?)",
-        [moduleResult.insertId, `${module[0]} overview`, `Complete this lesson to understand ${module[0].toLowerCase()} for the Home Buying Program.`, 8, 1]
+        `INSERT INTO course_lessons (module_id, title, lesson_type, content, resource_url, estimated_minutes, sort_order)
+         VALUES (?, ?, 'article', ?, ?, ?, 1)`,
+        [moduleResult.insertId, lesson.lessonTitle, lesson.content, `${frontendUrl()}${lesson.resourcePath}`, lesson.minutes]
       );
+      order += 1;
     }
+  }
+
+  for (const lesson of seedLessons()) {
+    await connection.query(
+      `UPDATE course_lessons cl
+       JOIN course_modules cm ON cm.id = cl.module_id
+       JOIN courses c ON c.id = cm.course_id
+       SET cl.lesson_type = COALESCE(NULLIF(cl.lesson_type, ''), 'article'),
+           cl.content = CASE WHEN cl.content IS NULL OR cl.content = '' OR cl.content LIKE 'Complete this lesson%' THEN ? ELSE cl.content END,
+           cl.resource_url = CASE WHEN cl.resource_url IS NULL OR cl.resource_url = '' THEN ? ELSE cl.resource_url END,
+           cl.estimated_minutes = CASE WHEN cl.estimated_minutes IS NULL OR cl.estimated_minutes < 5 THEN ? ELSE cl.estimated_minutes END
+       WHERE c.audience_role = 'hbt' AND cl.title = ?`,
+      [lesson.content, `${frontendUrl()}${lesson.resourcePath}`, lesson.minutes, lesson.lessonTitle]
+    );
   }
 };
 
