@@ -1,5 +1,6 @@
 const express = require("express");
 const fs = require("fs");
+const crypto = require("crypto");
 const csv = require("csv-parser");
 const multer = require("multer");
 const pool = require("../config/db");
@@ -27,6 +28,31 @@ const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 const normalizeName = (value) => String(value || "").trim();
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const removeUploadedFile = (filePath) => filePath && fs.unlink(filePath, () => {});
+const appUrl = () => (process.env.FRONTEND_URL || process.env.CLIENT_URL || "http://localhost:5173").replace(/\/+$/, "");
+const inviteToken = () => crypto.randomBytes(24).toString("hex");
+const inviteCode = () => Math.floor(100000 + Math.random() * 900000).toString();
+const inviteLink = (invite) => invite?.invite_token ? `${appUrl()}/invite/${invite.invite_token}` : null;
+
+const addColumnIfMissing = async (connection, tableName, columnName, definition) => {
+  const [rows] = await connection.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+    [tableName, columnName]
+  );
+  if (rows.length === 0) await connection.query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+};
+
+const ensureInviteLinkColumns = async (connection = pool) => {
+  await addColumnIfMissing(connection, "employee_invites", "invite_token", "VARCHAR(120) NULL");
+  await addColumnIfMissing(connection, "employee_invites", "invite_code", "VARCHAR(40) NULL");
+  await addColumnIfMissing(connection, "employee_invites", "expires_at", "DATETIME NULL");
+  await addColumnIfMissing(connection, "employee_invites", "accepted_at", "DATETIME NULL");
+  await addColumnIfMissing(connection, "employee_invites", "last_sent_at", "DATETIME NULL");
+};
+
+const shapeInvite = (invite) => ({
+  ...invite,
+  invite_link: inviteLink(invite),
+});
 
 const readCsvRows = (filePath) =>
   new Promise((resolve, reject) => {
@@ -52,6 +78,7 @@ const requireCompanyManager = (req, res, next) => {
 
 router.get("/dashboard", protect, requireCompanyManager, async (req, res) => {
   try {
+    await ensureInviteLinkColumns();
     const partnershipId = req.user.partnership_id;
 
     const [[partnership]] = await pool.query(
@@ -91,13 +118,14 @@ router.get("/dashboard", protect, requireCompanyManager, async (req, res) => {
       [partnershipId]
     );
 
-    const [invites] = await pool.query(
-      `SELECT id, full_name, email, status, created_at, registered_at, revoked_at
+    const [inviteRows] = await pool.query(
+      `SELECT id, full_name, email, status, invite_token, invite_code, expires_at, last_sent_at, created_at, registered_at, revoked_at
        FROM employee_invites
        WHERE partnership_id = ?
        ORDER BY id DESC`,
       [partnershipId]
     );
+    const invites = inviteRows.map(shapeInvite);
 
     const [batches] = await pool.query(
       `SELECT id, partnership_id, original_filename, created_count, skipped_count, status, created_at, revoked_at
@@ -148,6 +176,7 @@ router.get("/dashboard", protect, requireCompanyManager, async (req, res) => {
 
 router.post("/invites", protect, requireCompanyManager, async (req, res) => {
   try {
+    await ensureInviteLinkColumns();
     const partnershipId = req.user.partnership_id;
     const fullName = normalizeName(req.body.full_name || req.body.name);
     const email = normalizeEmail(req.body.email);
@@ -165,20 +194,26 @@ router.post("/invites", protect, requireCompanyManager, async (req, res) => {
       return res.status(409).json({ status: "error", message: "This email already has an account" });
     }
 
+    const token = inviteToken();
+    const code = inviteCode();
     await pool.query(
       `INSERT INTO employee_invites
-       (partnership_id, invited_by_user_id, full_name, email, status)
-       VALUES (?, ?, ?, ?, 'invited')
+       (partnership_id, invited_by_user_id, full_name, email, status, invite_token, invite_code, expires_at, last_sent_at)
+       VALUES (?, ?, ?, ?, 'invited', ?, ?, DATE_ADD(NOW(), INTERVAL 14 DAY), NOW())
        ON DUPLICATE KEY UPDATE
          full_name = VALUES(full_name),
          invited_by_user_id = VALUES(invited_by_user_id),
          status = IF(status = 'registered', 'registered', 'invited'),
+         invite_token = VALUES(invite_token),
+         invite_code = VALUES(invite_code),
+         expires_at = VALUES(expires_at),
+         last_sent_at = NOW(),
          revoked_at = NULL`,
-      [partnershipId, req.user.id, fullName, email]
+      [partnershipId, req.user.id, fullName, email, token, code]
     );
 
     const [[invite]] = await pool.query(
-      `SELECT id, full_name, email, status, created_at, registered_at, revoked_at
+      `SELECT id, full_name, email, status, invite_token, invite_code, expires_at, last_sent_at, created_at, registered_at, revoked_at
        FROM employee_invites
        WHERE partnership_id = ? AND email = ?
        LIMIT 1`,
@@ -187,8 +222,8 @@ router.post("/invites", protect, requireCompanyManager, async (req, res) => {
 
     return res.status(201).json({
       status: "success",
-      message: invite.status === "registered" ? "Employee is already registered" : "Employee invite added successfully",
-      invite,
+      message: invite.status === "registered" ? "Employee is already registered" : "Employee invite created with secure link",
+      invite: shapeInvite(invite),
     });
   } catch (error) {
     return res.status(500).json({ status: "error", message: "Failed to add employee invite", error: error.message });
@@ -199,9 +234,7 @@ router.post("/invites/upload", protect, requireCompanyManager, upload.single("fi
   let connection;
 
   try {
-    if (!req.file) {
-      return res.status(400).json({ status: "error", message: "CSV file is required" });
-    }
+    if (!req.file) return res.status(400).json({ status: "error", message: "CSV file is required" });
 
     const rows = await readCsvRows(req.file.path);
     if (rows.length === 0) {
@@ -210,10 +243,10 @@ router.post("/invites/upload", protect, requireCompanyManager, upload.single("fi
     }
 
     connection = await pool.getConnection();
+    await ensureInviteLinkColumns(connection);
     await connection.beginTransaction();
 
     const partnershipId = req.user.partnership_id;
-
     const [batchResult] = await connection.query(
       `INSERT INTO enrollment_batches (partnership_id, uploaded_by_user_id, original_filename)
        VALUES (?, ?, ?)`,
@@ -238,13 +271,11 @@ router.post("/invites/upload", protect, requireCompanyManager, upload.single("fi
         errors.push({ row_number: rowNumber, email, reason: "Missing full_name or email" });
         continue;
       }
-
       if (!isValidEmail(email)) {
         skipped++;
         errors.push({ row_number: rowNumber, email, reason: "Invalid email format" });
         continue;
       }
-
       if (seenEmails.has(email)) {
         skipped++;
         errors.push({ row_number: rowNumber, email, reason: "Duplicate email inside this CSV" });
@@ -252,7 +283,6 @@ router.post("/invites/upload", protect, requireCompanyManager, upload.single("fi
       }
 
       seenEmails.add(email);
-
       const [existingUser] = await connection.query("SELECT id FROM users WHERE email = ? LIMIT 1", [email]);
       if (existingUser.length > 0) {
         skipped++;
@@ -260,28 +290,30 @@ router.post("/invites/upload", protect, requireCompanyManager, upload.single("fi
         continue;
       }
 
+      const token = inviteToken();
+      const code = inviteCode();
       await connection.query(
         `INSERT INTO employee_invites
-         (partnership_id, enrollment_batch_id, invited_by_user_id, full_name, email, status)
-         VALUES (?, ?, ?, ?, ?, 'invited')
+         (partnership_id, enrollment_batch_id, invited_by_user_id, full_name, email, status, invite_token, invite_code, expires_at, last_sent_at)
+         VALUES (?, ?, ?, ?, ?, 'invited', ?, ?, DATE_ADD(NOW(), INTERVAL 14 DAY), NOW())
          ON DUPLICATE KEY UPDATE
            full_name = VALUES(full_name),
            enrollment_batch_id = VALUES(enrollment_batch_id),
            invited_by_user_id = VALUES(invited_by_user_id),
            status = IF(status = 'registered', 'registered', 'invited'),
+           invite_token = VALUES(invite_token),
+           invite_code = VALUES(invite_code),
+           expires_at = VALUES(expires_at),
+           last_sent_at = NOW(),
            revoked_at = NULL`,
-        [partnershipId, batchId, req.user.id, fullName, email]
+        [partnershipId, batchId, req.user.id, fullName, email, token, code]
       );
 
       invited++;
-      invitedEmployees.push({ full_name: fullName, email });
+      invitedEmployees.push({ full_name: fullName, email, invite_link: `${appUrl()}/invite/${token}`, invite_code: code });
     }
 
-    await connection.query(
-      `UPDATE enrollment_batches SET created_count = ?, skipped_count = ? WHERE id = ?`,
-      [invited, skipped, batchId]
-    );
-
+    await connection.query(`UPDATE enrollment_batches SET created_count = ?, skipped_count = ? WHERE id = ?`, [invited, skipped, batchId]);
     await connection.commit();
     removeUploadedFile(req.file.path);
 
@@ -305,11 +337,7 @@ router.put("/batches/:batchId/revoke", protect, requireCompanyManager, async (re
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
-    const [batches] = await connection.query(
-      `SELECT id, status FROM enrollment_batches WHERE id = ? AND partnership_id = ? LIMIT 1`,
-      [batchId, partnershipId]
-    );
-
+    const [batches] = await connection.query(`SELECT id, status FROM enrollment_batches WHERE id = ? AND partnership_id = ? LIMIT 1`, [batchId, partnershipId]);
     if (batches.length === 0) {
       await connection.rollback();
       return res.status(404).json({ status: "error", message: "Batch not found for this employer" });
@@ -318,9 +346,7 @@ router.put("/batches/:batchId/revoke", protect, requireCompanyManager, async (re
     const [result] = await connection.query(
       `UPDATE employee_invites
        SET status = 'revoked', revoked_at = NOW()
-       WHERE enrollment_batch_id = ?
-       AND partnership_id = ?
-       AND status = 'invited'`,
+       WHERE enrollment_batch_id = ? AND partnership_id = ? AND status = 'invited'`,
       [batchId, partnershipId]
     );
 
