@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 import ChatWidget from "../components/ChatWidget";
@@ -12,37 +12,8 @@ type User = {
   role?: string;
 };
 
-type AvailabilityRow = {
-  team_member_id: number;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  is_available: number | boolean;
-};
-
-type TeamMember = {
-  id: number;
-  full_name: string;
-  title?: string;
-};
-
-type Appointment = {
-  id: number;
-  topic: string;
-  status: string;
-  preferred_date?: string | null;
-  employee_name: string;
-  team_member_name?: string | null;
-};
-
-const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const toTime = (value?: string) => (value ? value.slice(0, 5) : "--:--");
-
 function HBTDashboard() {
   const [unreadCount, setUnreadCount] = useState(0);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [availability, setAvailability] = useState<AvailabilityRow[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   const token = localStorage.getItem("token");
   const userData = localStorage.getItem("user");
@@ -55,66 +26,24 @@ function HBTDashboard() {
       .then((res) => res.json())
       .then((payload) => setUnreadCount(Number(payload.unread_count || 0)))
       .catch(() => setUnreadCount(0));
-
-    fetch(`${API_BASE_URL}/advisor-availability`, { headers })
-      .then((res) => res.json())
-      .then((payload) => {
-        setTeamMembers(Array.isArray(payload.team_members) ? payload.team_members : []);
-        setAvailability(Array.isArray(payload.availability) ? payload.availability : []);
-      })
-      .catch(() => {
-        setTeamMembers([]);
-        setAvailability([]);
-      });
-
-    fetch(`${API_BASE_URL}/appointments/hbt`, { headers })
-      .then((res) => res.json())
-      .then((payload) => setAppointments(Array.isArray(payload) ? payload : []))
-      .catch(() => setAppointments([]));
   }, [token]);
-
-  const appointmentStats = useMemo(() => {
-    return {
-      total: appointments.length,
-      pending: appointments.filter((item) => item.status === "pending").length,
-      approved: appointments.filter((item) => item.status === "approved").length,
-      completed: appointments.filter((item) => item.status === "completed").length,
-    };
-  }, [appointments]);
-
-  const workTimePreview = useMemo(() => {
-    return teamMembers.slice(0, 4).map((member) => {
-      const rows = availability
-        .filter((row) => Number(row.team_member_id) === Number(member.id) && Boolean(row.is_available))
-        .sort((a, b) => Number(a.day_of_week) - Number(b.day_of_week));
-
-      const first = rows[0];
-      const last = rows[rows.length - 1];
-
-      return {
-        member,
-        days: rows.length,
-        label:
-          first && last
-            ? `${dayNames[first.day_of_week]}-${dayNames[last.day_of_week]} · ${toTime(first.start_time)}-${toTime(first.end_time)}`
-            : "No work hours set",
-      };
-    });
-  }, [availability, teamMembers]);
-
-  const latestAppointments = appointments.slice(0, 4);
 
   const cards = [
     { title: "Employer Partnerships", icon: "🏢", description: "View employer branded pages assigned to your Home Buying Team.", link: "/hbt/companies", accent: "from-blue-500 to-cyan-500" },
     { title: "Employees", icon: "👥", description: "View employees, assign leads to team members, and track progress.", link: "/hbt/employees", accent: "from-indigo-500 to-purple-500" },
-    { title: "Messages", icon: "💬", description: "End-to-end communication with employees, company managers, HBT members, and admin support.", link: "/hbt/messages", accent: "from-violet-600 to-fuchsia-600" },
-    { title: "Appointments", icon: "📆", description: "Review employee appointment requests and manage follow-up status.", link: "/hbt/appointments", accent: "from-green-500 to-emerald-600" },
-    { title: "Availability", icon: "⏰", description: "Set advisor working hours and block off unavailable times.", link: "/hbt/availability", accent: "from-cyan-500 to-blue-600" },
-    { title: "Notifications", icon: "🔔", description: "View appointment updates, meeting-link activity, and system messages.", link: "/notifications", accent: "from-blue-600 to-violet-600" },
-    { title: "Team Members", icon: "🤝", description: "Manage mortgage advisors, realtors, planners, and booking links.", link: "/hbt/team-members", accent: "from-emerald-500 to-teal-500" },
+    { title: "Messages", icon: "💬", description: "Use Communication Center for employee, company, advisor, and admin support conversations.", link: "/hbt/messages", accent: "from-violet-600 to-fuchsia-600" },
+    { title: "Team Members", icon: "🤝", description: "Manage mortgage advisors, realtors, planners, and contact details.", link: "/hbt/team-members", accent: "from-emerald-500 to-teal-500" },
     { title: "Resources", icon: "📚", description: "Curate guides, checklists, and tools for employees.", link: "/hbt/resources", accent: "from-amber-500 to-orange-500" },
     { title: "Quiz Submissions", icon: "🧠", description: "Review readiness quiz answers and prioritize warm follow-ups.", link: "/hbt/quiz-submissions", accent: "from-pink-500 to-rose-500" },
-    { title: "Events", icon: "📅", description: "Promote Lunch & Learns, webinars, and booking sessions.", link: "/hbt/events", accent: "from-slate-700 to-slate-950" },
+    { title: "Events", icon: "📅", description: "Promote Lunch & Learns, webinars, and education sessions.", link: "/hbt/events", accent: "from-slate-700 to-slate-950" },
+    { title: "Courses", icon: "🎓", description: "Manage course content and structured employee learning paths.", link: "/hbt/courses", accent: "from-cyan-500 to-blue-600" },
+    { title: "Reports", icon: "📈", description: "Export partnership, employee engagement, and readiness reports.", link: "/hbt/reports", accent: "from-blue-600 to-violet-600" },
+  ];
+
+  const workflowCards = [
+    { label: "Lead follow-up", title: "Prioritize employees", text: "Start with assigned employees, quiz signals, and message threads that need attention.", link: "/hbt/employees", cta: "Open employees" },
+    { label: "Communication", title: "Keep conversations moving", text: "Use messages as the single support channel for employees and company managers.", link: "/hbt/messages", cta: "Open messages" },
+    { label: "Education", title: "Push helpful content", text: "Refresh resources, events, and courses so employees always have the next best step.", link: "/hbt/resources", cta: "Manage resources" },
   ];
 
   return (
@@ -127,17 +56,17 @@ function HBTDashboard() {
             <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-200">Home Buying Team Control Center</p>
             <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">HBT Dashboard</h1>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-violet-100 md:text-base">
-              Welcome, <strong className="text-white">{user.full_name || "HBT Member"}</strong>. Manage partnerships, employees, communication, appointments, availability, resources, events, and notifications from one command center.
+              Welcome, <strong className="text-white">{user.full_name || "HBT Member"}</strong>. Manage partnerships, employees, communication, resources, events, reports, and readiness from one command center.
             </p>
           </div>
         </section>
 
         <section className="grid gap-4 md:grid-cols-4">
           {[
-            ["Total Appts", String(appointmentStats.total), "text-violet-700"],
-            ["Pending", String(appointmentStats.pending), "text-amber-700"],
-            ["Approved", String(appointmentStats.approved), "text-blue-700"],
             ["Unread Updates", String(unreadCount), "text-red-700"],
+            ["Core Modules", String(cards.length), "text-violet-700"],
+            ["Pipeline", "Active", "text-blue-700"],
+            ["Support", "Messages", "text-emerald-700"],
           ].map(([label, value, tone]) => (
             <div key={label} className="metric-card">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
@@ -146,68 +75,15 @@ function HBTDashboard() {
           ))}
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-2">
-          <div className="premium-card">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="eyebrow">Work Time</p>
-                <h2 className="mt-1 text-2xl font-black text-slate-950">Advisor work hours</h2>
-              </div>
-              <Link to="/hbt/availability" className="btn-primary">Manage hours</Link>
-            </div>
-
-            <div className="space-y-3">
-              {workTimePreview.length === 0 ? (
-                <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No advisors found. Add team members first.</p>
-              ) : (
-                workTimePreview.map((item) => (
-                  <div key={item.member.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-black text-slate-950">{item.member.full_name}</p>
-                        <p className="text-sm text-slate-500">{item.member.title || "Advisor"}</p>
-                      </div>
-                      <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700">{item.days} days</span>
-                    </div>
-                    <p className="mt-2 text-sm font-black text-blue-700">{item.label}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="premium-card">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="eyebrow">Appointment Time</p>
-                <h2 className="mt-1 text-2xl font-black text-slate-950">Upcoming requests</h2>
-              </div>
-              <Link to="/hbt/appointments" className="btn-dark">Open queue</Link>
-            </div>
-
-            <div className="mb-5 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl bg-amber-50 p-4 text-center"><p className="text-2xl font-black text-amber-700">{appointmentStats.pending}</p><p className="text-xs font-black uppercase text-amber-700">Pending</p></div>
-              <div className="rounded-2xl bg-blue-50 p-4 text-center"><p className="text-2xl font-black text-blue-700">{appointmentStats.approved}</p><p className="text-xs font-black uppercase text-blue-700">Approved</p></div>
-              <div className="rounded-2xl bg-emerald-50 p-4 text-center"><p className="text-2xl font-black text-emerald-700">{appointmentStats.completed}</p><p className="text-xs font-black uppercase text-emerald-700">Completed</p></div>
-            </div>
-
-            <div className="space-y-3">
-              {latestAppointments.length === 0 ? (
-                <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No appointment requests yet.</p>
-              ) : (
-                latestAppointments.map((appointment) => (
-                  <div key={appointment.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-black text-slate-950">{appointment.topic}</p>
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-black uppercase text-slate-700">{appointment.status}</span>
-                    </div>
-                    <p className="mt-1 text-sm text-slate-500">{appointment.employee_name} · {appointment.team_member_name || "Advisor"}</p>
-                    <p className="mt-2 text-sm font-bold text-slate-700">{appointment.preferred_date ? new Date(appointment.preferred_date).toLocaleString() : "No time selected"}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+        <section className="grid gap-5 lg:grid-cols-3">
+          {workflowCards.map((item) => (
+            <Link key={item.label} to={item.link} className="premium-card group block transition hover:-translate-y-1 hover:shadow-2xl">
+              <p className="eyebrow">{item.label}</p>
+              <h2 className="mt-2 text-2xl font-black text-slate-950">{item.title}</h2>
+              <p className="mt-3 min-h-[64px] text-sm leading-relaxed text-slate-600">{item.text}</p>
+              <p className="mt-5 text-sm font-black text-violet-700">{item.cta} →</p>
+            </Link>
+          ))}
         </section>
 
         <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
