@@ -74,7 +74,7 @@ const ensureCourseTables = async (connection = pool) => {
     const modules = [
       ["Program Foundation", "Understand the offer, audience, and business value.", 1],
       ["Employer Outreach", "Learn how to introduce the benefit to employers.", 2],
-      ["Employee Support Workflow", "Review the employee journey, appointments, resources, and follow-up.", 3],
+      ["Employee Support Workflow", "Review the employee journey, resources, messaging, and follow-up.", 3],
     ];
     for (const module of modules) {
       const [moduleResult] = await connection.query(
@@ -97,13 +97,34 @@ const summarizeCourse = async (courseId, userId) => {
      FROM courses c
      LEFT JOIN course_modules cm ON cm.course_id = c.id AND cm.is_active = 1
      LEFT JOIN course_lessons cl ON cl.module_id = cm.id AND cl.is_active = 1
-     LEFT JOIN course_progress cp ON cp.lesson_id = cl.id AND cp.user_id = ?
+     LEFT JOIN course_progress cp ON cp.lesson_id = cl.id AND cp.user_id = ? AND cp.status = 'completed'
      WHERE c.id = ?`,
     [userId, courseId]
   );
+
+  const [[nextLesson]] = await pool.query(
+    `SELECT cl.id, cl.title, cm.title AS module_title
+     FROM course_lessons cl
+     JOIN course_modules cm ON cm.id = cl.module_id
+     LEFT JOIN course_progress cp ON cp.lesson_id = cl.id AND cp.user_id = ? AND cp.status = 'completed'
+     WHERE cm.course_id = ? AND cm.is_active = 1 AND cl.is_active = 1 AND cp.id IS NULL
+     ORDER BY cm.sort_order ASC, cm.id ASC, cl.sort_order ASC, cl.id ASC
+     LIMIT 1`,
+    [userId, courseId]
+  );
+
   const total = Number(stats.total_lessons || 0);
   const completed = Number(stats.completed_lessons || 0);
-  return { total_lessons: total, completed_lessons: completed, percent: total ? Math.round((completed / total) * 100) : 0, last_completed_at: stats.last_completed_at };
+  return {
+    total_lessons: total,
+    completed_lessons: completed,
+    percent: total ? Math.round((completed / total) * 100) : 0,
+    last_completed_at: stats.last_completed_at,
+    resume_lesson_id: nextLesson?.id || null,
+    resume_lesson_title: nextLesson?.title || null,
+    resume_module_title: nextLesson?.module_title || null,
+    is_complete: total > 0 && completed >= total,
+  };
 };
 
 router.use(protect);
