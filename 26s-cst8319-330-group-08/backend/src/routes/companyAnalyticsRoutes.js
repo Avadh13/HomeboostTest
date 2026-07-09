@@ -117,13 +117,6 @@ const calculateSummary = async (partnershipId) => {
     [partnershipId]
   );
 
-  const [[appointmentStats]] = await pool.query(
-    `SELECT COUNT(*) AS appointment_count, SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_appointments
-     FROM appointments
-     WHERE partnership_id = ?`,
-    [partnershipId]
-  );
-
   const [[resourceStats]] = await pool.query(
     `SELECT COUNT(*) AS resource_view_count, COUNT(DISTINCT user_id) AS employees_viewed_resources
      FROM resource_views
@@ -169,10 +162,9 @@ const calculateSummary = async (partnershipId) => {
 
   const activeEmployees = Math.max(Number(activityStats?.active_employees || 0), Number(quizStats?.employees_with_quiz || 0), Number(resourceStats?.employees_viewed_resources || 0));
   const quizCompletionRate = safePercent(quizStats?.employees_with_quiz, totalEmployees);
-  const appointmentRate = safePercent(appointmentStats?.appointment_count, Math.max(totalEmployees, 1));
   const resourceUsageRate = safePercent(resourceStats?.employees_viewed_resources, totalEmployees);
   const activeEmployeeRate = safePercent(activeEmployees, totalEmployees || enabledEmployees || 1);
-  const engagementScore = Math.round(clamp((quizCompletionRate * 0.3) + (appointmentRate * 0.25) + (resourceUsageRate * 0.2) + (activeEmployeeRate * 0.25)));
+  const engagementScore = Math.round(clamp((quizCompletionRate * 0.4) + (resourceUsageRate * 0.25) + (activeEmployeeRate * 0.35)));
   const averageReadinessScore = Math.round(Number(readinessStats?.average_readiness_score || 0) * 100) / 100;
 
   const summary = {
@@ -183,9 +175,9 @@ const calculateSummary = async (partnershipId) => {
     active_employee_rate: activeEmployeeRate,
     quiz_completion_rate: quizCompletionRate,
     total_quiz_submissions: Number(quizStats?.total_submissions || 0),
-    appointment_count: Number(appointmentStats?.appointment_count || 0),
-    pending_appointments: Number(appointmentStats?.pending_appointments || 0),
-    appointment_rate: appointmentRate,
+    appointment_count: 0,
+    pending_appointments: 0,
+    appointment_rate: 0,
     resource_view_count: Number(resourceStats?.resource_view_count || 0),
     employees_viewed_resources: Number(resourceStats?.employees_viewed_resources || 0),
     resource_usage_rate: resourceUsageRate,
@@ -207,12 +199,12 @@ const calculateSummary = async (partnershipId) => {
   await pool.query(
     `INSERT INTO company_engagement_summary
      (partnership_id, total_employees, active_employees, quiz_completion_rate, appointment_count, resource_view_count, average_readiness_score, engagement_score, calculated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+     VALUES (?, ?, ?, ?, 0, ?, ?, ?, NOW())
      ON DUPLICATE KEY UPDATE
        total_employees = VALUES(total_employees),
        active_employees = VALUES(active_employees),
        quiz_completion_rate = VALUES(quiz_completion_rate),
-       appointment_count = VALUES(appointment_count),
+       appointment_count = 0,
        resource_view_count = VALUES(resource_view_count),
        average_readiness_score = VALUES(average_readiness_score),
        engagement_score = VALUES(engagement_score),
@@ -222,7 +214,6 @@ const calculateSummary = async (partnershipId) => {
       summary.total_employees,
       summary.active_employees,
       summary.quiz_completion_rate,
-      summary.appointment_count,
       summary.resource_view_count,
       summary.average_readiness_score,
       summary.engagement_score,
