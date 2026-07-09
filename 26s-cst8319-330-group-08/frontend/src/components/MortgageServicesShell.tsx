@@ -5,7 +5,6 @@ import AdvisorRequestsPanel from "./AdvisorRequestsPanel";
 import CompanyBenefitSummaryPanel from "./CompanyBenefitSummaryPanel";
 import EmployeeDocumentChecklistWidget from "./EmployeeDocumentChecklistWidget";
 import AdvisorDocumentReviewWidget from "./AdvisorDocumentReviewWidget";
-import AppointmentAutomationWidget from "./AppointmentAutomationWidget";
 
 const publicPaths = ["/", "/pricing", "/contact", "/partners"];
 
@@ -28,10 +27,6 @@ function MortgageServicesShell() {
         <AdvisorDocumentReviewWidget />
       </>
     );
-  }
-
-  if (location.pathname === "/hbt/appointments") {
-    return <AppointmentAutomationWidget />;
   }
 
   if (location.pathname === "/company/dashboard") {
