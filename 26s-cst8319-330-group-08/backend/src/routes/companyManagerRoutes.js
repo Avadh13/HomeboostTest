@@ -126,25 +126,6 @@ router.get("/dashboard", protect, requireCompanyManager, async (req, res) => {
       [partnershipId]
     );
 
-    const [appointments] = await pool.query(
-      `SELECT
-        a.id,
-        a.topic,
-        a.preferred_date,
-        a.status,
-        a.created_at,
-        u.full_name AS employee_name,
-        u.email AS employee_email,
-        tm.full_name AS team_member_name
-       FROM appointments a
-       LEFT JOIN users u ON a.employee_user_id = u.id
-       LEFT JOIN team_members tm ON a.team_member_id = tm.id
-       WHERE a.partnership_id = ?
-       ORDER BY a.created_at DESC
-       LIMIT 50`,
-      [partnershipId]
-    );
-
     res.json({
       status: "success",
       partnership,
@@ -152,14 +133,12 @@ router.get("/dashboard", protect, requireCompanyManager, async (req, res) => {
       invites,
       batches,
       submissions,
-      appointments,
       stats: {
         employees: employees.length,
         invited: invites.filter((item) => item.status === "invited").length,
         registered: invites.filter((item) => item.status === "registered").length,
         revoked: invites.filter((item) => item.status === "revoked").length,
         quiz_submissions: submissions.length,
-        pending_appointments: appointments.filter((item) => item.status === "pending").length,
       },
     });
   } catch (error) {
