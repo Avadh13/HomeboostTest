@@ -47,7 +47,6 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
     { path: "/admin/payments", label: "Payments", icon: "$", group: "Operations" },
     { path: "/admin/hbts", label: "Home Buying Teams", icon: "◈", group: "Operations" },
     { path: "/admin/partnerships", label: "Partnerships", icon: "◇", group: "Operations" },
-    { path: "/admin/appointments", label: "Appointments", icon: "◷", group: "Operations" },
     { path: "/admin/users", label: "Users", icon: "♙", group: "Operations" },
     { path: "/admin/service-requests", label: "Mortgage Requests", icon: "◍", group: "Operations" },
     { path: "/admin/resources", label: "Resources", icon: "▤", group: "Content" },
