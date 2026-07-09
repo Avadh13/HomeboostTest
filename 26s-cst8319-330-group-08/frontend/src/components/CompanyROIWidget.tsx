@@ -6,7 +6,6 @@ type Summary = {
   total_employees: number;
   active_employees: number;
   quiz_completion_rate: number;
-  appointment_count: number;
   resource_view_count: number;
   average_readiness_score: number;
   engagement_score: number;
