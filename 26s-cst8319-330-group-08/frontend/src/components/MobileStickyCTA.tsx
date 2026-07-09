@@ -20,13 +20,13 @@ function MobileStickyCTA() {
 
   const isPartnershipPortal = Boolean(partnershipSlug);
   const primaryHref = isPartnershipPortal ? `/mortgage-request?partnership=${encodeURIComponent(partnershipSlug)}` : "/hbt-signup";
-  const secondaryHref = isPartnershipPortal ? "/employee/appointments" : "/contact";
+  const secondaryHref = isPartnershipPortal ? "/employee/messages" : "/contact";
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/70 bg-white/95 p-3 shadow-2xl shadow-slate-950/15 backdrop-blur-xl md:hidden">
       <div className="mx-auto grid max-w-md grid-cols-2 gap-2">
         <Link to={secondaryHref} className="rounded-2xl bg-slate-100 px-4 py-3 text-center text-sm font-black text-slate-800 active:scale-[0.98]">
-          {isPartnershipPortal ? "Book Advisor" : "Book Call"}
+          {isPartnershipPortal ? "Message Team" : "Contact Us"}
         </Link>
         <Link to={primaryHref} className="rounded-2xl bg-blue-600 px-4 py-3 text-center text-sm font-black text-white shadow-lg shadow-blue-500/20 active:scale-[0.98]">
           {isPartnershipPortal ? "Start Request" : "Sign Up"}
