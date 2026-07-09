@@ -71,7 +71,7 @@ function Navbar() {
   const publicLinks: NavLinkItem[] = [
     { to: "/", label: "Program" },
     { to: "/hbt-signup", label: "Sign Up" },
-    { to: "/contact", label: "Book Discovery Call", shortLabel: "Discovery" },
+    { to: "/contact", label: "Contact" },
   ];
 
   const employeeLinks: NavLinkItem[] = [
@@ -79,7 +79,6 @@ function Navbar() {
     { to: "/employee/journey", label: "Journey" },
     { to: "/resources", label: "Resources" },
     { to: "/employee/messages", label: "Messages" },
-    { to: "/employee/appointments", label: "Appointments", shortLabel: "Appts" },
     { to: "/notifications", label: "Notifications", shortLabel: "Alerts" },
   ];
 
@@ -111,8 +110,6 @@ function Navbar() {
     { to: "/hbt/courses", label: "Courses" },
     { to: "/hbt/messages", label: "Messages" },
     { to: "/notifications", label: "Notifications", shortLabel: "Alerts" },
-    { to: "/hbt/appointments", label: "Appointments", shortLabel: "Appts" },
-    { to: "/hbt/availability", label: "Availability", shortLabel: "Hours" },
   ];
 
   const adminLinks: NavLinkItem[] = [
