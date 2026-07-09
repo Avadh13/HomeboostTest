@@ -91,9 +91,16 @@ const ruleMatches = (rule, context) => {
 
 const assignJourney = async (connection, { userId, journeyId, submissionId = null, ruleId = null, assignedBy = null, source = "quiz_rule", message = null }) => {
   await connection.query(
+    `UPDATE employee_journey_assignments
+     SET status = 'replaced', completed_at = NOW()
+     WHERE user_id = ? AND status = 'active' AND journey_id <> ?`,
+    [userId, journeyId]
+  );
+
+  await connection.query(
     `INSERT INTO employee_journey_assignments (user_id, journey_id, assigned_by_user_id, source, status)
      VALUES (?, ?, ?, ?, 'active')
-     ON DUPLICATE KEY UPDATE status = 'active', source = VALUES(source), assigned_by_user_id = VALUES(assigned_by_user_id), assigned_at = CURRENT_TIMESTAMP`,
+     ON DUPLICATE KEY UPDATE status = 'active', source = VALUES(source), assigned_by_user_id = VALUES(assigned_by_user_id), assigned_at = CURRENT_TIMESTAMP, completed_at = NULL`,
     [userId, journeyId, assignedBy, source]
   );
 
