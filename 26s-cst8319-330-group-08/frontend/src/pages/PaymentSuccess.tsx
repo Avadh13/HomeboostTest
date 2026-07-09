@@ -14,11 +14,19 @@ type Registration = {
   user_id?: number | null;
 };
 
+type PortalAccess = {
+  login_email?: string;
+  login_url?: string;
+  initial_password?: string;
+  already_created?: boolean;
+};
+
 function PaymentSuccess() {
   const [searchParams] = useSearchParams();
   const registrationId = searchParams.get("registration");
   const demo = searchParams.get("demo") === "1";
   const [registration, setRegistration] = useState<Registration | null>(null);
+  const [access, setAccess] = useState<PortalAccess | null>(null);
   const [message, setMessage] = useState("Checking enrollment status...");
   const [loading, setLoading] = useState(false);
 
@@ -41,7 +49,10 @@ function PaymentSuccess() {
     if (!registrationId) return;
     setLoading(true);
     try {
-      await fetch(`${API_BASE_URL}/payments/demo-complete/${registrationId}`, { method: "POST" });
+      const response = await fetch(`${API_BASE_URL}/payments/demo-complete/${registrationId}`, { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (data.access) setAccess(data.access);
+      setMessage(data.message || "Demo payment completed. HBT portal access created.");
       loadStatus();
     } finally {
       setLoading(false);
@@ -68,6 +79,17 @@ function PaymentSuccess() {
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-400">Payment</p><p className="mt-1 font-black text-slate-900">{registration.payment_status}</p></div>
                   <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-400">Portal</p><p className="mt-1 font-black text-slate-900">{registration.team_id ? "Created" : "Pending"}</p></div>
+                </div>
+              </div>
+            )}
+
+            {access?.initial_password && (
+              <div className="mx-auto mt-6 max-w-2xl rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-5 text-left text-emerald-900">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Demo portal credentials</p>
+                <p className="mt-3 text-sm font-bold">Use these once for testing. Change this password before real client launch.</p>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-400">Email</p><p className="mt-1 break-all font-black text-slate-900">{access.login_email}</p></div>
+                  <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-400">Temporary password</p><p className="mt-1 break-all font-black text-slate-900">{access.initial_password}</p></div>
                 </div>
               </div>
             )}
