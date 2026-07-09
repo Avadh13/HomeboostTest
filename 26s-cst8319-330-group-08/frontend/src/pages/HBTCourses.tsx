@@ -2,11 +2,21 @@ import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import API_BASE_URL from "../api/api";
 
+type CourseProgress = {
+  percent: number;
+  completed_lessons: number;
+  total_lessons: number;
+  resume_lesson_id?: number | null;
+  resume_lesson_title?: string | null;
+  resume_module_title?: string | null;
+  is_complete?: boolean;
+};
+
 type Course = {
   id: number;
   title: string;
   description?: string | null;
-  progress?: { percent: number; completed_lessons: number; total_lessons: number };
+  progress?: CourseProgress;
 };
 
 type Module = { id: number; course_id: number; title: string; description?: string | null };
@@ -44,6 +54,8 @@ function HBTCourses() {
   useEffect(() => { loadCourses(); }, []);
   useEffect(() => { if (!details && courses[0]) openCourse(courses[0].id); }, [courses.length]);
 
+  const resumeLessonId = details?.course.progress?.resume_lesson_id || null;
+
   return (
     <main className="theme-page min-h-screen text-slate-950">
       <Navbar />
@@ -52,7 +64,7 @@ function HBTCourses() {
           <div className="mb-6 rounded-[2rem] bg-slate-950 p-8 text-white shadow-2xl">
             <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-200">HBT Course Portal</p>
             <h1 className="mt-3 text-4xl font-black tracking-tight md:text-6xl">Training for Home Buying Teams.</h1>
-            <p className="mt-4 max-w-3xl text-slate-300">Complete lessons, track progress, and continue from your current course.</p>
+            <p className="mt-4 max-w-3xl text-slate-300">Complete lessons, track progress, and resume from the next unfinished lesson.</p>
           </div>
 
           {loading ? <div className="loading-state">Loading courses...</div> : (
@@ -64,6 +76,9 @@ function HBTCourses() {
                     <p className="mt-2 line-clamp-2 text-sm font-semibold text-slate-500">{course.description}</p>
                     <div className="mt-4 h-2 rounded-full bg-slate-200"><div className="h-2 rounded-full bg-blue-600" style={{ width: `${course.progress?.percent || 0}%` }} /></div>
                     <p className="mt-2 text-xs font-black text-blue-700">{course.progress?.percent || 0}% complete</p>
+                    <p className="mt-2 line-clamp-1 text-xs font-bold text-slate-500">
+                      {course.progress?.is_complete ? "Course finished" : course.progress?.resume_lesson_title ? `Resume: ${course.progress.resume_lesson_title}` : "Start first lesson"}
+                    </p>
                   </button>
                 ))}
               </aside>
@@ -72,7 +87,18 @@ function HBTCourses() {
                 {details ? (
                   <>
                     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-                      <div><p className="eyebrow text-blue-600">Current course</p><h2 className="mt-2 text-3xl font-black">{details.course.title}</h2><p className="mt-2 text-slate-600">{details.course.description}</p></div>
+                      <div>
+                        <p className="eyebrow text-blue-600">Current course</p>
+                        <h2 className="mt-2 text-3xl font-black">{details.course.title}</h2>
+                        <p className="mt-2 text-slate-600">{details.course.description}</p>
+                        <div className="mt-4 rounded-2xl bg-blue-50 p-4 text-sm font-bold text-blue-800">
+                          {details.course.progress?.is_complete
+                            ? "You completed this course. Great work."
+                            : details.course.progress?.resume_lesson_title
+                              ? `Resume next: ${details.course.progress.resume_module_title} → ${details.course.progress.resume_lesson_title}`
+                              : "Start this course from the first lesson."}
+                        </div>
+                      </div>
                       <div className="rounded-3xl bg-blue-50 p-5 text-center"><p className="text-3xl font-black text-blue-700">{details.course.progress?.percent || 0}%</p><p className="text-xs font-black uppercase text-blue-700">Complete</p></div>
                     </div>
                     <div className="space-y-5">
@@ -80,12 +106,22 @@ function HBTCourses() {
                         <div key={module.id} className="rounded-[1.5rem] border border-slate-100 bg-slate-50 p-5">
                           <h3 className="text-xl font-black text-slate-950">{module.title}</h3>
                           <div className="mt-4 space-y-3">
-                            {details.lessons.filter((lesson) => lesson.module_id === module.id).map((lesson) => (
-                              <div key={lesson.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4">
-                                <div><p className="font-black text-slate-900">{lesson.title}</p><p className="mt-1 text-xs font-bold text-slate-500">{lesson.estimated_minutes || 5} min</p></div>
-                                <button onClick={() => completeLesson(lesson.id)} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-black text-white hover:bg-blue-700">{lesson.progress_status ? "Completed" : "Mark Complete"}</button>
-                              </div>
-                            ))}
+                            {details.lessons.filter((lesson) => lesson.module_id === module.id).map((lesson) => {
+                              const isResume = resumeLessonId === lesson.id;
+                              const isDone = Boolean(lesson.progress_status);
+                              return (
+                                <div key={lesson.id} className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4 ${isResume ? "bg-blue-50 ring-2 ring-blue-200" : "bg-white"}`}>
+                                  <div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="font-black text-slate-900">{lesson.title}</p>
+                                      {isResume && <span className="rounded-full bg-blue-600 px-2 py-1 text-[10px] font-black uppercase text-white">Resume here</span>}
+                                    </div>
+                                    <p className="mt-1 text-xs font-bold text-slate-500">{lesson.estimated_minutes || 5} min</p>
+                                  </div>
+                                  <button onClick={() => completeLesson(lesson.id)} className={`rounded-full px-4 py-2 text-sm font-black text-white ${isDone ? "bg-emerald-600 hover:bg-emerald-700" : "bg-slate-950 hover:bg-blue-700"}`}>{isDone ? "Completed" : "Mark Complete"}</button>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       ))}
