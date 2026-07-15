@@ -56,6 +56,11 @@ const formatMoney = (cents?: number | null, currency = "cad") => {
 
 const formatDate = (value?: string | null) => value ? new Date(value).toLocaleString() : "—";
 
+const filenameFromDisposition = (value: string | null, fallback: string) => {
+  const match = value?.match(/filename="?([^";]+)"?/i);
+  return match?.[1] || fallback;
+};
+
 function ManagePayments() {
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [statusBuckets, setStatusBuckets] = useState<Bucket[]>([]);
@@ -66,6 +71,7 @@ function ManagePayments() {
   const [search, setSearch] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const token = localStorage.getItem("token");
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
@@ -110,6 +116,32 @@ function ManagePayments() {
     loadPayments();
   };
 
+  const downloadInvoice = async (payment: PaymentRow) => {
+    setDownloadingId(payment.registration_id);
+    setNotice("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/payments/admin/registrations/${payment.registration_id}/receipt`, { headers });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "Could not download invoice.");
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filenameFromDisposition(response.headers.get("content-disposition"), `homebuying-payment-receipt-${payment.registration_id}.html`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setNotice("Invoice/receipt downloaded.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not download invoice.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   return (
     <AdminLayout title="Payment Tracking">
       <div className="space-y-6">
@@ -118,7 +150,7 @@ function ManagePayments() {
             <div>
               <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300">Stripe + demo payment tracking</p>
               <h1 className="mt-3 text-4xl font-black tracking-tight md:text-5xl">Admin payment dashboard</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">Track HBT signup payments, demo activations, paid portal access, checkout session IDs, and revenue from one admin screen.</p>
+              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">Track HBT signup payments, demo activations, paid portal access, checkout session IDs, revenue, and downloadable receipts from one admin screen.</p>
             </div>
             <button onClick={loadPayments} className="rounded-full bg-white px-5 py-3 text-sm font-black text-slate-950 hover:bg-emerald-100">Refresh</button>
           </div>
@@ -191,10 +223,10 @@ function ManagePayments() {
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-500">
-                  <tr><th className="px-4 py-3">Registration</th><th className="px-4 py-3">Company</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Provider</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Portal</th><th className="px-4 py-3">Created</th><th className="px-4 py-3">Admin action</th></tr>
+                  <tr><th className="px-4 py-3">Registration</th><th className="px-4 py-3">Company</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Provider</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Portal</th><th className="px-4 py-3">Created</th><th className="px-4 py-3">Invoice</th><th className="px-4 py-3">Admin action</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {loading ? <tr><td colSpan={8} className="px-4 py-8 text-center font-bold text-slate-500">Loading payments...</td></tr> : payments.length === 0 ? <tr><td colSpan={8} className="px-4 py-8 text-center font-bold text-slate-500">No payment records found.</td></tr> : payments.map((payment) => (
+                  {loading ? <tr><td colSpan={9} className="px-4 py-8 text-center font-bold text-slate-500">Loading payments...</td></tr> : payments.length === 0 ? <tr><td colSpan={9} className="px-4 py-8 text-center font-bold text-slate-500">No payment records found.</td></tr> : payments.map((payment) => (
                     <tr key={`${payment.registration_id}-${payment.payment_id || "registration"}`} className="hover:bg-slate-50">
                       <td className="px-4 py-3"><p className="font-black text-slate-950">#{payment.registration_id} {payment.full_name}</p><p className="text-xs font-semibold text-slate-500">{payment.email}</p><p className="mt-1 max-w-[240px] truncate text-[11px] font-mono text-slate-400">{payment.provider_session_id || payment.checkout_session_id || "no session"}</p></td>
                       <td className="px-4 py-3"><p className="font-bold text-slate-700">{payment.company_name}</p><p className="text-xs font-semibold text-slate-500">{payment.hbt_team_name || "Team pending"}</p></td>
@@ -203,6 +235,7 @@ function ManagePayments() {
                       <td className="px-4 py-3"><span className={`rounded-full px-3 py-1 text-xs font-black uppercase ring-1 ${statusTone(payment.payment_status || payment.payment_record_status)}`}>{String(payment.payment_status || payment.payment_record_status || "unknown").replace(/_/g, " ")}</span></td>
                       <td className="px-4 py-3"><p className="font-bold text-slate-700">{payment.portal_user_name ? "Created" : "Pending"}</p><p className="text-xs font-semibold text-slate-500">{payment.portal_user_email || "No portal user"}</p></td>
                       <td className="px-4 py-3 text-xs font-bold text-slate-500">{formatDate(payment.registration_created_at)}</td>
+                      <td className="px-4 py-3"><button onClick={() => downloadInvoice(payment)} disabled={downloadingId === payment.registration_id} className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 hover:bg-blue-100 disabled:opacity-60">{downloadingId === payment.registration_id ? "Downloading..." : "Invoice"}</button></td>
                       <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button onClick={() => updatePaymentStatus(payment.payment_id, "paid")} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">Mark paid</button><button onClick={() => updatePaymentStatus(payment.payment_id, "refunded")} className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700">Refunded</button></div></td>
                     </tr>
                   ))}
