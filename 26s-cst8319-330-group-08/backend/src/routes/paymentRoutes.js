@@ -11,10 +11,100 @@ const allowedStatuses = new Set(["pending", "demo_pending", "paid", "failed", "c
 const toCents = (value) => Number(value || 0);
 const formatCurrency = (cents, currency = "cad") => new Intl.NumberFormat("en-CA", { style: "currency", currency: String(currency || "cad").toUpperCase() }).format(toCents(cents) / 100);
 const isAdmin = (user) => adminRoles.includes(user?.role);
+const escapeHtml = (value) => String(value ?? "")
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#039;");
 
 const ensureAdmin = (req, res, next) => {
   if (!isAdmin(req.user)) return res.status(403).json({ status: "error", message: "Admin payment access required" });
   next();
+};
+
+const formatDate = (value) => value ? new Date(value).toLocaleString("en-CA", { timeZone: "America/Toronto" }) : "—";
+
+const receiptHtml = (payment) => {
+  const currency = payment.currency || process.env.HBT_PROGRAM_CURRENCY || "cad";
+  const amountCents = toCents(payment.amount_cents || process.env.HBT_PROGRAM_PRICE_CENTS || 99000);
+  const paidStatus = payment.payment_status === "paid" || payment.payment_record_status === "paid";
+  const receiptNumber = `HBP-${String(payment.registration_id).padStart(5, "0")}`;
+  const issuedAt = formatDate(new Date().toISOString());
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Payment Receipt ${escapeHtml(receiptNumber)}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
+    .page { max-width: 820px; margin: 32px auto; background: white; border-radius: 24px; padding: 40px; box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12); }
+    .header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 24px; }
+    .brand { font-size: 28px; font-weight: 900; letter-spacing: -0.04em; }
+    .subtitle { color: #64748b; margin-top: 6px; font-size: 14px; line-height: 1.6; }
+    .badge { display: inline-block; border-radius: 999px; padding: 8px 14px; font-size: 12px; font-weight: 900; text-transform: uppercase; background: ${paidStatus ? "#dcfce7" : "#fef3c7"}; color: ${paidStatus ? "#047857" : "#b45309"}; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 28px; }
+    .card { border: 1px solid #e2e8f0; border-radius: 18px; padding: 18px; }
+    .label { color: #64748b; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+    .value { font-size: 15px; font-weight: 700; line-height: 1.5; }
+    table { width: 100%; border-collapse: collapse; margin-top: 28px; }
+    th { background: #0f172a; color: white; text-align: left; padding: 14px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+    td { border-bottom: 1px solid #e2e8f0; padding: 14px; font-size: 14px; }
+    .total { text-align: right; font-size: 28px; font-weight: 900; margin-top: 26px; }
+    .note { margin-top: 30px; border-radius: 16px; background: #f1f5f9; padding: 16px; color: #475569; font-size: 13px; line-height: 1.6; }
+    @media print { body { background: white; } .page { box-shadow: none; margin: 0; max-width: none; border-radius: 0; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="header">
+      <div>
+        <div class="brand">Home Buying Program</div>
+        <div class="subtitle">HBT Membership Payment Receipt<br />Generated from the HomeBoost Admin Payment Dashboard</div>
+      </div>
+      <div style="text-align:right">
+        <span class="badge">${escapeHtml(payment.payment_status || payment.payment_record_status || "pending")}</span>
+        <div class="subtitle" style="margin-top:12px">Receipt #: <strong>${escapeHtml(receiptNumber)}</strong><br />Issued: ${escapeHtml(issuedAt)}</div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <div class="label">Bill To</div>
+        <div class="value">${escapeHtml(payment.full_name)}<br />${escapeHtml(payment.email)}<br />${escapeHtml(payment.phone || "")}</div>
+      </div>
+      <div class="card">
+        <div class="label">Organization</div>
+        <div class="value">${escapeHtml(payment.company_name)}<br />${escapeHtml(payment.role_title || "HBT Membership")}</div>
+      </div>
+      <div class="card">
+        <div class="label">Payment Info</div>
+        <div class="value">Provider: ${escapeHtml(payment.provider || "stripe/demo")}<br />Session: ${escapeHtml(payment.provider_session_id || payment.checkout_session_id || "—")}<br />Payment ID: ${escapeHtml(payment.payment_id || "—")}</div>
+      </div>
+      <div class="card">
+        <div class="label">Portal Access</div>
+        <div class="value">Team: ${escapeHtml(payment.hbt_team_name || "Pending") }<br />Portal user: ${escapeHtml(payment.portal_user_email || "Pending")}</div>
+      </div>
+    </section>
+
+    <table>
+      <thead><tr><th>Description</th><th>Status</th><th>Date</th><th style="text-align:right">Amount</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Home Buying Program HBT Membership Enrollment</td>
+          <td>${escapeHtml(payment.payment_status || payment.payment_record_status || "pending")}</td>
+          <td>${escapeHtml(formatDate(payment.payment_created_at || payment.registration_created_at))}</td>
+          <td style="text-align:right">${escapeHtml(formatCurrency(amountCents, currency))}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="total">Total: ${escapeHtml(formatCurrency(amountCents, currency))}</div>
+    <div class="note">This receipt is generated from HomeBoost payment records for internal/admin use. For live Stripe production payments, Stripe-hosted invoice/receipt URLs can also be stored and linked when webhook events are enabled.</div>
+  </main>
+</body>
+</html>`;
 };
 
 const handleCheckoutCompleted = async (session) => {
@@ -219,6 +309,55 @@ router.get("/admin/list", ensureAdmin, async (req, res) => {
     return res.json({ status: "success", payments });
   } catch (error) {
     return res.status(500).json({ status: "error", message: "Failed to load payments", error: error.message });
+  }
+});
+
+router.get("/admin/registrations/:registrationId/receipt", ensureAdmin, async (req, res) => {
+  try {
+    await ensureSignupTables();
+    const [[payment]] = await pool.query(
+      `SELECT
+        r.id AS registration_id,
+        r.full_name,
+        r.email,
+        r.phone,
+        r.company_name,
+        r.role_title,
+        r.status AS registration_status,
+        r.payment_status,
+        r.checkout_session_id,
+        r.team_id,
+        r.user_id,
+        r.created_at AS registration_created_at,
+        p.id AS payment_id,
+        COALESCE(p.provider, CASE WHEN r.checkout_session_id LIKE 'demo_%' THEN 'demo' ELSE 'stripe' END) AS provider,
+        p.provider_session_id,
+        COALESCE(p.amount_cents, ?) AS amount_cents,
+        COALESCE(p.currency, ?) AS currency,
+        COALESCE(p.status, r.payment_status) AS payment_record_status,
+        p.created_at AS payment_created_at,
+        p.updated_at AS payment_updated_at,
+        h.name AS hbt_team_name,
+        u.full_name AS portal_user_name,
+        u.email AS portal_user_email
+       FROM hbt_registrations r
+       LEFT JOIN payments p ON p.registration_id = r.id
+       LEFT JOIN home_buying_teams h ON h.id = r.team_id
+       LEFT JOIN users u ON u.id = r.user_id
+       WHERE r.id = ?
+       ORDER BY p.created_at DESC
+       LIMIT 1`,
+      [Number(process.env.HBT_PROGRAM_PRICE_CENTS || 99000), process.env.HBT_PROGRAM_CURRENCY || "cad", req.params.registrationId]
+    );
+
+    if (!payment) return res.status(404).json({ status: "error", message: "Payment registration not found" });
+
+    const filename = `homebuying-payment-receipt-${payment.registration_id}.html`;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.send(receiptHtml(payment));
+  } catch (error) {
+    return res.status(500).json({ status: "error", message: "Failed to generate payment receipt", error: error.message });
   }
 });
 
