@@ -61,6 +61,11 @@ const filenameFromDisposition = (value: string | null, fallback: string) => {
   return match?.[1] || fallback;
 };
 
+const compactId = (value?: string | null) => {
+  if (!value) return "No session";
+  return value.length > 28 ? `${value.slice(0, 16)}...${value.slice(-8)}` : value;
+};
+
 function ManagePayments() {
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [statusBuckets, setStatusBuckets] = useState<Bucket[]>([]);
@@ -166,7 +171,7 @@ function ManagePayments() {
           <div className="metric-card"><p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Total</p><h2 className="mt-2 text-3xl font-black text-blue-700">{summary?.total_registrations || 0}</h2><p className="mt-1 text-xs font-bold text-slate-500">Registrations</p></div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[360px_1fr]">
+        <section className="grid gap-6 2xl:grid-cols-[340px_1fr]">
           <aside className="space-y-6">
             <div className="premium-card">
               <p className="eyebrow text-blue-600">Filters</p>
@@ -215,33 +220,73 @@ function ManagePayments() {
             </div>
           </aside>
 
-          <section className="premium-card overflow-hidden">
+          <section className="rounded-[2rem] bg-white p-4 shadow-xl shadow-slate-200/70 ring-1 ring-slate-100 md:p-6">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <div><p className="eyebrow text-slate-500">Payment records</p><h2 className="text-2xl font-black">HBT signup payments</h2></div>
+              <div>
+                <p className="eyebrow text-slate-500">Payment records</p>
+                <h2 className="text-2xl font-black text-slate-950">HBT signup payments</h2>
+              </div>
               <span className="rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-600">{payments.length} rows</span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-500">
-                  <tr><th className="px-4 py-3">Registration</th><th className="px-4 py-3">Company</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Provider</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Portal</th><th className="px-4 py-3">Created</th><th className="px-4 py-3">Invoice</th><th className="px-4 py-3">Admin action</th></tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {loading ? <tr><td colSpan={9} className="px-4 py-8 text-center font-bold text-slate-500">Loading payments...</td></tr> : payments.length === 0 ? <tr><td colSpan={9} className="px-4 py-8 text-center font-bold text-slate-500">No payment records found.</td></tr> : payments.map((payment) => (
-                    <tr key={`${payment.registration_id}-${payment.payment_id || "registration"}`} className="hover:bg-slate-50">
-                      <td className="px-4 py-3"><p className="font-black text-slate-950">#{payment.registration_id} {payment.full_name}</p><p className="text-xs font-semibold text-slate-500">{payment.email}</p><p className="mt-1 max-w-[240px] truncate text-[11px] font-mono text-slate-400">{payment.provider_session_id || payment.checkout_session_id || "no session"}</p></td>
-                      <td className="px-4 py-3"><p className="font-bold text-slate-700">{payment.company_name}</p><p className="text-xs font-semibold text-slate-500">{payment.hbt_team_name || "Team pending"}</p></td>
-                      <td className="px-4 py-3 font-black text-slate-950">{formatMoney(payment.amount_cents, payment.currency || "cad")}</td>
-                      <td className="px-4 py-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase text-slate-700">{payment.provider || "stripe"}</span></td>
-                      <td className="px-4 py-3"><span className={`rounded-full px-3 py-1 text-xs font-black uppercase ring-1 ${statusTone(payment.payment_status || payment.payment_record_status)}`}>{String(payment.payment_status || payment.payment_record_status || "unknown").replace(/_/g, " ")}</span></td>
-                      <td className="px-4 py-3"><p className="font-bold text-slate-700">{payment.portal_user_name ? "Created" : "Pending"}</p><p className="text-xs font-semibold text-slate-500">{payment.portal_user_email || "No portal user"}</p></td>
-                      <td className="px-4 py-3 text-xs font-bold text-slate-500">{formatDate(payment.registration_created_at)}</td>
-                      <td className="px-4 py-3"><button onClick={() => downloadInvoice(payment)} disabled={downloadingId === payment.registration_id} className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 hover:bg-blue-100 disabled:opacity-60">{downloadingId === payment.registration_id ? "Downloading..." : "Invoice"}</button></td>
-                      <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button onClick={() => updatePaymentStatus(payment.payment_id, "paid")} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">Mark paid</button><button onClick={() => updatePaymentStatus(payment.payment_id, "refunded")} className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700">Refunded</button></div></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+
+            {loading ? (
+              <div className="rounded-3xl bg-slate-50 p-8 text-center font-bold text-slate-500">Loading payments...</div>
+            ) : payments.length === 0 ? (
+              <div className="rounded-3xl bg-slate-50 p-8 text-center font-bold text-slate-500">No payment records found.</div>
+            ) : (
+              <div className="space-y-4">
+                {payments.map((payment) => {
+                  const rowStatus = payment.payment_status || payment.payment_record_status || "unknown";
+                  const session = payment.provider_session_id || payment.checkout_session_id || "";
+                  return (
+                    <article key={`${payment.registration_id}-${payment.payment_id || "registration"}`} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-lg md:p-5">
+                      <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr_0.7fr_0.85fr_0.95fr] xl:items-center">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-lg font-black text-slate-950">#{payment.registration_id} {payment.full_name || "Unnamed registration"}</h3>
+                            <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase ring-1 ${statusTone(rowStatus)}`}>{String(rowStatus).replace(/_/g, " ")}</span>
+                          </div>
+                          <p className="mt-1 break-all text-sm font-bold text-slate-600">{payment.email}</p>
+                          <p className="mt-2 rounded-2xl bg-slate-50 px-3 py-2 font-mono text-[11px] font-bold text-slate-500" title={session || "No session"}>{compactId(session)}</p>
+                        </div>
+
+                        <div className="grid gap-2 text-sm">
+                          <div>
+                            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Company</p>
+                            <p className="mt-1 font-black text-slate-800">{payment.company_name || "—"}</p>
+                            <p className="text-xs font-bold text-slate-500">{payment.hbt_team_name || "Team pending"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Portal</p>
+                            <p className="mt-1 font-bold text-slate-700">{payment.portal_user_name ? "Created" : "Pending"}</p>
+                            <p className="break-all text-xs font-semibold text-slate-500">{payment.portal_user_email || "No portal user"}</p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Amount</p>
+                          <p className="mt-1 text-2xl font-black text-slate-950">{formatMoney(payment.amount_cents, payment.currency || "cad")}</p>
+                          <span className="mt-2 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase text-slate-700">{payment.provider || "stripe"}</span>
+                        </div>
+
+                        <div>
+                          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Created</p>
+                          <p className="mt-1 text-sm font-black text-slate-700">{formatDate(payment.registration_created_at)}</p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 xl:justify-end">
+                          <button onClick={() => downloadInvoice(payment)} disabled={downloadingId === payment.registration_id} className="rounded-full bg-blue-600 px-4 py-2 text-xs font-black text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 disabled:opacity-60">
+                            {downloadingId === payment.registration_id ? "Downloading..." : "Invoice"}
+                          </button>
+                          <button onClick={() => updatePaymentStatus(payment.payment_id, "paid")} className="rounded-full bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700 hover:bg-emerald-100">Mark paid</button>
+                          <button onClick={() => updatePaymentStatus(payment.payment_id, "refunded")} className="rounded-full bg-red-50 px-4 py-2 text-xs font-black text-red-700 hover:bg-red-100">Refunded</button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </section>
         </section>
       </div>
