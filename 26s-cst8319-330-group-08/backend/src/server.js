@@ -7,6 +7,7 @@ require("dotenv").config();
 const pool = require("./config/db");
 const { corsOptions } = require("./config/cors");
 const { apiLimiter } = require("./middleware/rateLimiter");
+const sanitizeErrorResponse = require("./middleware/sanitizeErrorResponse");
 const errorHandler = require("./middleware/errorHandler");
 const authRoutes = require("./routes/authRoutes");
 const resourceRoutes = require("./routes/resourceRoutes");
@@ -69,6 +70,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(cors(corsOptions));
+app.use(sanitizeErrorResponse);
 app.use(apiLimiter);
 app.post("/api/payments/stripe-webhook", express.raw({ type: "application/json" }), paymentRoutes.handleStripeWebhook);
 app.use(express.json({ limit: "1mb" }));
