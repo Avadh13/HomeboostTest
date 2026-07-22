@@ -35,17 +35,17 @@ type FooterData = {
 const fallback: FooterData = {
   settings: {
     is_enabled: 1,
-    brand_name: "HomeBoost Mortgage Benefit",
-    logo_text: "HB",
-    tagline: "Mortgage & home buying benefit platform.",
-    description: "Modern employer portals, advisor communication, mortgage service intake, resources, appointments, and guided home-buying support in one place.",
+    brand_name: "Employee Benefit Program",
+    logo_text: "EBP",
+    tagline: "Home buying and mortgage benefits for employees.",
+    description: "Employer portals, advisor communication, mortgage service intake, resources, learning, and guided home-buying support in one secure platform.",
     cta_text: "Start Mortgage Request",
     cta_link: "/login",
-    newsletter_title: "Need mortgage guidance?",
-    newsletter_text: "Choose a service, share your details, and connect with the right advisor through HomeBoost.",
+    newsletter_title: "Need home-buying or mortgage guidance?",
+    newsletter_text: "Choose a service, share your details, and connect with the right advisor through the Employee Benefit Program.",
     background_mode: "dark",
     layout_style: "three_column",
-    copyright_text: "© 2026 HomeBoost. All rights reserved.",
+    copyright_text: "© 2026 Employee Benefit Program. All rights reserved.",
   },
   links: [
     { id: 1, label: "Employer Portals", href: "/partners", column_key: "left", display_order: 1, is_active: 1, opens_new_tab: 0 },
@@ -145,7 +145,7 @@ function Footer() {
               <div className="flex items-center gap-3">
                 <BrandLogo variant="icon" iconClassName="h-14 w-14 rounded-2xl shadow-lg shadow-blue-500/20" />
                 <div>
-                  <h2 className="text-xl font-black tracking-tight">{settings.brand_name || "HomeBoost Mortgage Benefit"}</h2>
+                  <h2 className="text-xl font-black tracking-tight">{settings.brand_name || "Employee Benefit Program"}</h2>
                   {settings.tagline && <p className={`mt-0.5 text-sm font-semibold ${mutedClasses[backgroundMode]}`}>{settings.tagline}</p>}
                 </div>
               </div>
@@ -176,7 +176,7 @@ function Footer() {
           </div>
 
           <div className={`mt-8 flex flex-col gap-4 border-t pt-5 md:flex-row md:items-center md:justify-between ${backgroundMode === "dark" ? "border-white/10" : "border-slate-200"}`}>
-            <p className={`text-sm font-semibold ${mutedClasses[backgroundMode]}`}>{settings.copyright_text || "© 2026 HomeBoost. All rights reserved."}</p>
+            <p className={`text-sm font-semibold ${mutedClasses[backgroundMode]}`}>{settings.copyright_text || "© 2026 Employee Benefit Program. All rights reserved."}</p>
             <div className="flex flex-wrap gap-2">{linksByColumn.bottom.map(renderLink)}</div>
           </div>
         </div>
