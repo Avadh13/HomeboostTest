@@ -1,17 +1,17 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import API_BASE_URL from "../api/api";
+import { clearStoredSession, readStoredToken, readStoredUser, type StoredUser } from "../utils/auth";
+import { dashboardPathForRole, isPortalPath } from "../utils/routes";
 import BrandLogo from "./BrandLogo";
-
-type User = {
-  id: number;
-  full_name: string;
-  email: string;
-  role: string;
-  team_id?: number | null;
-  partnership_id?: number | null;
-  photo_url?: string | null;
-};
 
 type NavLinkItem = {
   to: string;
@@ -21,6 +21,21 @@ type NavLinkItem = {
 };
 
 type MessageThreadSummary = { unread_count?: number | string | null };
+
+type NavbarProps = {
+  globalInstance?: boolean;
+};
+
+type NavbarHostProps = {
+  globalMounted: boolean;
+  children: ReactNode;
+};
+
+const GlobalNavbarContext = createContext(false);
+
+export function NavbarHost({ globalMounted, children }: NavbarHostProps) {
+  return <GlobalNavbarContext.Provider value={globalMounted}>{children}</GlobalNavbarContext.Provider>;
+}
 
 const initials = (name?: string) =>
   (name || "User")
@@ -99,46 +114,56 @@ const adminLinks: NavLinkItem[] = [
   { to: "/admin/profile", label: "My Profile", icon: "○" },
 ];
 
-function Navbar() {
+const linksForUser = (user: StoredUser | null): NavLinkItem[] => {
+  if (user?.role === "employee") return employeeLinks;
+  if (user?.role === "company_admin" || user?.role === "company") return companyLinks;
+  if (user?.role === "hbt_admin") return hbtAdminLinks;
+  if (user?.role === "hbt_member") return hbtMemberLinks;
+  if (user?.role === "admin" || user?.role === "super_admin") return adminLinks;
+  return publicLinks;
+};
+
+function NavbarContent() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const navRef = useRef<HTMLElement | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const token = localStorage.getItem("token");
-  const userData = localStorage.getItem("user");
-
-  let user: User | null = null;
-  try {
-    user = userData ? JSON.parse(userData) : null;
-  } catch {
-    user = null;
-  }
-
+  const token = readStoredToken();
+  const user = readStoredUser();
   const isLoggedIn = Boolean(token && user);
+  const portalMode = Boolean(isLoggedIn && isPortalPath(location.pathname));
+  const dashboardPath = dashboardPathForRole(user?.role);
 
-  const links = useMemo(() => {
-    if (!isLoggedIn) return publicLinks;
-    if (user?.role === "employee") return employeeLinks;
-    if (user?.role === "company_admin" || user?.role === "company") return companyLinks;
-    if (user?.role === "hbt_admin") return hbtAdminLinks;
-    if (user?.role === "hbt_member") return hbtMemberLinks;
-    if (user?.role === "admin" || user?.role === "super_admin") return adminLinks;
-    return publicLinks;
-  }, [isLoggedIn, user?.role]);
+  const links = useMemo(
+    () => (portalMode ? linksForUser(user) : publicLinks),
+    [portalMode, user?.role],
+  );
 
   useEffect(() => {
-    document.body.classList.toggle("hb-portal-mode", isLoggedIn);
-    if (!isLoggedIn) setOpen(false);
-  }, [isLoggedIn]);
+    document.body.classList.toggle("hb-portal-mode", portalMode);
+    if (!portalMode) setOpen(false);
+
+    return () => {
+      document.body.classList.remove("hb-portal-mode");
+    };
+  }, [portalMode]);
 
   useEffect(() => {
     setOpen(false);
+    setSearch("");
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!isLoggedIn || !token) {
+    if (!portalMode || !navRef.current) return;
+    const activeLink = navRef.current.querySelector<HTMLElement>(".hb-portal-link.is-active");
+    activeLink?.scrollIntoView({ block: "nearest" });
+  }, [location.pathname, portalMode]);
+
+  useEffect(() => {
+    if (!portalMode || !token) {
       setUnreadAlerts(0);
       setUnreadMessages(0);
       return;
@@ -148,42 +173,39 @@ function Navbar() {
     const headers = { Authorization: `Bearer ${token}` };
 
     const loadBadges = async () => {
-      try {
-        const [notificationsResponse, messagesResponse] = await Promise.all([
-          fetch(`${API_BASE_URL}/notifications/unread-count`, { headers }),
-          fetch(`${API_BASE_URL}/messages/threads`, { headers }),
-        ]);
+      const [notificationsResult, messagesResult] = await Promise.allSettled([
+        fetch(`${API_BASE_URL}/notifications/unread-count`, { headers }),
+        fetch(`${API_BASE_URL}/messages/threads`, { headers }),
+      ]);
 
-        if (cancelled) return;
+      if (cancelled) return;
 
-        if (notificationsResponse.ok) {
-          const data = await notificationsResponse.json();
-          setUnreadAlerts(Number(data.unread_count || 0));
-        }
+      if (notificationsResult.status === "fulfilled" && notificationsResult.value.ok) {
+        const data = await notificationsResult.value.json().catch(() => ({}));
+        if (!cancelled) setUnreadAlerts(Number(data.unread_count || 0));
+      }
 
-        if (messagesResponse.ok) {
-          const threads = await messagesResponse.json();
-          const unreadTotal = Array.isArray(threads)
-            ? threads.reduce(
-                (sum: number, thread: MessageThreadSummary) =>
-                  sum + Number(thread.unread_count || 0),
-                0,
-              )
-            : 0;
-          setUnreadMessages(unreadTotal);
-        }
-      } catch {
-        // Badge refresh is intentionally non-blocking.
+      if (messagesResult.status === "fulfilled" && messagesResult.value.ok) {
+        const threads = await messagesResult.value.json().catch(() => []);
+        const unreadTotal = Array.isArray(threads)
+          ? threads.reduce(
+              (sum: number, thread: MessageThreadSummary) =>
+                sum + Number(thread.unread_count || 0),
+              0,
+            )
+          : 0;
+        if (!cancelled) setUnreadMessages(unreadTotal);
       }
     };
 
-    loadBadges();
-    const timer = window.setInterval(loadBadges, 15_000);
+    loadBadges().catch(() => undefined);
+    const timer = window.setInterval(() => loadBadges().catch(() => undefined), 60_000);
+
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [isLoggedIn, token, location.pathname]);
+  }, [portalMode, token, location.pathname]);
 
   const isActive = (to: string) =>
     to === "/"
@@ -207,44 +229,47 @@ function Navbar() {
       : "/profile";
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    document.body.classList.remove("hb-portal-mode");
+    clearStoredSession();
     setOpen(false);
-    navigate("/login");
+    navigate("/login", { replace: true });
   };
 
   const handleSearch = () => {
     const query = search.trim().toLowerCase();
     if (!query) return;
+
     const match = links.find((link) =>
       `${link.label} ${link.shortLabel || ""}`.toLowerCase().includes(query),
     );
+
     if (match) {
       navigate(match.to);
       setSearch("");
     }
   };
 
-  if (isLoggedIn && user) {
+  if (portalMode && user) {
     return (
       <>
         <aside className={`hb-portal-sidebar ${open ? "is-open" : ""}`} data-hb-portal-navigation>
           <div className="hb-portal-brand">
-            <Link to="/" aria-label="HomeBoost home">
+            <Link to={dashboardPath} aria-label="HomeBoost portal dashboard">
               <BrandLogo className="h-12 w-[210px]" />
             </Link>
             <p>Employee Benefit Portal</p>
           </div>
 
-          <nav className="hb-portal-nav" aria-label="Portal navigation">
+          <nav ref={navRef} className="hb-portal-nav" aria-label="Portal navigation">
             {links.map((link) => {
               const badgeCount = getBadgeCount(link);
+              const active = isActive(link.to);
+
               return (
                 <Link
                   key={link.to}
                   to={link.to}
-                  className={`hb-portal-link ${isActive(link.to) ? "is-active" : ""}`}
+                  className={`hb-portal-link ${active ? "is-active" : ""}`}
+                  aria-current={active ? "page" : undefined}
                 >
                   <span className="hb-portal-link-icon" aria-hidden="true">{link.icon}</span>
                   <span className="hb-portal-link-label">{link.label}</span>
@@ -305,14 +330,14 @@ function Navbar() {
             <Link to={profilePath} className="hb-portal-profile-link">
               <span className="hb-portal-avatar">
                 {user.photo_url ? (
-                  <img src={user.photo_url} alt={user.full_name} />
+                  <img src={user.photo_url} alt={user.full_name || "User"} />
                 ) : (
                   initials(user.full_name)
                 )}
               </span>
               <span className="hb-portal-profile-copy">
-                <strong>{user.full_name}</strong>
-                <small>{user.role.replaceAll("_", " ")}</small>
+                <strong>{user.full_name || "User"}</strong>
+                <small>{String(user.role || "user").replaceAll("_", " ")}</small>
               </span>
               <span className="hb-portal-chevron" aria-hidden="true">⌄</span>
             </Link>
@@ -340,15 +365,29 @@ function Navbar() {
 
         <div className="hb-public-links">
           {publicLinks.map((link) => (
-            <Link key={link.to} to={link.to} className={isActive(link.to) ? "is-active" : ""}>
+            <Link
+              key={link.to}
+              to={link.to}
+              className={isActive(link.to) ? "is-active" : ""}
+              aria-current={isActive(link.to) ? "page" : undefined}
+            >
               {link.label}
             </Link>
           ))}
         </div>
 
         <div className="hb-public-actions">
-          <Link to="/login" className="hb-public-signin">Sign In</Link>
-          <Link to="/hbt-signup" className="hb-public-signup">Join Program</Link>
+          {isLoggedIn && user ? (
+            <>
+              <Link to={dashboardPath} className="hb-public-signin">Open Portal</Link>
+              <button type="button" onClick={handleLogout} className="hb-public-signup">Logout</button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="hb-public-signin">Sign In</Link>
+              <Link to="/hbt-signup" className="hb-public-signup">Join Program</Link>
+            </>
+          )}
         </div>
 
         <button
@@ -369,12 +408,27 @@ function Navbar() {
               {link.label}
             </Link>
           ))}
-          <Link to="/login" onClick={() => setOpen(false)}>Sign In</Link>
-          <Link to="/hbt-signup" onClick={() => setOpen(false)} className="is-primary">Join Program</Link>
+          {isLoggedIn && user ? (
+            <>
+              <Link to={dashboardPath} onClick={() => setOpen(false)}>Open Portal</Link>
+              <button type="button" onClick={handleLogout}>Logout</button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" onClick={() => setOpen(false)}>Sign In</Link>
+              <Link to="/hbt-signup" onClick={() => setOpen(false)} className="is-primary">Join Program</Link>
+            </>
+          )}
         </div>
       )}
     </nav>
   );
+}
+
+function Navbar({ globalInstance = false }: NavbarProps) {
+  const globalMounted = useContext(GlobalNavbarContext);
+  if (globalMounted && !globalInstance) return null;
+  return <NavbarContent />;
 }
 
 export default Navbar;
