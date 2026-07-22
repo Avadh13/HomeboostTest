@@ -72,7 +72,18 @@ app.use((req, res, next) => {
 app.use(cors(corsOptions));
 app.use(sanitizeErrorResponse);
 app.use(apiLimiter);
-app.post("/api/payments/stripe-webhook", express.raw({ type: "application/json" }), paymentRoutes.handleStripeWebhook);
+
+app.post(
+  "/api/payments/stripe-webhook",
+  express.raw({ type: "application/json" }),
+  (req, res) => {
+    if (isProduction && !process.env.STRIPE_WEBHOOK_SECRET) {
+      return res.status(503).json({ status: "error", message: "Payment webhook is not configured" });
+    }
+    return paymentRoutes.handleStripeWebhook(req, res);
+  },
+);
+
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use("/uploads", express.static(uploadsDir));
@@ -131,6 +142,12 @@ app.use("/api/resource-recommendations", resourceRecommendationRoutes);
 app.use("/api/company-analytics", companyAnalyticsRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/hbt-signup", hbtSignupRoutes);
+app.post("/api/payments/demo-complete/:registrationId", (req, res, next) => {
+  if (process.env.ALLOW_DEMO_PAYMENT_COMPLETION !== "true") {
+    return res.status(403).json({ status: "error", message: "Demo completion is disabled" });
+  }
+  return next();
+});
 app.use("/api/payments", paymentRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/journeys", journeyRoutes);
