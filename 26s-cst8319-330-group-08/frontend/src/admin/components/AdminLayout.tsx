@@ -111,7 +111,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
       <header className="hb-admin-header sticky top-0 z-40 flex items-center justify-between border-b px-4 py-3 shadow-sm lg:hidden">
         <Link to="/admin" className="flex items-center gap-2 text-lg font-black text-slate-950">
           <BrandLogo variant="icon" iconClassName="h-10 w-10 rounded-xl shadow-sm" />
-          HomeBoost Admin
+          Employee Benefit Program Admin
         </Link>
         <button
           type="button"
@@ -167,7 +167,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
             <Link to="/admin" className="flex items-center gap-3">
               <BrandLogo variant="icon" iconClassName="h-12 w-12 rounded-2xl shadow-lg" />
               <div>
-                <p className="text-lg font-black text-slate-950">HomeBoost</p>
+                <p className="text-lg font-black text-slate-950">Employee Benefit Program</p>
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Admin Console</p>
               </div>
             </Link>
@@ -212,7 +212,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
 
         <main className="hb-admin-content min-w-0 flex-1 lg:ml-[22rem]">
           <div className="hb-admin-header border-b px-4 py-4 shadow-sm md:px-6 lg:px-8">
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-600">HomeBoost Admin</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-600">Employee Benefit Program Admin</p>
             <h1 className="mt-1 text-2xl font-black text-slate-950">{title || "Admin"}</h1>
           </div>
           <div className="p-4 md:p-6 lg:p-8">{children}</div>
