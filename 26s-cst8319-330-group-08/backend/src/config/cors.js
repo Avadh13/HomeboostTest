@@ -9,30 +9,34 @@ const parseOrigins = (value) =>
     .map(normalizeOrigin)
     .filter(Boolean);
 
+const isProduction = process.env.NODE_ENV === "production";
+
 const getAllowedOrigins = () => {
   const envOrigins = parseOrigins(process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "");
 
-  const localOrigins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "http://localhost:8080",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:5174",
-    "http://127.0.0.1:5175",
-    "http://127.0.0.1:8080",
-  ];
+  const localOrigins = !isProduction || process.env.ALLOW_LOCAL_ORIGINS === "true"
+    ? [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://localhost:8080",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
+        "http://127.0.0.1:8080",
+      ]
+    : [];
 
-  const vercelOrigins = [
+  const productionOrigins = [
     "https://homeboost-test.vercel.app",
     "https://homeboosttest.vercel.app",
   ];
 
-  return [...new Set([...localOrigins, ...vercelOrigins, ...envOrigins])];
+  return [...new Set([...localOrigins, ...productionOrigins, ...envOrigins])];
 };
 
 const isAllowedVercelPreview = (origin) => {
-  if (process.env.ALLOW_VERCEL_PREVIEWS === "false") return false;
+  if (process.env.ALLOW_VERCEL_PREVIEWS !== "true") return false;
 
   const allowedPreviewPrefixes = [
     "https://homeboost-test-",
@@ -46,12 +50,12 @@ const isAllowedVercelPreview = (origin) => {
   ];
 
   return allowedPreviewPrefixes.some((prefix) =>
-    allowedPreviewSuffixes.some((suffix) => origin.startsWith(prefix) && origin.endsWith(suffix))
+    allowedPreviewSuffixes.some((suffix) => origin.startsWith(prefix) && origin.endsWith(suffix)),
   );
 };
 
 const isAllowedCodespacesOrigin = (origin) => {
-  if (process.env.ALLOW_CODESPACES_ORIGINS === "false") return false;
+  if (process.env.ALLOW_CODESPACES_ORIGINS !== "true") return false;
   return origin.startsWith("https://") && origin.endsWith(".app.github.dev");
 };
 
@@ -70,12 +74,13 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    console.log("CORS blocked origin:", requestOrigin);
+    console.warn("CORS blocked origin:", requestOrigin);
     return callback(new Error("Origin is not allowed by CORS policy"));
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 204,
 };
 
 module.exports = { corsOptions, getAllowedOrigins };
