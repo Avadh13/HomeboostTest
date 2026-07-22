@@ -13,7 +13,7 @@ function HeroSection({ title, subtitle, primaryLink = "/login", primaryLabel = "
   return (
     <section className="bg-slate-50 px-6 py-20">
       <div className="mx-auto max-w-5xl text-center">
-        <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-600">HomeBoost</p>
+        <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-600">Employee Benefit Program</p>
         <h1 className="mt-4 text-5xl font-black text-slate-950 md:text-7xl">{title}</h1>
         {subtitle && <p className="mx-auto mt-6 max-w-2xl text-xl text-slate-600">{subtitle}</p>}
         <div className="mt-8 flex justify-center gap-4">
