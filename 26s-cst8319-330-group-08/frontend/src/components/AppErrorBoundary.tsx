@@ -1,7 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
- type Props = { children: ReactNode };
- type State = { hasError: boolean };
+type Props = { children: ReactNode };
+type State = { hasError: boolean };
 
 class AppErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false };
@@ -11,6 +11,7 @@ class AppErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    document.body.classList.remove("hb-portal-mode");
     console.error("HomeBoost UI crashed:", error, info);
   }
 
