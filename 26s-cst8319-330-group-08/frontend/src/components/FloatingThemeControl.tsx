@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
+import { hasStoredSession } from "../utils/auth";
+import { isAdminPath, isPortalPath } from "../utils/routes";
 import { useTheme, type ThemePreference } from "./ThemeProvider";
 
 const options: Array<{ value: ThemePreference; label: string; icon: string }> = [
@@ -11,9 +14,13 @@ const options: Array<{ value: ThemePreference; label: string; icon: string }> = 
 function FloatingThemeControl() {
   const { preference, resolvedTheme, setPreference } = useTheme();
   const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
+  const portalMode = isPortalPath(pathname) && hasStoredSession();
+
+  if (isAdminPath(pathname)) return null;
 
   return (
-    <div className="fixed bottom-24 left-4 z-50 md:bottom-5">
+    <div className={`hb-floating-theme-control ${portalMode ? "is-portal" : ""}`}>
       {open && (
         <div className="mb-2 w-48 rounded-3xl border border-white/70 bg-white/95 p-2 shadow-2xl shadow-slate-900/20 backdrop-blur-xl">
           <p className="px-3 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Theme preference</p>
@@ -41,6 +48,8 @@ function FloatingThemeControl() {
         onClick={() => setOpen((value) => !value)}
         className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-lg font-black text-white shadow-2xl shadow-slate-900/30 ring-1 ring-white/20 transition hover:-translate-y-0.5"
         title={`Theme: ${preference} (${resolvedTheme})`}
+        aria-label={`Change theme. Current theme: ${preference}`}
+        aria-expanded={open}
       >
         {resolvedTheme === "dark" ? "☾" : resolvedTheme === "soft" ? "✦" : "☼"}
       </button>
