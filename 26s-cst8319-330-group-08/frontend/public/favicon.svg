@@ -1,19 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 128 128" role="img" aria-label="HomeBoost favicon">
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 128 128" role="img" aria-label="Employee Benefit Program favicon">
   <defs>
-    <linearGradient id="hbLogoGradient" x1="18" y1="15" x2="110" y2="114" gradientUnits="userSpaceOnUse">
+    <linearGradient id="ebpMark" x1="15" y1="12" x2="116" y2="120" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#2563EB"/>
-      <stop offset="0.48" stop-color="#4F46E5"/>
+      <stop offset="0.52" stop-color="#4F46E5"/>
       <stop offset="1" stop-color="#7C3AED"/>
     </linearGradient>
-    <linearGradient id="hbTextGradient" x1="34" y1="43" x2="94" y2="103" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#0EA5E9"/>
-      <stop offset="0.52" stop-color="#2563EB"/>
-      <stop offset="1" stop-color="#8B5CF6"/>
-    </linearGradient>
   </defs>
-  <rect width="128" height="128" rx="30" fill="#FFFFFF"/>
-  <path d="M23 61.5 64 27l41 34.5" fill="none" stroke="url(#hbLogoGradient)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M35 57v45h58V57" fill="none" stroke="url(#hbLogoGradient)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
-  <path d="M55 45h7v7h-7v-7Zm11 0h7v7h-7v-7Zm-11 11h7v7h-7v-7Zm11 0h7v7h-7v-7Z" fill="url(#hbLogoGradient)"/>
-  <text x="64" y="94" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="48" font-weight="900" fill="url(#hbTextGradient)" letter-spacing="-5">HB</text>
+  <rect width="128" height="128" rx="30" fill="url(#ebpMark)"/>
+  <path d="M64 22 99 35v27c0 24-15 42-35 51-20-9-35-27-35-51V35l35-13Z" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linejoin="round"/>
+  <circle cx="49" cy="49" r="7" fill="#FFFFFF"/>
+  <circle cx="79" cy="49" r="7" fill="#FFFFFF"/>
+  <path d="M36 77c3-12 11-19 23-19s20 7 23 19" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+  <text x="64" y="102" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="900" fill="#FFFFFF" letter-spacing="1">EBP</text>
 </svg>
