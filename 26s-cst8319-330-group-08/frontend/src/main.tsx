@@ -7,6 +7,7 @@ import "./index.css";
 import "./theme.css";
 import "./dashboard-cleanup.css";
 import "./ui-polish.css";
+import "./portal-theme.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -15,5 +16,5 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <App />
       </ToastProvider>
     </ThemeProvider>
-  </React.StrictMode>
+  </React.StrictMode>,
 );
