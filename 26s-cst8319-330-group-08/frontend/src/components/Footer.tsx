@@ -27,10 +27,15 @@ type FooterLink = {
   opens_new_tab: number;
 };
 
-type FooterData = {
-  settings: FooterSettings;
-  links: FooterLink[];
-};
+type FooterData = { settings: FooterSettings; links: FooterLink[] };
+
+const replaceLegacyBrand = (value?: string | null) =>
+  value
+    ? value
+        .replace(/HomeBoost Employee Benefit/gi, "Employee Benefit Program")
+        .replace(/HomeBoost Mortgage Benefit/gi, "Employee Benefit Program")
+        .replace(/HomeBoost/gi, "Employee Benefit Program")
+    : value;
 
 const fallback: FooterData = {
   settings: {
@@ -92,35 +97,45 @@ function Footer() {
     fetch(`${API_BASE_URL}/footer`)
       .then((response) => (response.ok ? response.json() : Promise.reject()))
       .then((payload) => {
-        if (!mounted) return;
-        if (payload?.settings) {
-          setData({ settings: payload.settings, links: Array.isArray(payload.links) ? payload.links : [] });
-        }
+        if (!mounted || !payload?.settings) return;
+        setData({ settings: payload.settings, links: Array.isArray(payload.links) ? payload.links : [] });
       })
-      .catch(() => {
-        if (mounted) setData(fallback);
-      })
-      .finally(() => {
-        if (mounted) setLoaded(true);
-      });
+      .catch(() => mounted && setData(fallback))
+      .finally(() => mounted && setLoaded(true));
 
     return () => {
       mounted = false;
     };
   }, []);
 
-  const settings = data.settings || fallback.settings;
+  const sourceSettings = data.settings || fallback.settings;
+  const settings: FooterSettings = {
+    ...sourceSettings,
+    brand_name: "Employee Benefit Program",
+    logo_text: "EBP",
+    tagline: replaceLegacyBrand(sourceSettings.tagline),
+    description: replaceLegacyBrand(sourceSettings.description),
+    newsletter_title: replaceLegacyBrand(sourceSettings.newsletter_title),
+    newsletter_text: replaceLegacyBrand(sourceSettings.newsletter_text),
+    copyright_text: "© 2026 Employee Benefit Program. All rights reserved.",
+  };
+
   const backgroundMode = settings.background_mode || "dark";
-  const activeLinks = data.links.filter((link) => Number(link.is_active) === 1);
-  const linksByColumn = useMemo(() => {
-    return activeLinks.reduce<Record<FooterLink["column_key"], FooterLink[]>>(
-      (groups, link) => {
-        groups[link.column_key]?.push(link);
-        return groups;
-      },
-      { left: [], center: [], right: [], bottom: [] }
-    );
-  }, [activeLinks]);
+  const activeLinks = data.links
+    .filter((link) => Number(link.is_active) === 1)
+    .map((link) => ({ ...link, label: replaceLegacyBrand(link.label) || link.label }));
+
+  const linksByColumn = useMemo(
+    () =>
+      activeLinks.reduce<Record<FooterLink["column_key"], FooterLink[]>>(
+        (groups, link) => {
+          groups[link.column_key]?.push(link);
+          return groups;
+        },
+        { left: [], center: [], right: [], bottom: [] },
+      ),
+    [activeLinks],
+  );
 
   if (loaded && Number(settings.is_enabled) !== 1) return null;
 
@@ -145,7 +160,7 @@ function Footer() {
               <div className="flex items-center gap-3">
                 <BrandLogo variant="icon" iconClassName="h-14 w-14 rounded-2xl shadow-lg shadow-blue-500/20" />
                 <div>
-                  <h2 className="text-xl font-black tracking-tight">{settings.brand_name || "Employee Benefit Program"}</h2>
+                  <h2 className="text-xl font-black tracking-tight">{settings.brand_name}</h2>
                   {settings.tagline && <p className={`mt-0.5 text-sm font-semibold ${mutedClasses[backgroundMode]}`}>{settings.tagline}</p>}
                 </div>
               </div>
@@ -156,11 +171,7 @@ function Footer() {
                 <div className={`mt-6 rounded-2xl border p-4 ${panelClasses[backgroundMode]}`}>
                   {settings.newsletter_title && <p className="font-black">{settings.newsletter_title}</p>}
                   {settings.newsletter_text && <p className={`mt-1 text-sm leading-relaxed ${mutedClasses[backgroundMode]}`}>{settings.newsletter_text}</p>}
-                  {settings.cta_text && settings.cta_link && (
-                    <a href={settings.cta_link} className="mt-4 inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700">
-                      {settings.cta_text}
-                    </a>
-                  )}
+                  {settings.cta_text && settings.cta_link && <a href={settings.cta_link} className="mt-4 inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700">{settings.cta_text}</a>}
                 </div>
               )}
             </div>
@@ -176,7 +187,7 @@ function Footer() {
           </div>
 
           <div className={`mt-8 flex flex-col gap-4 border-t pt-5 md:flex-row md:items-center md:justify-between ${backgroundMode === "dark" ? "border-white/10" : "border-slate-200"}`}>
-            <p className={`text-sm font-semibold ${mutedClasses[backgroundMode]}`}>{settings.copyright_text || "© 2026 Employee Benefit Program. All rights reserved."}</p>
+            <p className={`text-sm font-semibold ${mutedClasses[backgroundMode]}`}>{settings.copyright_text}</p>
             <div className="flex flex-wrap gap-2">{linksByColumn.bottom.map(renderLink)}</div>
           </div>
         </div>
