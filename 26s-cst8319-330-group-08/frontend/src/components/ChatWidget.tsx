@@ -137,7 +137,7 @@ function ChatWidget() {
             <form onSubmit={sendAdminSupport} className="space-y-4">
               <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">Sending to</p>
-                <p className="mt-1 font-black text-slate-950">HomeBoost Admin Support</p>
+                <p className="mt-1 font-black text-slate-950">Employee Benefit Program Admin Support</p>
                 <p className="mt-1 text-sm text-slate-600">For platform problems, login help, account issues, or admin questions.</p>
               </div>
 
