@@ -1,33 +1,30 @@
 import type { ReactNode } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
+import { clearStoredSession, readStoredToken, readStoredUser } from "../../utils/auth";
+import { dashboardPathForRole } from "../../utils/routes";
 
 type AdminProtectedRouteProps = {
   children: ReactNode;
 };
 
 function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
-  const token = localStorage.getItem("token");
-  const userData = localStorage.getItem("user");
+  const location = useLocation();
+  const token = readStoredToken();
+  const user = readStoredUser();
 
-  if (!token || !userData) {
-    return <Navigate to="/login" replace />;
-  }
-
-  let user: { role?: string } = {};
-
-  try {
-    user = JSON.parse(userData);
-  } catch {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    return <Navigate to="/login" replace />;
+  if (!token || !user?.role) {
+    clearStoredSession();
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: `${location.pathname}${location.search}${location.hash}` }}
+      />
+    );
   }
 
   if (user.role !== "admin" && user.role !== "super_admin") {
-    if (user.role === "hbt_admin") return <Navigate to="/hbt/dashboard" replace />;
-    if (user.role === "hbt_member") return <Navigate to="/hbt/member-dashboard" replace />;
-    if (user.role === "employee") return <Navigate to="/employee-portal" replace />;
-    return <Navigate to="/login" replace />;
+    return <Navigate to={dashboardPathForRole(user.role)} replace />;
   }
 
   return <>{children}</>;
