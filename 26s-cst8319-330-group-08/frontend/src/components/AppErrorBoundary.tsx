@@ -12,7 +12,7 @@ class AppErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     document.body.classList.remove("hb-portal-mode");
-    console.error("HomeBoost UI crashed:", error, info);
+    console.error("Employee Benefit Program UI crashed:", error, info);
   }
 
   render() {
@@ -21,7 +21,7 @@ class AppErrorBoundary extends Component<Props, State> {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
         <section className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xl">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">HomeBoost</p>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">Employee Benefit Program</p>
           <h1 className="mt-3 text-3xl font-black text-slate-950">This page could not be displayed.</h1>
           <p className="mt-3 text-sm leading-relaxed text-slate-600">
             A temporary interface error occurred. Your account data has not been changed.
