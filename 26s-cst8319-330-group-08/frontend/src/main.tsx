@@ -8,6 +8,7 @@ import "./theme.css";
 import "./dashboard-cleanup.css";
 import "./ui-polish.css";
 import "./portal-theme.css";
+import "./portal-layout-fixes.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
