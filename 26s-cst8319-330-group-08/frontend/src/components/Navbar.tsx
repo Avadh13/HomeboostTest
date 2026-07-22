@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import API_BASE_URL from "../api/api";
+import { BRAND } from "../config/brand";
 import { clearStoredSession, readStoredToken, readStoredUser, type StoredUser } from "../utils/auth";
 import { dashboardPathForRole, isPortalPath } from "../utils/routes";
 import BrandLogo from "./BrandLogo";
@@ -21,15 +22,8 @@ type NavLinkItem = {
 };
 
 type MessageThreadSummary = { unread_count?: number | string | null };
-
-type NavbarProps = {
-  globalInstance?: boolean;
-};
-
-type NavbarHostProps = {
-  globalMounted: boolean;
-  children: ReactNode;
-};
+type NavbarProps = { globalInstance?: boolean };
+type NavbarHostProps = { globalMounted: boolean; children: ReactNode };
 
 const GlobalNavbarContext = createContext(false);
 
@@ -137,18 +131,12 @@ function NavbarContent() {
   const portalMode = Boolean(isLoggedIn && isPortalPath(location.pathname));
   const dashboardPath = dashboardPathForRole(user?.role);
 
-  const links = useMemo(
-    () => (portalMode ? linksForUser(user) : publicLinks),
-    [portalMode, user?.role],
-  );
+  const links = useMemo(() => (portalMode ? linksForUser(user) : publicLinks), [portalMode, user?.role]);
 
   useEffect(() => {
     document.body.classList.toggle("hb-portal-mode", portalMode);
     if (!portalMode) setOpen(false);
-
-    return () => {
-      document.body.classList.remove("hb-portal-mode");
-    };
+    return () => document.body.classList.remove("hb-portal-mode");
   }, [portalMode]);
 
   useEffect(() => {
@@ -158,8 +146,7 @@ function NavbarContent() {
 
   useEffect(() => {
     if (!portalMode || !navRef.current) return;
-    const activeLink = navRef.current.querySelector<HTMLElement>(".hb-portal-link.is-active");
-    activeLink?.scrollIntoView({ block: "nearest" });
+    navRef.current.querySelector<HTMLElement>(".hb-portal-link.is-active")?.scrollIntoView({ block: "nearest" });
   }, [location.pathname, portalMode]);
 
   useEffect(() => {
@@ -187,20 +174,15 @@ function NavbarContent() {
 
       if (messagesResult.status === "fulfilled" && messagesResult.value.ok) {
         const threads = await messagesResult.value.json().catch(() => []);
-        const unreadTotal = Array.isArray(threads)
-          ? threads.reduce(
-              (sum: number, thread: MessageThreadSummary) =>
-                sum + Number(thread.unread_count || 0),
-              0,
-            )
+        const total = Array.isArray(threads)
+          ? threads.reduce((sum: number, thread: MessageThreadSummary) => sum + Number(thread.unread_count || 0), 0)
           : 0;
-        if (!cancelled) setUnreadMessages(unreadTotal);
+        if (!cancelled) setUnreadMessages(total);
       }
     };
 
     loadBadges().catch(() => undefined);
     const timer = window.setInterval(() => loadBadges().catch(() => undefined), 60_000);
-
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -208,25 +190,16 @@ function NavbarContent() {
   }, [portalMode, token, location.pathname]);
 
   const isActive = (to: string) =>
-    to === "/"
-      ? location.pathname === "/"
-      : location.pathname === to || location.pathname.startsWith(`${to}/`);
+    to === "/" ? location.pathname === "/" : location.pathname === to || location.pathname.startsWith(`${to}/`);
 
-  const getBadgeCount = (link: NavLinkItem) =>
-    link.to.includes("messages")
-      ? unreadMessages
-      : link.to.includes("notifications")
-        ? unreadAlerts
-        : 0;
+  const badgeFor = (link: NavLinkItem) =>
+    link.to.includes("messages") ? unreadMessages : link.to.includes("notifications") ? unreadAlerts : 0;
 
   const pageTitle =
     links.find((link) => isActive(link.to))?.label ||
-    (user?.role === "employee" ? "Employee Portal" : "HomeBoost Portal");
+    (user?.role === "employee" ? "Employee Portal" : "Employee Benefit Portal");
 
-  const profilePath =
-    user?.role === "admin" || user?.role === "super_admin"
-      ? "/admin/profile"
-      : "/profile";
+  const profilePath = user?.role === "admin" || user?.role === "super_admin" ? "/admin/profile" : "/profile";
 
   const handleLogout = () => {
     clearStoredSession();
@@ -237,11 +210,7 @@ function NavbarContent() {
   const handleSearch = () => {
     const query = search.trim().toLowerCase();
     if (!query) return;
-
-    const match = links.find((link) =>
-      `${link.label} ${link.shortLabel || ""}`.toLowerCase().includes(query),
-    );
-
+    const match = links.find((link) => `${link.label} ${link.shortLabel || ""}`.toLowerCase().includes(query));
     if (match) {
       navigate(match.to);
       setSearch("");
@@ -253,17 +222,16 @@ function NavbarContent() {
       <>
         <aside className={`hb-portal-sidebar ${open ? "is-open" : ""}`} data-hb-portal-navigation>
           <div className="hb-portal-brand">
-            <Link to={dashboardPath} aria-label="HomeBoost portal dashboard">
-              <BrandLogo className="h-12 w-[210px]" />
+            <Link to={dashboardPath} aria-label={`${BRAND.name} portal dashboard`}>
+              <BrandLogo className="h-12 w-[230px]" />
             </Link>
-            <p>Employee Benefit Portal</p>
+            <p>Secure Employee & Partner Portal</p>
           </div>
 
           <nav ref={navRef} className="hb-portal-nav" aria-label="Portal navigation">
             {links.map((link) => {
-              const badgeCount = getBadgeCount(link);
+              const badgeCount = badgeFor(link);
               const active = isActive(link.to);
-
               return (
                 <Link
                   key={link.to}
@@ -280,14 +248,8 @@ function NavbarContent() {
           </nav>
 
           <div className="hb-portal-sidebar-footer">
-            <Link to="/contact" className="hb-portal-help-link">
-              <span aria-hidden="true">?</span>
-              Support
-            </Link>
-            <button type="button" onClick={handleLogout} className="hb-portal-logout">
-              <span aria-hidden="true">↪</span>
-              Logout
-            </button>
+            <Link to="/contact" className="hb-portal-help-link"><span aria-hidden="true">?</span>Support</Link>
+            <button type="button" onClick={handleLogout} className="hb-portal-logout"><span aria-hidden="true">↪</span>Logout</button>
           </div>
         </aside>
 
@@ -303,7 +265,7 @@ function NavbarContent() {
               {open ? "×" : "☰"}
             </button>
             <div>
-              <p className="hb-portal-kicker">HomeBoost</p>
+              <p className="hb-portal-kicker">{BRAND.name}</p>
               <h1>{pageTitle}</h1>
             </div>
           </div>
@@ -313,9 +275,7 @@ function NavbarContent() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") handleSearch();
-              }}
+              onKeyDown={(event) => event.key === "Enter" && handleSearch()}
               placeholder="Search portal pages..."
               aria-label="Search portal pages"
             />
@@ -326,14 +286,9 @@ function NavbarContent() {
               <span aria-hidden="true">◉</span>
               {unreadAlerts > 0 && <span>{formatBadge(unreadAlerts)}</span>}
             </Link>
-
             <Link to={profilePath} className="hb-portal-profile-link">
               <span className="hb-portal-avatar">
-                {user.photo_url ? (
-                  <img src={user.photo_url} alt={user.full_name || "User"} />
-                ) : (
-                  initials(user.full_name)
-                )}
+                {user.photo_url ? <img src={user.photo_url} alt={user.full_name || "User"} /> : initials(user.full_name)}
               </span>
               <span className="hb-portal-profile-copy">
                 <strong>{user.full_name || "User"}</strong>
@@ -344,14 +299,7 @@ function NavbarContent() {
           </div>
         </header>
 
-        {open && (
-          <button
-            type="button"
-            className="hb-portal-backdrop"
-            onClick={() => setOpen(false)}
-            aria-label="Close portal navigation"
-          />
-        )}
+        {open && <button type="button" className="hb-portal-backdrop" onClick={() => setOpen(false)} aria-label="Close portal navigation" />}
       </>
     );
   }
@@ -359,18 +307,13 @@ function NavbarContent() {
   return (
     <nav className="hb-public-navbar">
       <div className="hb-public-navbar-inner">
-        <Link to="/" className="hb-public-brand" aria-label="HomeBoost home">
-          <BrandLogo className="h-12 w-[220px] md:h-14 md:w-[260px]" />
+        <Link to="/" className="hb-public-brand" aria-label={`${BRAND.name} home`}>
+          <BrandLogo className="h-12 w-[250px] md:h-14 md:w-[320px]" />
         </Link>
 
         <div className="hb-public-links">
           {publicLinks.map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={isActive(link.to) ? "is-active" : ""}
-              aria-current={isActive(link.to) ? "page" : undefined}
-            >
+            <Link key={link.to} to={link.to} className={isActive(link.to) ? "is-active" : ""} aria-current={isActive(link.to) ? "page" : undefined}>
               {link.label}
             </Link>
           ))}
@@ -390,24 +333,14 @@ function NavbarContent() {
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setOpen((current) => !current)}
-          className="hb-public-menu"
-          aria-expanded={open}
-          aria-label="Toggle navigation menu"
-        >
+        <button type="button" onClick={() => setOpen((current) => !current)} className="hb-public-menu" aria-expanded={open} aria-label="Toggle navigation menu">
           {open ? "Close" : "Menu"}
         </button>
       </div>
 
       {open && (
         <div className="hb-public-mobile-menu">
-          {publicLinks.map((link) => (
-            <Link key={link.to} to={link.to} onClick={() => setOpen(false)}>
-              {link.label}
-            </Link>
-          ))}
+          {publicLinks.map((link) => <Link key={link.to} to={link.to} onClick={() => setOpen(false)}>{link.label}</Link>)}
           {isLoggedIn && user ? (
             <>
               <Link to={dashboardPath} onClick={() => setOpen(false)}>Open Portal</Link>
