@@ -79,7 +79,7 @@ function Pricing() {
               Choose a plan that helps employees access homeownership guidance, trusted resources, and role-based support from the right Home Buying Team.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Link to="/contact" className="rounded-full bg-white px-5 py-2.5 text-sm font-black text-violet-800 hover:bg-violet-50">Talk to HomeBoost</Link>
+              <Link to="/contact" className="rounded-full bg-white px-5 py-2.5 text-sm font-black text-violet-800 hover:bg-violet-50">Talk to the Employee Benefit Program</Link>
               <Link to="/partners" className="rounded-full border border-white/30 px-5 py-2.5 text-sm font-black text-white hover:bg-white/10">View employer portals</Link>
             </div>
           </header>
@@ -105,7 +105,7 @@ function Pricing() {
           ) : plans.length === 0 ? (
             <section className="premium-card p-10 text-center">
               <h2 className="text-2xl font-black text-slate-950">No pricing plans available</h2>
-              <p className="mx-auto mt-2 max-w-xl text-slate-600">Pricing content can be managed from Admin → Pricing. Contact HomeBoost for plan details.</p>
+              <p className="mx-auto mt-2 max-w-xl text-slate-600">Pricing content can be managed from Admin → Pricing. Contact the Employee Benefit Program team for plan details.</p>
               <Link to="/contact" className="btn-primary mt-6 inline-flex">Contact us</Link>
             </section>
           ) : (
