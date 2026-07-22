@@ -1,0 +1,86 @@
+/*
+ * Portal layout corrections
+ *
+ * The authenticated navigation is fixed to the left. Route pages and the
+ * supplemental dashboard panels must therefore use the same remaining
+ * viewport column. Keeping the offset in one place prevents cards, headings,
+ * reports, and request panels from rendering underneath the sidebar.
+ */
+
+body.hb-portal-mode {
+  overflow-x: hidden;
+}
+
+body.hb-portal-mode main {
+  box-sizing: border-box;
+  width: calc(100% - 264px) !important;
+  max-width: calc(100% - 264px) !important;
+  margin-left: 264px !important;
+  padding-top: 96px !important;
+  padding-right: clamp(1rem, 2vw, 1.5rem) !important;
+  padding-left: clamp(1rem, 2vw, 1.5rem) !important;
+  overflow-x: clip;
+}
+
+/* Components rendered after <Routes> need the same portal content column. */
+.hb-portal-support-content {
+  width: 100%;
+  min-width: 0;
+}
+
+body.hb-portal-mode .hb-portal-support-content {
+  box-sizing: border-box;
+  width: calc(100% - 264px);
+  max-width: calc(100% - 264px);
+  margin-left: 264px;
+  overflow-x: clip;
+}
+
+body.hb-portal-mode .hb-portal-support-content > * {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+/* Prevent wide tables, cards, and form rows from forcing the page under the rail. */
+body.hb-portal-mode main img,
+body.hb-portal-mode main video,
+body.hb-portal-mode main canvas,
+body.hb-portal-mode .hb-portal-support-content img,
+body.hb-portal-mode .hb-portal-support-content video,
+body.hb-portal-mode .hb-portal-support-content canvas {
+  max-width: 100%;
+}
+
+body.hb-portal-mode main table,
+body.hb-portal-mode .hb-portal-support-content table {
+  max-width: 100%;
+}
+
+body.hb-portal-mode main > *,
+body.hb-portal-mode .hb-portal-support-content > * {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  body.hb-portal-mode main {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    padding-top: 88px !important;
+    padding-right: 1rem !important;
+    padding-left: 1rem !important;
+  }
+
+  body.hb-portal-mode .hb-portal-support-content {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  body.hb-portal-mode main {
+    padding-right: 0.75rem !important;
+    padding-left: 0.75rem !important;
+  }
+}
