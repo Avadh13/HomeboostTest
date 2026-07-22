@@ -1,33 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="700" height="150" viewBox="0 0 700 150" role="img" aria-label="HomeBoost Mortgage and Home Buying Benefit Program logo">
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="170" viewBox="0 0 900 170" role="img" aria-label="Employee Benefit Program logo">
   <defs>
-    <linearGradient id="hbLogoGradient" x1="18" y1="22" x2="126" y2="126" gradientUnits="userSpaceOnUse">
+    <linearGradient id="ebpMark" x1="22" y1="20" x2="138" y2="142" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#2563EB"/>
-      <stop offset="0.48" stop-color="#4F46E5"/>
+      <stop offset="0.52" stop-color="#4F46E5"/>
       <stop offset="1" stop-color="#7C3AED"/>
     </linearGradient>
-    <linearGradient id="hbWordGradient" x1="286" y1="52" x2="530" y2="90" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#111827"/>
-      <stop offset="0.42" stop-color="#2563EB"/>
+    <linearGradient id="ebpWord" x1="255" y1="46" x2="720" y2="104" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2563EB"/>
       <stop offset="1" stop-color="#7C3AED"/>
     </linearGradient>
-    <linearGradient id="hbTextGradient" x1="42" y1="55" x2="105" y2="116" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#0EA5E9"/>
-      <stop offset="0.52" stop-color="#2563EB"/>
-      <stop offset="1" stop-color="#8B5CF6"/>
-    </linearGradient>
-    <filter id="hbShadow" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#312E81" flood-opacity="0.18"/>
+    <filter id="ebpShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#312E81" flood-opacity="0.2"/>
     </filter>
   </defs>
-  <rect width="700" height="150" rx="24" fill="none"/>
-  <g filter="url(#hbShadow)">
-    <path d="M25 70 75 28l50 42" fill="none" stroke="url(#hbLogoGradient)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M39 65v52h72V65" fill="none" stroke="url(#hbLogoGradient)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
-    <path d="M64 50h7v7h-7v-7Zm12 0h7v7h-7v-7Zm-12 12h7v7h-7v-7Zm12 0h7v7h-7v-7Z" fill="url(#hbLogoGradient)"/>
-    <text x="75" y="108" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="50" font-weight="900" fill="url(#hbTextGradient)" letter-spacing="-5">HB</text>
+  <rect width="900" height="170" rx="28" fill="none"/>
+  <g filter="url(#ebpShadow)">
+    <rect x="18" y="18" width="134" height="134" rx="38" fill="url(#ebpMark)"/>
+    <path d="M85 42 126 57v31c0 28-17 48-41 58-24-10-41-30-41-58V57l41-15Z" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linejoin="round"/>
+    <circle cx="67" cy="73" r="9" fill="#FFFFFF"/>
+    <circle cx="103" cy="73" r="9" fill="#FFFFFF"/>
+    <path d="M51 105c3-15 12-23 27-23s24 8 27 23" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+    <text x="85" y="132" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="27" font-weight="900" fill="#FFFFFF" letter-spacing="1">EBP</text>
   </g>
-  <path d="M151 35v80" stroke="#CBD5E1" stroke-width="3" stroke-linecap="round"/>
-  <text x="182" y="80" font-family="Inter, Arial, sans-serif" font-size="50" font-weight="900" letter-spacing="-2.5" fill="#111827">Home</text>
-  <text x="329" y="80" font-family="Inter, Arial, sans-serif" font-size="50" font-weight="900" letter-spacing="-2.5" fill="url(#hbWordGradient)">Boost</text>
-  <text x="184" y="112" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800" letter-spacing="5" fill="#94A3B8">MORTGAGE &amp; HOME BUYING BENEFIT PROGRAM</text>
+  <path d="M178 38v94" stroke="#CBD5E1" stroke-width="3" stroke-linecap="round"/>
+  <text x="208" y="83" font-family="Inter, Arial, sans-serif" font-size="46" font-weight="900" letter-spacing="-2.2" fill="#111827">Employee</text>
+  <text x="430" y="83" font-family="Inter, Arial, sans-serif" font-size="46" font-weight="900" letter-spacing="-2.2" fill="url(#ebpWord)">Benefit Program</text>
+  <text x="211" y="118" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="800" letter-spacing="4.2" fill="#64748B">HOME BUYING &amp; MORTGAGE BENEFITS</text>
 </svg>
