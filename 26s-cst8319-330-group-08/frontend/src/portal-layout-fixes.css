@@ -1,53 +1,91 @@
 /*
  * Portal layout corrections
  *
- * The authenticated navigation is fixed to the left. Route pages and the
- * supplemental dashboard panels must therefore use the same remaining
- * viewport column. Keeping the offset in one place prevents cards, headings,
- * reports, and request panels from rendering underneath the sidebar.
+ * The authenticated navigation is fixed to the left. Every route page and
+ * every supplemental dashboard panel uses the same remaining viewport column.
  */
+
+:root {
+  --hb-portal-sidebar-width: 264px;
+  --hb-portal-topbar-height: 76px;
+}
 
 body.hb-portal-mode {
   overflow-x: hidden;
 }
 
+.hb-portal-sidebar {
+  width: var(--hb-portal-sidebar-width);
+}
+
+.hb-portal-brand,
+.hb-portal-sidebar-footer {
+  flex: 0 0 auto;
+}
+
+.hb-portal-nav {
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.hb-portal-topbar {
+  box-sizing: border-box;
+  left: var(--hb-portal-sidebar-width);
+  width: calc(100% - var(--hb-portal-sidebar-width));
+  min-width: 0;
+}
+
 body.hb-portal-mode main {
   box-sizing: border-box;
-  width: calc(100% - 264px) !important;
-  max-width: calc(100% - 264px) !important;
-  margin-left: 264px !important;
-  padding-top: 96px !important;
+  width: calc(100% - var(--hb-portal-sidebar-width)) !important;
+  max-width: calc(100% - var(--hb-portal-sidebar-width)) !important;
+  min-height: 100vh !important;
+  margin-left: var(--hb-portal-sidebar-width) !important;
+  padding-top: calc(var(--hb-portal-topbar-height) + 20px) !important;
   padding-right: clamp(1rem, 2vw, 1.5rem) !important;
   padding-left: clamp(1rem, 2vw, 1.5rem) !important;
   overflow-x: clip;
 }
 
-/* Components rendered after <Routes> need the same portal content column. */
+body.hb-portal-mode main > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Components rendered after <Routes> use the same portal content column. */
 .hb-portal-support-content {
   width: 100%;
   min-width: 0;
 }
 
+.hb-portal-support-content:empty {
+  display: none;
+}
+
 body.hb-portal-mode .hb-portal-support-content {
   box-sizing: border-box;
-  width: calc(100% - 264px);
-  max-width: calc(100% - 264px);
-  margin-left: 264px;
+  width: calc(100% - var(--hb-portal-sidebar-width));
+  max-width: calc(100% - var(--hb-portal-sidebar-width));
+  margin-left: var(--hb-portal-sidebar-width);
   overflow-x: clip;
 }
 
 body.hb-portal-mode .hb-portal-support-content > * {
   box-sizing: border-box;
+  min-width: 0;
   max-width: 100%;
 }
 
-/* Prevent wide tables, cards, and form rows from forcing the page under the rail. */
+/* Prevent wide content from forcing any portal page below the sidebar. */
 body.hb-portal-mode main img,
 body.hb-portal-mode main video,
 body.hb-portal-mode main canvas,
+body.hb-portal-mode main iframe,
 body.hb-portal-mode .hb-portal-support-content img,
 body.hb-portal-mode .hb-portal-support-content video,
-body.hb-portal-mode .hb-portal-support-content canvas {
+body.hb-portal-mode .hb-portal-support-content canvas,
+body.hb-portal-mode .hb-portal-support-content iframe {
   max-width: 100%;
 }
 
@@ -56,12 +94,59 @@ body.hb-portal-mode .hb-portal-support-content table {
   max-width: 100%;
 }
 
-body.hb-portal-mode main > *,
-body.hb-portal-mode .hb-portal-support-content > * {
-  min-width: 0;
+body.hb-portal-mode main .overflow-x-auto,
+body.hb-portal-mode .hb-portal-support-content .overflow-x-auto {
+  width: 100%;
+  max-width: 100%;
+}
+
+body.hb-portal-mode main input,
+body.hb-portal-mode main textarea,
+body.hb-portal-mode main select,
+body.hb-portal-mode .hb-portal-support-content input,
+body.hb-portal-mode .hb-portal-support-content textarea,
+body.hb-portal-mode .hb-portal-support-content select {
+  max-width: 100%;
+}
+
+/* Keep the global theme switch clear of the fixed portal sidebar. */
+.hb-floating-theme-control {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 1rem;
+  z-index: 90;
+}
+
+.hb-floating-theme-control.is-portal {
+  left: calc(var(--hb-portal-sidebar-width) + 1rem);
+}
+
+/* The mobile public menu can contain links and a logout button. */
+.hb-public-mobile-menu button {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  background: #fff1f2;
+  padding: 0.8rem 0.9rem;
+  color: #c73545;
+  text-align: left;
+  font-weight: 800;
+}
+
+@media (max-width: 1100px) {
+  .hb-portal-topbar {
+    gap: 0.75rem;
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
 }
 
 @media (max-width: 900px) {
+  .hb-portal-topbar {
+    left: 0;
+    width: 100%;
+  }
+
   body.hb-portal-mode main {
     width: 100% !important;
     max-width: 100% !important;
@@ -76,11 +161,23 @@ body.hb-portal-mode .hb-portal-support-content > * {
     max-width: 100%;
     margin-left: 0;
   }
+
+  .hb-floating-theme-control.is-portal {
+    left: 1rem;
+  }
 }
 
 @media (max-width: 640px) {
+  :root {
+    --hb-portal-topbar-height: 72px;
+  }
+
   body.hb-portal-mode main {
     padding-right: 0.75rem !important;
     padding-left: 0.75rem !important;
+  }
+
+  .hb-floating-theme-control {
+    bottom: 5.5rem;
   }
 }
