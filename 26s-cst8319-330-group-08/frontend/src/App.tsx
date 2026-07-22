@@ -165,7 +165,20 @@ function App() {
         <Route path="/:slug" element={<PartnershipLanding />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <MortgageReadinessWidget /><RecommendedResourcesWidget /><HBTLeadPipelineWidget /><CompanyROIWidget /><MortgageServicesShell /><PartnershipMortgageServicesShell /><FloatingThemeControl /><MobileStickyCTA /><FooterShell /><SpeedInsights />
+
+      <div className="hb-portal-support-content">
+        <MortgageReadinessWidget />
+        <RecommendedResourcesWidget />
+        <HBTLeadPipelineWidget />
+        <CompanyROIWidget />
+        <MortgageServicesShell />
+        <PartnershipMortgageServicesShell />
+      </div>
+
+      <FloatingThemeControl />
+      <MobileStickyCTA />
+      <FooterShell />
+      <SpeedInsights />
     </BrowserRouter>
   );
 }
