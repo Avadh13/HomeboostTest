@@ -1,9 +1,9 @@
 export const BRAND = {
-  name: "HomeBoost",
-  shortName: "HomeBoost Mortgage Benefit",
-  fullName: "HomeBoost Mortgage & Home Buying Benefit Program",
-  subtitle: "Mortgage & Home Buying Benefit Program",
-  tagline: "Mortgage guidance for employees, homeowners, and families.",
+  name: "Employee Benefit Program",
+  shortName: "Employee Benefit Program",
+  fullName: "Employee Benefit Program — Home Buying & Mortgage Benefits",
+  subtitle: "Home Buying & Mortgage Benefits",
+  tagline: "Practical home-buying and mortgage guidance for employees and families.",
   description:
     "Get expert help with buying, renewing, refinancing, debt consolidation, self-employed mortgage situations, separation or divorce mortgage planning, and mortgage readiness.",
   primaryCta: "Start Mortgage Request",
