@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import API_BASE_URL from "../api/api";
 import BrandLogo from "./BrandLogo";
 
@@ -13,14 +13,95 @@ type User = {
   photo_url?: string | null;
 };
 
-type NavLinkItem = { to: string; label: string; shortLabel?: string };
+type NavLinkItem = {
+  to: string;
+  label: string;
+  shortLabel?: string;
+  icon: string;
+};
+
 type MessageThreadSummary = { unread_count?: number | string | null };
 
-const initials = (name?: string) => (name || "User").trim().charAt(0).toUpperCase() || "U";
+const initials = (name?: string) =>
+  (name || "User")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("") || "U";
+
 const formatBadge = (count: number) => (count > 99 ? "99+" : String(count));
+
+const publicLinks: NavLinkItem[] = [
+  { to: "/", label: "Program", icon: "⌂" },
+  { to: "/hbt-signup", label: "Sign Up", icon: "+" },
+  { to: "/contact", label: "Contact", icon: "✉" },
+];
+
+const employeeLinks: NavLinkItem[] = [
+  { to: "/employee-portal", label: "Dashboard", icon: "⌂" },
+  { to: "/employee/journey", label: "My Journey", icon: "◇" },
+  { to: "/resources", label: "Resources", icon: "▤" },
+  { to: "/quiz", label: "Quizzes", icon: "✓" },
+  { to: "/employee/messages", label: "Communication", shortLabel: "Messages", icon: "✉" },
+  { to: "/notifications", label: "Notifications", shortLabel: "Alerts", icon: "◉" },
+  { to: "/profile", label: "My Profile", icon: "○" },
+];
+
+const companyLinks: NavLinkItem[] = [
+  { to: "/company/dashboard", label: "Dashboard", icon: "⌂" },
+  { to: "/company/employer-approval", label: "Employer Approval", shortLabel: "Approval", icon: "✓" },
+  { to: "/company/invites", label: "Employee Invites", shortLabel: "Invites", icon: "+" },
+  { to: "/company/branding", label: "Portal Branding", shortLabel: "Branding", icon: "◇" },
+  { to: "/company/reports", label: "Reports", icon: "▥" },
+  { to: "/company/messages", label: "Communication", shortLabel: "Messages", icon: "✉" },
+  { to: "/notifications", label: "Notifications", shortLabel: "Alerts", icon: "◉" },
+  { to: "/profile", label: "My Profile", icon: "○" },
+];
+
+const hbtAdminLinks: NavLinkItem[] = [
+  { to: "/hbt/dashboard", label: "Dashboard", icon: "⌂" },
+  { to: "/hbt/companies", label: "Companies", icon: "▦" },
+  { to: "/hbt/employees", label: "Employees", icon: "♙" },
+  { to: "/hbt/team-members", label: "Team Members", icon: "◎" },
+  { to: "/hbt/resources", label: "Resources", icon: "▤" },
+  { to: "/hbt/quiz-submissions", label: "Quiz Submissions", shortLabel: "Submissions", icon: "✓" },
+  { to: "/hbt/events", label: "Education Events", shortLabel: "Events", icon: "□" },
+  { to: "/hbt/courses", label: "Courses", icon: "▣" },
+  { to: "/hbt/journeys", label: "Journeys", icon: "◇" },
+  { to: "/hbt/quiz-journey-rules", label: "Journey Rules", shortLabel: "Rules", icon: "⌁" },
+  { to: "/hbt/employer-approvals", label: "Employer Approvals", shortLabel: "Approvals", icon: "◈" },
+  { to: "/hbt/invites", label: "Invites", icon: "+" },
+  { to: "/hbt/branding", label: "Branding", icon: "✦" },
+  { to: "/hbt/reports", label: "Reports", icon: "▥" },
+  { to: "/hbt/qa", label: "QA Readiness", shortLabel: "QA", icon: "✓" },
+  { to: "/hbt/messages", label: "Communication", shortLabel: "Messages", icon: "✉" },
+  { to: "/notifications", label: "Notifications", shortLabel: "Alerts", icon: "◉" },
+  { to: "/profile", label: "My Profile", icon: "○" },
+];
+
+const hbtMemberLinks: NavLinkItem[] = [
+  { to: "/hbt/member-dashboard", label: "Dashboard", icon: "⌂" },
+  { to: "/hbt/quiz-submissions", label: "Quiz Submissions", shortLabel: "Submissions", icon: "✓" },
+  { to: "/hbt/courses", label: "Courses", icon: "▣" },
+  { to: "/hbt/reports", label: "Reports", icon: "▥" },
+  { to: "/hbt/messages", label: "Communication", shortLabel: "Messages", icon: "✉" },
+  { to: "/notifications", label: "Notifications", shortLabel: "Alerts", icon: "◉" },
+  { to: "/profile", label: "My Profile", icon: "○" },
+];
+
+const adminLinks: NavLinkItem[] = [
+  { to: "/admin", label: "Admin Dashboard", shortLabel: "Admin", icon: "⌂" },
+  { to: "/admin/reports", label: "Reports", icon: "▥" },
+  { to: "/admin/qa", label: "QA Readiness", shortLabel: "QA", icon: "✓" },
+  { to: "/admin/messages", label: "Communication", shortLabel: "Messages", icon: "✉" },
+  { to: "/admin/notifications", label: "Notifications", shortLabel: "Alerts", icon: "◉" },
+  { to: "/admin/profile", label: "My Profile", icon: "○" },
+];
 
 function Navbar() {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const navigate = useNavigate();
@@ -35,7 +116,26 @@ function Navbar() {
     user = null;
   }
 
-  const isLoggedIn = !!token && !!user;
+  const isLoggedIn = Boolean(token && user);
+
+  const links = useMemo(() => {
+    if (!isLoggedIn) return publicLinks;
+    if (user?.role === "employee") return employeeLinks;
+    if (user?.role === "company_admin" || user?.role === "company") return companyLinks;
+    if (user?.role === "hbt_admin") return hbtAdminLinks;
+    if (user?.role === "hbt_member") return hbtMemberLinks;
+    if (user?.role === "admin" || user?.role === "super_admin") return adminLinks;
+    return publicLinks;
+  }, [isLoggedIn, user?.role]);
+
+  useEffect(() => {
+    document.body.classList.toggle("hb-portal-mode", isLoggedIn);
+    if (!isLoggedIn) setOpen(false);
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!isLoggedIn || !token) {
@@ -64,12 +164,16 @@ function Navbar() {
         if (messagesResponse.ok) {
           const threads = await messagesResponse.json();
           const unreadTotal = Array.isArray(threads)
-            ? threads.reduce((sum: number, thread: MessageThreadSummary) => sum + Number(thread.unread_count || 0), 0)
+            ? threads.reduce(
+                (sum: number, thread: MessageThreadSummary) =>
+                  sum + Number(thread.unread_count || 0),
+                0,
+              )
             : 0;
           setUnreadMessages(unreadTotal);
         }
       } catch {
-        // Badge refresh is non-critical.
+        // Badge refresh is intentionally non-blocking.
       }
     };
 
@@ -81,147 +185,176 @@ function Navbar() {
     };
   }, [isLoggedIn, token, location.pathname]);
 
+  const isActive = (to: string) =>
+    to === "/"
+      ? location.pathname === "/"
+      : location.pathname === to || location.pathname.startsWith(`${to}/`);
+
+  const getBadgeCount = (link: NavLinkItem) =>
+    link.to.includes("messages")
+      ? unreadMessages
+      : link.to.includes("notifications")
+        ? unreadAlerts
+        : 0;
+
+  const pageTitle =
+    links.find((link) => isActive(link.to))?.label ||
+    (user?.role === "employee" ? "Employee Portal" : "HomeBoost Portal");
+
+  const profilePath =
+    user?.role === "admin" || user?.role === "super_admin"
+      ? "/admin/profile"
+      : "/profile";
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    document.body.classList.remove("hb-portal-mode");
     setOpen(false);
     navigate("/login");
   };
 
-  const publicLinks: NavLinkItem[] = [
-    { to: "/", label: "Program" },
-    { to: "/hbt-signup", label: "Sign Up" },
-    { to: "/contact", label: "Contact" },
-  ];
-
-  const employeeLinks: NavLinkItem[] = [
-    { to: "/employee-portal", label: "Portal" },
-    { to: "/employee/journey", label: "Journey" },
-    { to: "/resources", label: "Resources" },
-    { to: "/employee/messages", label: "Messages" },
-    { to: "/notifications", label: "Notifications", shortLabel: "Alerts" },
-  ];
-
-  const companyLinks: NavLinkItem[] = [
-    { to: "/company/dashboard", label: "Dashboard", shortLabel: "Dash" },
-    { to: "/company/employer-approval", label: "Approval", shortLabel: "Approve" },
-    { to: "/company/reports", label: "Reports" },
-    { to: "/company/invites", label: "Invites" },
-    { to: "/company/branding", label: "Branding" },
-    { to: "/company/messages", label: "Messages" },
-  ];
-
-  const hbtAdminLinks: NavLinkItem[] = [
-    { to: "/hbt/dashboard", label: "Dashboard", shortLabel: "Dash" },
-    { to: "/hbt/reports", label: "Reports" },
-    { to: "/hbt/qa", label: "QA" },
-    { to: "/hbt/journeys", label: "Journeys" },
-    { to: "/hbt/quiz-journey-rules", label: "Rules" },
-    { to: "/hbt/employer-approvals", label: "Approvals", shortLabel: "Approvals" },
-    { to: "/hbt/courses", label: "Courses" },
-    { to: "/hbt/invites", label: "Invites" },
-    { to: "/hbt/branding", label: "Branding" },
-    { to: "/hbt/messages", label: "Messages" },
-  ];
-
-  const hbtMemberLinks: NavLinkItem[] = [
-    { to: "/hbt/member-dashboard", label: "Dashboard", shortLabel: "Dash" },
-    { to: "/hbt/reports", label: "Reports" },
-    { to: "/hbt/courses", label: "Courses" },
-    { to: "/hbt/messages", label: "Messages" },
-    { to: "/notifications", label: "Notifications", shortLabel: "Alerts" },
-  ];
-
-  const adminLinks: NavLinkItem[] = [
-    { to: "/admin", label: "Admin" },
-    { to: "/admin/reports", label: "Reports" },
-    { to: "/admin/qa", label: "QA" },
-    { to: "/admin/messages", label: "Messages" },
-    { to: "/admin/notifications", label: "Notifications", shortLabel: "Alerts" },
-    { to: "/admin/profile", label: "Profile" },
-    { to: "/admin/users", label: "Users" },
-    { to: "/admin/hbts", label: "HBTs" },
-  ];
-
-  const getLinks = () => {
-    if (!isLoggedIn) return publicLinks;
-    if (user?.role === "employee") return employeeLinks;
-    if (user?.role === "company_admin" || user?.role === "company") return companyLinks;
-    if (user?.role === "hbt_admin") return hbtAdminLinks;
-    if (user?.role === "hbt_member") return hbtMemberLinks;
-    if (user?.role === "admin" || user?.role === "super_admin") return adminLinks;
-    return publicLinks;
+  const handleSearch = () => {
+    const query = search.trim().toLowerCase();
+    if (!query) return;
+    const match = links.find((link) =>
+      `${link.label} ${link.shortLabel || ""}`.toLowerCase().includes(query),
+    );
+    if (match) {
+      navigate(match.to);
+      setSearch("");
+    }
   };
 
-  const links = getLinks();
-  const isActive = (to: string) => (to === "/" ? location.pathname === "/" : location.pathname === to || location.pathname.startsWith(`${to}/`));
-  const getBadgeCount = (link: NavLinkItem) => (link.to.includes("messages") ? unreadMessages : link.to.includes("notifications") ? unreadAlerts : 0);
-  const renderBadge = (count: number, className = "") =>
-    count > 0 ? <span className={`ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white ${className}`}>{formatBadge(count)}</span> : null;
+  if (isLoggedIn && user) {
+    return (
+      <>
+        <aside className={`hb-portal-sidebar ${open ? "is-open" : ""}`} data-hb-portal-navigation>
+          <div className="hb-portal-brand">
+            <Link to="/" aria-label="HomeBoost home">
+              <BrandLogo className="h-12 w-[210px]" />
+            </Link>
+            <p>Employee Benefit Portal</p>
+          </div>
 
-  const profilePath = user?.role === "admin" || user?.role === "super_admin" ? "/admin/profile" : "/profile";
+          <nav className="hb-portal-nav" aria-label="Portal navigation">
+            {links.map((link) => {
+              const badgeCount = getBadgeCount(link);
+              return (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className={`hb-portal-link ${isActive(link.to) ? "is-active" : ""}`}
+                >
+                  <span className="hb-portal-link-icon" aria-hidden="true">{link.icon}</span>
+                  <span className="hb-portal-link-label">{link.label}</span>
+                  {badgeCount > 0 && <span className="hb-portal-badge">{formatBadge(badgeCount)}</span>}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="hb-portal-sidebar-footer">
+            <Link to="/contact" className="hb-portal-help-link">
+              <span aria-hidden="true">?</span>
+              Support
+            </Link>
+            <button type="button" onClick={handleLogout} className="hb-portal-logout">
+              <span aria-hidden="true">↪</span>
+              Logout
+            </button>
+          </div>
+        </aside>
+
+        <header className="hb-portal-topbar">
+          <div className="hb-portal-topbar-left">
+            <button
+              type="button"
+              onClick={() => setOpen((current) => !current)}
+              className="hb-portal-menu-button"
+              aria-label="Toggle portal navigation"
+              aria-expanded={open}
+            >
+              {open ? "×" : "☰"}
+            </button>
+            <div>
+              <p className="hb-portal-kicker">HomeBoost</p>
+              <h1>{pageTitle}</h1>
+            </div>
+          </div>
+
+          <div className="hb-portal-search">
+            <span aria-hidden="true">⌕</span>
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") handleSearch();
+              }}
+              placeholder="Search portal pages..."
+              aria-label="Search portal pages"
+            />
+          </div>
+
+          <div className="hb-portal-user-actions">
+            <Link to="/notifications" className="hb-portal-alert-button" aria-label="Notifications">
+              <span aria-hidden="true">◉</span>
+              {unreadAlerts > 0 && <span>{formatBadge(unreadAlerts)}</span>}
+            </Link>
+
+            <Link to={profilePath} className="hb-portal-profile-link">
+              <span className="hb-portal-avatar">
+                {user.photo_url ? (
+                  <img src={user.photo_url} alt={user.full_name} />
+                ) : (
+                  initials(user.full_name)
+                )}
+              </span>
+              <span className="hb-portal-profile-copy">
+                <strong>{user.full_name}</strong>
+                <small>{user.role.replaceAll("_", " ")}</small>
+              </span>
+              <span className="hb-portal-chevron" aria-hidden="true">⌄</span>
+            </Link>
+          </div>
+        </header>
+
+        {open && (
+          <button
+            type="button"
+            className="hb-portal-backdrop"
+            onClick={() => setOpen(false)}
+            aria-label="Close portal navigation"
+          />
+        )}
+      </>
+    );
+  }
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/70 backdrop-blur-2xl">
-      <div className="mx-auto grid max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3 lg:px-8">
-        <Link to="/" className="group flex min-w-0 items-center justify-self-start" aria-label="HomeBoost home">
-          <BrandLogo className="h-12 w-[220px] transition duration-200 group-hover:-translate-y-0.5 md:h-14 md:w-[260px]" />
+    <nav className="hb-public-navbar">
+      <div className="hb-public-navbar-inner">
+        <Link to="/" className="hb-public-brand" aria-label="HomeBoost home">
+          <BrandLogo className="h-12 w-[220px] md:h-14 md:w-[260px]" />
         </Link>
 
-        <div className="hide-scrollbar hidden max-w-[48vw] items-center gap-1 overflow-x-auto rounded-[28px] border border-slate-800/10 bg-slate-950/95 p-1.5 text-sm font-black text-white shadow-xl shadow-slate-900/15 lg:flex 2xl:max-w-none">
-          {links.map((link) => {
-            const badgeCount = getBadgeCount(link);
-            const active = isActive(link.to);
-            return (
-              <Link
-                key={`${link.to}-${link.label}`}
-                to={link.to}
-                title={link.label}
-                className={`relative whitespace-nowrap rounded-full px-4 py-2.5 transition duration-200 xl:px-5 ${
-                  active
-                    ? "bg-white text-blue-700 shadow-lg shadow-blue-950/20"
-                    : "text-white/85 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <span className="xl:hidden">{link.shortLabel || link.label}</span>
-                <span className="hidden xl:inline">{link.label}</span>
-                {renderBadge(badgeCount)}
-              </Link>
-            );
-          })}
+        <div className="hb-public-links">
+          {publicLinks.map((link) => (
+            <Link key={link.to} to={link.to} className={isActive(link.to) ? "is-active" : ""}>
+              {link.label}
+            </Link>
+          ))}
         </div>
 
-        <div className="hidden shrink-0 items-center justify-self-end gap-3 lg:flex">
-          {!isLoggedIn ? (
-            <>
-              <Link to="/login" className="rounded-full px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-100 hover:text-blue-700 xl:px-5">
-                Sign In
-              </Link>
-              <Link to="/hbt-signup" className="rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-6 py-3 text-sm font-black text-white shadow-xl shadow-blue-900/20 transition hover:-translate-y-0.5 hover:shadow-blue-900/30">
-                Sign Up
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link to={profilePath} className="flex max-w-[250px] items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-2 text-right shadow-sm transition hover:border-blue-200 hover:bg-blue-50 xl:max-w-[300px]">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-100 to-violet-100 text-sm font-black text-blue-700 ring-1 ring-blue-200">
-                  {user?.photo_url ? <img src={user.photo_url} alt={user.full_name} className="h-full w-full object-cover" /> : initials(user?.full_name)}
-                </span>
-                <span className="min-w-0">
-                  <p className="truncate text-sm font-black text-slate-950">{user?.full_name}</p>
-                  <p className="truncate text-[11px] font-bold uppercase tracking-wide text-slate-500">{user?.role?.replace("_", " ")}</p>
-                </span>
-              </Link>
-              <button onClick={handleLogout} className="rounded-full bg-red-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-red-900/15 transition hover:-translate-y-0.5 hover:bg-red-700">
-                Logout
-              </button>
-            </>
-          )}
+        <div className="hb-public-actions">
+          <Link to="/login" className="hb-public-signin">Sign In</Link>
+          <Link to="/hbt-signup" className="hb-public-signup">Join Program</Link>
         </div>
 
         <button
-          onClick={() => setOpen(!open)}
-          className="touch-target justify-self-end rounded-full bg-slate-950 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-slate-900/20 lg:hidden"
+          type="button"
+          onClick={() => setOpen((current) => !current)}
+          className="hb-public-menu"
           aria-expanded={open}
           aria-label="Toggle navigation menu"
         >
@@ -230,52 +363,14 @@ function Navbar() {
       </div>
 
       {open && (
-        <div className="max-h-[calc(100vh-78px)] overflow-y-auto border-t border-slate-100 bg-white/98 px-4 py-4 shadow-xl backdrop-blur-xl lg:hidden">
-          <div className="grid gap-2">
-            {links.map((link) => {
-              const badgeCount = getBadgeCount(link);
-              const active = isActive(link.to);
-              return (
-                <Link
-                  key={`${link.to}-${link.label}`}
-                  to={link.to}
-                  onClick={() => setOpen(false)}
-                  className={`flex items-center justify-between rounded-2xl px-4 py-3 font-black transition ${
-                    active ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-blue-50 hover:text-blue-700"
-                  }`}
-                >
-                  <span>{link.label}</span>
-                  {renderBadge(badgeCount, "ml-3 px-2 py-1 text-xs")}
-                </Link>
-              );
-            })}
-
-            {!isLoggedIn ? (
-              <>
-                <Link to="/login" onClick={() => setOpen(false)} className="block rounded-2xl px-4 py-3 font-black text-slate-700 hover:bg-blue-50">
-                  Sign In
-                </Link>
-                <Link to="/hbt-signup" onClick={() => setOpen(false)} className="block rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-3 text-center font-black text-white">
-                  Sign Up
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link to={profilePath} onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 font-black text-slate-800">
-                  <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-blue-700">
-                    {user?.photo_url ? <img src={user.photo_url} alt={user.full_name} className="h-full w-full object-cover" /> : initials(user?.full_name)}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate">{user?.full_name}</span>
-                    <span className="block truncate text-xs uppercase tracking-wide text-slate-500">{user?.role?.replace("_", " ")}</span>
-                  </span>
-                </Link>
-                <button onClick={handleLogout} className="block w-full rounded-2xl bg-red-600 px-4 py-3 text-center font-black text-white">
-                  Logout
-                </button>
-              </>
-            )}
-          </div>
+        <div className="hb-public-mobile-menu">
+          {publicLinks.map((link) => (
+            <Link key={link.to} to={link.to} onClick={() => setOpen(false)}>
+              {link.label}
+            </Link>
+          ))}
+          <Link to="/login" onClick={() => setOpen(false)}>Sign In</Link>
+          <Link to="/hbt-signup" onClick={() => setOpen(false)} className="is-primary">Join Program</Link>
         </div>
       )}
     </nav>
