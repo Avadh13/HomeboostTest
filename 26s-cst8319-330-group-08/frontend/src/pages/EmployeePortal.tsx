@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 import ChatWidget from "../components/ChatWidget";
+import EmployeeDashboardAnalytics from "../components/EmployeeDashboardAnalytics";
+import type { EmployeeDashboardAnalyticsData } from "../components/EmployeeDashboardAnalytics";
 import EmployeeLeadProgress from "../components/EmployeeLeadProgress";
 
 const defaultAvatar = "https://images.unsplash.com/photo-1556157382-97eda2d62296?auto=format&fit=crop&w=800&q=80";
@@ -33,6 +35,7 @@ type PortalData = {
   }>;
   resources: Array<{ id: number; title: string; description: string; category: string }>;
   quizzes: Array<{ id: number; title: string; description: string }>;
+  analytics?: EmployeeDashboardAnalyticsData;
 };
 
 function EmployeePortal() {
@@ -65,7 +68,7 @@ function EmployeePortal() {
     [data]
   );
 
-  const progressPercent = Math.round((journeySteps.filter((step) => step.isReady).length / journeySteps.length) * 100);
+  const fallbackProgressPercent = Math.round((journeySteps.filter((step) => step.isReady).length / journeySteps.length) * 100);
 
   if (loading) {
     return (
@@ -96,6 +99,7 @@ function EmployeePortal() {
   const portalTitle = employee.portal_title || `${employee.employer_name} Home Buying Portal`;
   const welcomeMessage = employee.welcome_message || `Welcome, ${employee.full_name}. Your program is supported by ${employee.team_name}. Start with your journey, review resources, take the readiness quiz, and message your advisor when you are ready.`;
   const promptText = employee.prompt_text || "Not sure where to start? Open your journey or message your Home Buying Team for the next best step.";
+  const journeyProgressPercent = data.analytics?.journey.percent ?? fallbackProgressPercent;
 
   return (
     <main className="min-h-screen overflow-hidden text-slate-950" style={{ backgroundColor: secondary }}>
@@ -139,6 +143,8 @@ function EmployeePortal() {
             </div>
           </section>
 
+          {data.analytics && <EmployeeDashboardAnalytics analytics={data.analytics} primary={primary} />}
+
           <EmployeeLeadProgress primary={primary} />
 
           <section className="rounded-[2rem] bg-white p-5 shadow-xl md:p-6">
@@ -148,8 +154,8 @@ function EmployeePortal() {
                 <h2 className="mt-2 text-2xl font-black">Home-buying progress</h2>
                 <p className="mt-2 text-sm leading-relaxed text-slate-600">Follow these steps to move from learning to advisor support.</p>
                 <div className="mt-4">
-                  <div className="mb-2 flex justify-between text-xs font-black uppercase tracking-wide text-slate-500"><span>Progress</span><span>{progressPercent}%</span></div>
-                  <div className="h-3 rounded-full bg-slate-100"><div className="h-3 rounded-full transition-all" style={{ width: `${progressPercent}%`, backgroundColor: primary }} /></div>
+                  <div className="mb-2 flex justify-between text-xs font-black uppercase tracking-wide text-slate-500"><span>Progress</span><span>{journeyProgressPercent}%</span></div>
+                  <div className="h-3 rounded-full bg-slate-100"><div className="h-3 rounded-full transition-all" style={{ width: `${journeyProgressPercent}%`, backgroundColor: primary }} /></div>
                 </div>
               </div>
               <div className="grid gap-3 md:grid-cols-4">
@@ -165,11 +171,13 @@ function EmployeePortal() {
             </div>
           </section>
 
-          <section className="grid gap-4 md:grid-cols-4">
-            {[["Resources", data.resources.length, "Guides, checklists, and planning tools"], ["Quizzes", data.quizzes.length, "Readiness checks and next steps"], ["Experts", data.team_members.length, "Advisors available for support"], ["Messages", "Open", "Use Communication Center for team conversations"]].map(([label, count, text]) => (
-              <div key={label} className="metric-card"><p className="text-3xl font-black" style={{ color: primary }}>{count}</p><h3 className="mt-2 text-lg font-black">{label}</h3><p className="mt-2 text-sm text-slate-600">{text}</p></div>
-            ))}
-          </section>
+          {!data.analytics && (
+            <section className="grid gap-4 md:grid-cols-4">
+              {[["Resources", data.resources.length, "Guides, checklists, and planning tools"], ["Quizzes", data.quizzes.length, "Readiness checks and next steps"], ["Experts", data.team_members.length, "Advisors available for support"], ["Messages", "Open", "Use Communication Center for team conversations"]].map(([label, count, text]) => (
+                <div key={label} className="metric-card"><p className="text-3xl font-black" style={{ color: primary }}>{count}</p><h3 className="mt-2 text-lg font-black">{label}</h3><p className="mt-2 text-sm text-slate-600">{text}</p></div>
+              ))}
+            </section>
+          )}
 
           <section className="grid gap-5 lg:grid-cols-2">
             <div className="rounded-[2rem] bg-white p-6 shadow-xl">
