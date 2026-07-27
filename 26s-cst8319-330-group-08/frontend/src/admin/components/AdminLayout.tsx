@@ -16,6 +16,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const token = localStorage.getItem("token");
 
@@ -44,9 +45,21 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
       }
     };
 
+    const fetchPendingApprovals = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/employer-approval/requests`, { headers });
+        const data = await response.json();
+        const requests = Array.isArray(data.requests) ? data.requests : [];
+        setPendingApprovals(requests.filter((request) => request.approval_status === "pending" || request.approval_status === "needs_info").length);
+      } catch {
+        setPendingApprovals(0);
+      }
+    };
+
     if (token) {
       fetchUnreadMessages();
       fetchUnreadNotifications();
+      fetchPendingApprovals();
     }
   }, [token]);
 
@@ -67,6 +80,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
     { path: "/admin/payments", label: "Payments", icon: "$", group: "Operations" },
     { path: "/admin/hbts", label: "Home Buying Teams", icon: "◈", group: "Operations" },
     { path: "/admin/partnerships", label: "Partnerships", icon: "◇", group: "Operations" },
+    { path: "/admin/employer-approvals", label: "Employer Approvals", icon: "◆", group: "Operations" },
     { path: "/admin/users", label: "Users", icon: "♙", group: "Operations" },
     { path: "/admin/service-requests", label: "Mortgage Requests", icon: "◍", group: "Operations" },
     { path: "/admin/resources", label: "Resources", icon: "▤", group: "Content" },
@@ -157,6 +171,9 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
                       ) : null}
                       {item.path === "/admin/notifications" && unreadNotifications > 0 ? (
                         <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">{unreadNotifications}</span>
+                      ) : null}
+                      {item.path === "/admin/employer-approvals" && pendingApprovals > 0 ? (
+                        <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] text-white">{pendingApprovals}</span>
                       ) : null}
                     </NavLink>
                   ))}
