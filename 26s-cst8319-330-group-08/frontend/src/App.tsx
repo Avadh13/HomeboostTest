@@ -158,7 +158,7 @@ function AppShell() {
         <Route path="/admin/quizzes/:quizId/questions" element={<AdminProtectedRoute><ManageQuizQuestions /></AdminProtectedRoute>} />
         <Route path="/admin/quiz-submissions" element={<AdminProtectedRoute><QuizSubmissions /></AdminProtectedRoute>} />
         <Route path="/admin/reports" element={<AdminProtectedRoute><ReportsExportCenter /></AdminProtectedRoute>} />
-        <Route path="/admin/qa" element={<AdminProtectedRoute><DeploymentReadinessCenter /></AdminProtectedRoute>} />
+        <Route path="/admin/qa" element={<AdminProtectedRoute><AdminLayout title="QA Readiness"><DeploymentReadinessCenter embedded /></AdminLayout></AdminProtectedRoute>} />
         <Route path="/admin/messages" element={<AdminProtectedRoute><AdminLayout title="Communication Center"><MessageCenter embedded /></AdminLayout></AdminProtectedRoute>} />
         <Route path="/admin/notifications" element={<AdminProtectedRoute><AdminLayout title="Alerts Center"><NotificationCenter embedded /></AdminLayout></AdminProtectedRoute>} />
         <Route path="/admin/profile" element={<AdminProtectedRoute><AdminLayout title="My Profile"><ProfilePage embedded /></AdminLayout></AdminProtectedRoute>} />
