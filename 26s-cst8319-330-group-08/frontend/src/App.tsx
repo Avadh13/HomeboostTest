@@ -68,7 +68,6 @@ import FooterShell from "./components/FooterShell";
 import MortgageServicesShell from "./components/MortgageServicesShell";
 import PartnershipMortgageServicesShell from "./components/PartnershipMortgageServicesShell";
 import MobileStickyCTA from "./components/MobileStickyCTA";
-import FloatingThemeControl from "./components/FloatingThemeControl";
 import ScrollToTop from "./components/ScrollToTop";
 import MortgageReadinessWidget from "./components/MortgageReadinessWidget";
 import HBTLeadPipelineWidget from "./components/HBTLeadPipelineWidget";
@@ -177,7 +176,6 @@ function AppShell() {
         <PartnershipMortgageServicesShell />
       </div>
 
-      <FloatingThemeControl />
       <MobileStickyCTA />
       <FooterShell />
       <SpeedInsights />
