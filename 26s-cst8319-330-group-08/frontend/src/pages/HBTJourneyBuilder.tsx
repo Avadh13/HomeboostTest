@@ -170,8 +170,8 @@ function HBTJourneyBuilder() {
           </div>
           {notice && <div className="rounded-2xl bg-blue-50 p-4 text-sm font-bold text-blue-700 ring-1 ring-blue-100">{notice}</div>}
 
-          <div className="grid gap-6 lg:grid-cols-[390px_1fr]">
-            <aside className="space-y-6">
+          <div className="grid min-w-0 gap-6 xl:grid-cols-12">
+            <aside className="min-w-0 space-y-6 xl:col-span-4 2xl:col-span-3">
               <form onSubmit={createJourney} className="premium-card space-y-4">
                 <p className="eyebrow text-emerald-600">Create journey</p>
                 <h2 className="text-2xl font-black">New journey</h2>
@@ -193,36 +193,67 @@ function HBTJourneyBuilder() {
               </form>
             </aside>
 
-            <section className="premium-card">
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <section className="premium-card min-w-0 xl:col-span-8 2xl:col-span-9">
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div><p className="eyebrow text-violet-600">Journey library</p><h2 className="text-2xl font-black">Manage journeys</h2></div>
-                <button onClick={refresh} className="btn-secondary">Refresh</button>
+                <button type="button" onClick={refresh} className="btn-secondary w-full justify-center sm:w-auto">Refresh</button>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-[320px_1fr]">
-                <div className="space-y-3">
+              <div className="grid min-w-0 gap-5 lg:grid-cols-5">
+                <div className="min-w-0 space-y-3 lg:col-span-2">
                   {loading ? <div className="loading-state">Loading...</div> : journeys.map((journey) => (
-                    <button key={journey.id} onClick={() => setSelectedJourneyId(String(journey.id))} className={`w-full rounded-3xl border p-4 text-left transition ${String(journey.id) === selectedJourneyId ? "border-emerald-200 bg-emerald-50" : "border-slate-100 bg-slate-50 hover:bg-white"}`}>
-                      <h3 className="font-black text-slate-950">{journey.title}</h3>
-                      <p className="mt-1 text-xs font-bold text-slate-500">{journey.step_count || 0} step(s) · {journey.journey_type || "home_buying"}</p>
+                    <button type="button" key={journey.id} onClick={() => setSelectedJourneyId(String(journey.id))} className={`w-full rounded-3xl border p-5 text-left transition ${String(journey.id) === selectedJourneyId ? "border-emerald-200 bg-emerald-50" : "border-slate-100 bg-slate-50 hover:bg-white"}`}>
+                      <h3 className="break-words font-black leading-snug text-slate-950">{journey.title}</h3>
+                      <p className="mt-1 break-words text-xs font-bold text-slate-500">{journey.step_count || 0} step(s) · {journey.journey_type || "home_buying"}</p>
                     </button>
                   ))}
                 </div>
 
-                <div className="space-y-4">
+                <div className="min-w-0 space-y-4 lg:col-span-3">
                   {!selectedJourney || !detail ? <div className="empty-state">Select a journey to edit.</div> : (
                     <>
-                      <div className="rounded-3xl bg-slate-950 p-5 text-white">
-                        <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-wide text-emerald-200">Selected journey</p><h3 className="mt-1 text-2xl font-black">{detail.journey.title}</h3><p className="mt-2 text-sm text-slate-300">{detail.journey.description || "No description"}</p></div><div className="flex gap-2"><button onClick={() => duplicateJourney(detail.journey.id)} className="rounded-full bg-white/10 px-3 py-2 text-xs font-black text-white">Duplicate</button><button onClick={() => archiveJourney(detail.journey.id)} className="rounded-full bg-red-500 px-3 py-2 text-xs font-black text-white">Archive</button></div></div>
+                      <div className="min-w-0 rounded-3xl bg-slate-950 p-6 text-white">
+                        <div className="flex min-w-0 flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-black uppercase tracking-wide text-emerald-200">Selected journey</p>
+                            <h3 className="mt-2 break-words text-2xl font-black leading-tight md:text-3xl">{detail.journey.title}</h3>
+                            <p className="mt-3 max-w-2xl break-words text-sm leading-6 text-slate-300">{detail.journey.description || "No description"}</p>
+                          </div>
+                          <div className="grid w-full grid-cols-2 gap-2 sm:w-auto">
+                            <button type="button" onClick={() => duplicateJourney(detail.journey.id)} className="whitespace-nowrap rounded-full bg-white/10 px-4 py-2.5 text-xs font-black text-white transition hover:bg-white/20">Duplicate</button>
+                            <button type="button" onClick={() => archiveJourney(detail.journey.id)} className="whitespace-nowrap rounded-full bg-red-500 px-4 py-2.5 text-xs font-black text-white transition hover:bg-red-400">Archive</button>
+                          </div>
+                        </div>
                       </div>
 
                       {detail.steps.length === 0 ? <div className="empty-state">No steps yet. Add the first step.</div> : detail.steps.map((step, index) => (
-                        <article key={step.id} className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
-                          <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-black uppercase text-emerald-700">Step {index + 1}</p><h4 className="mt-1 text-xl font-black text-slate-950">{step.title}</h4><p className="mt-1 text-sm text-slate-600">{step.description}</p></div><button onClick={() => archiveStep(step.id)} className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-black text-red-700">Archive step</button></div>
+                        <article key={step.id} className="min-w-0 rounded-3xl border border-slate-100 bg-slate-50 p-5">
+                          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-black uppercase text-emerald-700">Step {index + 1}</p>
+                              <h4 className="mt-1 break-words text-xl font-black leading-snug text-slate-950">{step.title}</h4>
+                              <p className="mt-1 break-words text-sm leading-6 text-slate-600">{step.description}</p>
+                            </div>
+                            <button type="button" onClick={() => archiveStep(step.id)} className="w-full whitespace-nowrap rounded-full bg-red-50 px-3 py-1.5 text-xs font-black text-red-700 sm:w-auto">Archive step</button>
+                          </div>
 
-                          <div className="mt-4 grid gap-3 xl:grid-cols-2">
-                            <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-100"><p className="mb-2 text-xs font-black uppercase text-slate-400">Resources</p><div className="flex gap-2"><select value={resourceSelections[step.id] || ""} onChange={(e) => setResourceSelections((current) => ({ ...current, [step.id]: e.target.value }))} className="form-field"><option value="">Choose resource</option>{resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select><button onClick={() => attachResource(step.id)} className="btn-secondary">Add</button></div><div className="mt-3 flex flex-wrap gap-2">{(step.resources || []).map((resource) => <span key={resource.id} className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">{resource.title} <button onClick={() => detachResource(step.id, resource.id)} className="ml-1 text-red-500">×</button></span>)}</div></div>
-                            <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-100"><p className="mb-2 text-xs font-black uppercase text-slate-400">Checklist</p><div className="flex gap-2"><input value={checklistInputs[step.id] || ""} onChange={(e) => setChecklistInputs((current) => ({ ...current, [step.id]: e.target.value }))} placeholder="Checklist item" className="form-field" /><button onClick={() => addChecklistItem(step.id)} className="btn-secondary">Add</button></div><div className="mt-3 space-y-2">{(step.checklist_items || []).map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700"><span>{item.title}</span><button onClick={() => archiveChecklistItem(item.id)} className="text-red-600">Remove</button></div>)}</div></div>
+                          <div className="mt-4 grid min-w-0 gap-3 xl:grid-cols-2">
+                            <div className="min-w-0 rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+                              <p className="mb-2 text-xs font-black uppercase text-slate-400">Resources</p>
+                              <div className="flex min-w-0 flex-col gap-2 2xl:flex-row">
+                                <select value={resourceSelections[step.id] || ""} onChange={(e) => setResourceSelections((current) => ({ ...current, [step.id]: e.target.value }))} className="form-field min-w-0 flex-1"><option value="">Choose resource</option>{resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select>
+                                <button type="button" onClick={() => attachResource(step.id)} className="btn-secondary shrink-0 justify-center">Add</button>
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2">{(step.resources || []).map((resource) => <span key={resource.id} className="max-w-full break-words rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">{resource.title} <button type="button" onClick={() => detachResource(step.id, resource.id)} className="ml-1 text-red-500">×</button></span>)}</div>
+                            </div>
+                            <div className="min-w-0 rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+                              <p className="mb-2 text-xs font-black uppercase text-slate-400">Checklist</p>
+                              <div className="flex min-w-0 flex-col gap-2 2xl:flex-row">
+                                <input value={checklistInputs[step.id] || ""} onChange={(e) => setChecklistInputs((current) => ({ ...current, [step.id]: e.target.value }))} placeholder="Checklist item" className="form-field min-w-0 flex-1" />
+                                <button type="button" onClick={() => addChecklistItem(step.id)} className="btn-secondary shrink-0 justify-center">Add</button>
+                              </div>
+                              <div className="mt-3 space-y-2">{(step.checklist_items || []).map((item) => <div key={item.id} className="flex min-w-0 flex-col gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 sm:flex-row sm:items-center sm:justify-between"><span className="min-w-0 break-words">{item.title}</span><button type="button" onClick={() => archiveChecklistItem(item.id)} className="shrink-0 text-left text-red-600 sm:text-right">Remove</button></div>)}</div>
+                            </div>
                           </div>
                         </article>
                       ))}
