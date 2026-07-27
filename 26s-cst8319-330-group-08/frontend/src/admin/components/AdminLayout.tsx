@@ -95,17 +95,6 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
     [],
   );
 
-  const quickRail = [
-    { path: "/admin", label: "Home", icon: "⌂" },
-    { path: "/admin/reports", label: "Reports", icon: "▥" },
-    { path: "/admin/qa", label: "QA", icon: "✓" },
-    { path: "/admin/payments", label: "Payments", icon: "$" },
-    { path: "/admin/service-requests", label: "Requests", icon: "◍" },
-    { path: "/admin/resources", label: "Assets", icon: "▤" },
-    { path: "/admin/messages", label: "Messages", icon: "✉" },
-    { path: "/admin/notifications", label: "Alerts", icon: "◉" },
-  ];
-
   return (
     <div className="hb-admin-shell min-h-screen text-slate-950">
       <header className="hb-admin-header sticky top-0 z-40 flex items-center justify-between border-b px-4 py-3 shadow-sm lg:hidden">
@@ -123,47 +112,14 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
       </header>
 
       <div className="flex min-h-screen">
-        <aside className="hb-admin-rail fixed left-0 top-0 z-40 hidden h-screen w-16 shrink-0 flex-col items-center border-r py-4 lg:flex">
-          <Link to="/admin" className="mb-5 flex h-10 w-10 items-center justify-center rounded-xl shadow-md shadow-blue-500/15">
-            <BrandLogo variant="icon" iconClassName="h-10 w-10 rounded-xl" />
-          </Link>
-          <nav className="flex flex-1 flex-col items-center gap-2">
-            {quickRail.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === "/admin"}
-                title={item.label}
-                className={({ isActive }) =>
-                  `flex h-10 w-10 items-center justify-center rounded-xl text-base font-black transition ${
-                    isActive
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-slate-400 hover:bg-blue-50 hover:text-blue-700"
-                  }`
-                }
-              >
-                {item.icon}
-              </NavLink>
-            ))}
-          </nav>
-          <button
-            type="button"
-            onClick={handleLogout}
-            title="Logout"
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-base font-black text-red-600 hover:bg-red-100"
-          >
-            ⏻
-          </button>
-        </aside>
-
         <aside
           className={`hb-admin-sidebar ${
             sidebarOpen
-              ? "fixed inset-x-0 top-[65px] z-30 block max-h-[calc(100vh-65px)] overflow-y-auto"
+              ? "fixed inset-x-0 top-[65px] z-30 flex max-h-[calc(100vh-65px)]"
               : "hidden"
-          } border-r p-4 shadow-xl lg:fixed lg:left-16 lg:top-0 lg:block lg:h-screen lg:w-72 lg:overflow-y-auto lg:p-5 lg:shadow-none`}
+          } flex-col overflow-hidden border-r p-4 shadow-xl lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:h-screen lg:w-72 lg:p-5 lg:shadow-none`}
         >
-          <div className="mb-6 hidden lg:block">
+          <div className="mb-6 hidden shrink-0 lg:block">
             <Link to="/admin" className="flex items-center gap-3">
               <BrandLogo variant="icon" iconClassName="h-12 w-12 rounded-2xl shadow-lg" />
               <div>
@@ -173,7 +129,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
             </Link>
           </div>
 
-          <nav className="space-y-5">
+          <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
             {(Object.keys(groupedLinks) as Array<NavItem["group"]>).map((group) => (
               <div key={group}>
                 <p className="mb-2 px-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">{group}</p>
@@ -208,9 +164,20 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
               </div>
             ))}
           </nav>
+
+          <div className="mt-5 shrink-0 border-t border-slate-200 pt-4">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-black text-red-600 transition hover:bg-red-50"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-base text-red-600">⏻</span>
+              <span>Logout</span>
+            </button>
+          </div>
         </aside>
 
-        <main className="hb-admin-content min-w-0 flex-1 lg:ml-[22rem]">
+        <main className="hb-admin-content min-w-0 flex-1 lg:ml-72">
           <div className="hb-admin-header border-b px-4 py-4 shadow-sm md:px-6 lg:px-8">
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-600">Employee Benefit Program Admin</p>
             <h1 className="mt-1 text-2xl font-black text-slate-950">{title || "Admin"}</h1>
