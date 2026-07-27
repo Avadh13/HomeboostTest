@@ -11,6 +11,7 @@ type NavItem = {
   icon: string;
   group: "Core" | "Operations" | "Content" | "Communication";
 };
+type EmployerApprovalSummary = { approval_status?: string };
 
 function AdminLayout({ title, children }: AdminLayoutProps) {
   const navigate = useNavigate();
@@ -49,7 +50,7 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
       try {
         const response = await fetch(`${API_BASE_URL}/employer-approval/requests`, { headers });
         const data = await response.json();
-        const requests = Array.isArray(data.requests) ? data.requests : [];
+        const requests: EmployerApprovalSummary[] = Array.isArray(data.requests) ? data.requests : [];
         setPendingApprovals(requests.filter((request) => request.approval_status === "pending" || request.approval_status === "needs_info").length);
       } catch {
         setPendingApprovals(0);
