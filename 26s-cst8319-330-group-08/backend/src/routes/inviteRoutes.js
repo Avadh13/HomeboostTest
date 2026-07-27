@@ -7,8 +7,8 @@ const protect = require("../middleware/authMiddleware");
 
 const router = express.Router();
 const adminRoles = ["admin", "super_admin"];
-const hbtRoles = ["hbt_admin", "hbt_member"];
 const canInvite = (user) => adminRoles.includes(user?.role) || user?.role === "hbt_admin" || user?.role === "company" || user?.role === "company_admin";
+const allowedInviteRoles = new Set(["employee", "company", "company_admin"]);
 const clean = (value, max = 255) => String(value || "").trim().slice(0, max);
 const emailClean = (value) => clean(value, 255).toLowerCase();
 const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -40,6 +40,7 @@ const ensureInviteTables = async (connection = pool) => {
     full_name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
     status ENUM('invited', 'registered', 'revoked') NOT NULL DEFAULT 'invited',
+    invite_role VARCHAR(40) NOT NULL DEFAULT 'employee',
     invite_token VARCHAR(120) NULL,
     invite_code VARCHAR(40) NULL,
     expires_at DATETIME NULL,
@@ -58,6 +59,7 @@ const ensureInviteTables = async (connection = pool) => {
   await addColumnIfMissing(connection, "employee_invites", "expires_at", "DATETIME NULL");
   await addColumnIfMissing(connection, "employee_invites", "accepted_at", "DATETIME NULL");
   await addColumnIfMissing(connection, "employee_invites", "last_sent_at", "DATETIME NULL");
+  await addColumnIfMissing(connection, "employee_invites", "invite_role", "VARCHAR(40) NOT NULL DEFAULT 'employee'");
 
   await connection.query(`CREATE TABLE IF NOT EXISTS invite_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -90,6 +92,7 @@ const invitePayload = (invite) => ({
   full_name: invite.full_name,
   email: invite.email,
   status: invite.status,
+  invite_role: allowedInviteRoles.has(invite.invite_role) ? invite.invite_role : "employee",
   partnership_id: invite.partnership_id,
   invite_code: invite.invite_code,
   invite_link: invite.invite_token ? `${appUrl()}/invite/${invite.invite_token}` : null,
@@ -129,7 +132,7 @@ router.post("/accept", async (req, res) => {
     if (!token || !fullName || password.length < 6) return res.status(400).json({ status: "error", message: "Token, full name, and password are required" });
 
     await connection.beginTransaction();
-    const [[invite]] = await connection.query("SELECT * FROM employee_invites WHERE invite_token = ? OR invite_code = ? LIMIT 1", [token, token]);
+    const [[invite]] = await connection.query("SELECT * FROM employee_invites WHERE invite_token = ? OR invite_code = ? LIMIT 1 FOR UPDATE", [token, token]);
     if (!invite) {
       await connection.rollback();
       return res.status(404).json({ status: "error", message: "Invite not found" });
@@ -149,21 +152,42 @@ router.post("/accept", async (req, res) => {
       return res.status(409).json({ status: "error", message: "This email already has an account. Please sign in." });
     }
 
+    const inviteRole = allowedInviteRoles.has(invite.invite_role) ? invite.invite_role : "employee";
     const hash = await bcrypt.hash(password, 10);
     const [userResult] = await connection.query(
-      `INSERT INTO users (full_name, email, password, role, partnership_id, is_active) VALUES (?, ?, ?, 'employee', ?, 1)`,
-      [fullName, invite.email, hash, invite.partnership_id]
+      `INSERT INTO users (full_name, email, password, role, partnership_id, is_active) VALUES (?, ?, ?, ?, ?, 1)`,
+      [fullName, invite.email, hash, inviteRole, invite.partnership_id]
     );
 
     await connection.query(
       `UPDATE employee_invites SET status = 'registered', registered_user_id = ?, registered_at = NOW(), accepted_at = NOW() WHERE id = ?`,
       [userResult.insertId, invite.id]
     );
-    await connection.query("INSERT INTO invite_logs (invite_id, action, actor_user_id, message) VALUES (?, 'accepted', ?, ?)", [invite.id, userResult.insertId, "Employee accepted invite link"]);
+    await connection.query("INSERT INTO invite_logs (invite_id, action, actor_user_id, message) VALUES (?, 'accepted', ?, ?)", [invite.id, userResult.insertId, `${inviteRole} accepted invite link`]);
+
+    if (inviteRole === "company" || inviteRole === "company_admin") {
+      await connection.query(
+        `UPDATE company_points_of_contact SET user_id = ?, is_active = 1
+         WHERE partnership_id = ? AND email = ?`,
+        [userResult.insertId, invite.partnership_id, invite.email]
+      );
+    }
+
     await connection.commit();
 
-    const tokenJwt = jwt.sign({ id: userResult.insertId, role: "employee", partnership_id: invite.partnership_id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "1d" });
-    return res.status(201).json({ status: "success", message: "Employee account created", token: tokenJwt, redirect_to: "/employee-portal", user: { id: userResult.insertId, full_name: fullName, email: invite.email, role: "employee", partnership_id: invite.partnership_id } });
+    const redirectTo = inviteRole === "employee" ? "/employee-portal" : "/company/dashboard";
+    const tokenJwt = jwt.sign(
+      { id: userResult.insertId, role: inviteRole, partnership_id: invite.partnership_id },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || "1d" }
+    );
+    return res.status(201).json({
+      status: "success",
+      message: inviteRole === "employee" ? "Employee account created" : "Company Manager account created",
+      token: tokenJwt,
+      redirect_to: redirectTo,
+      user: { id: userResult.insertId, full_name: fullName, email: invite.email, role: inviteRole, partnership_id: invite.partnership_id },
+    });
   } catch (error) {
     await connection.rollback();
     return res.status(500).json({ status: "error", message: "Failed to accept invite", error: error.message });
@@ -217,14 +241,14 @@ router.post("/employee", async (req, res) => {
     const inviteCode = codeValue();
     const expiresDays = Number(req.body.expires_days || 14);
     await pool.query(
-      `INSERT INTO employee_invites (partnership_id, invited_by_user_id, full_name, email, status, invite_token, invite_code, expires_at, last_sent_at)
-       VALUES (?, ?, ?, ?, 'invited', ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), NOW())
-       ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), invited_by_user_id = VALUES(invited_by_user_id), status = IF(status = 'registered', 'registered', 'invited'), invite_token = VALUES(invite_token), invite_code = VALUES(invite_code), expires_at = VALUES(expires_at), revoked_at = NULL, last_sent_at = NOW()`,
+      `INSERT INTO employee_invites (partnership_id, invited_by_user_id, full_name, email, status, invite_role, invite_token, invite_code, expires_at, last_sent_at)
+       VALUES (?, ?, ?, ?, 'invited', 'employee', ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), NOW())
+       ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), invited_by_user_id = VALUES(invited_by_user_id), status = IF(status = 'registered', 'registered', 'invited'), invite_role = IF(status = 'registered', invite_role, 'employee'), invite_token = VALUES(invite_token), invite_code = VALUES(invite_code), expires_at = VALUES(expires_at), revoked_at = NULL, last_sent_at = NOW()`,
       [partnershipId, req.user.id, fullName, email, inviteToken, inviteCode, expiresDays]
     );
 
     const [[invite]] = await pool.query("SELECT * FROM employee_invites WHERE partnership_id = ? AND email = ? LIMIT 1", [partnershipId, email]);
-    await logInvite(invite.id, "created", req.user.id, "Invite link generated");
+    await logInvite(invite.id, "created", req.user.id, "Employee invite link generated");
     return res.status(201).json({ status: "success", message: "Employee invite created", invite: invitePayload(invite) });
   } catch (error) {
     return res.status(500).json({ status: "error", message: "Failed to create invite", error: error.message });
@@ -242,7 +266,7 @@ router.post("/resend/:id", async (req, res) => {
     const inviteCode = codeValue();
     await pool.query("UPDATE employee_invites SET invite_token = ?, invite_code = ?, expires_at = DATE_ADD(NOW(), INTERVAL 14 DAY), last_sent_at = NOW(), status = IF(status = 'registered', 'registered', 'invited') WHERE id = ?", [inviteToken, inviteCode, invite.id]);
     const [[updated]] = await pool.query("SELECT * FROM employee_invites WHERE id = ? LIMIT 1", [invite.id]);
-    await logInvite(invite.id, "resent", req.user.id, "Invite link regenerated");
+    await logInvite(invite.id, "resent", req.user.id, `${invite.invite_role || "employee"} invite link regenerated`);
     return res.json({ status: "success", message: "Invite resent", invite: invitePayload(updated) });
   } catch (error) {
     return res.status(500).json({ status: "error", message: "Failed to resend invite", error: error.message });

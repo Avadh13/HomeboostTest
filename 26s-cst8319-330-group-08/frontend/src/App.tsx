@@ -152,6 +152,7 @@ function AppShell() {
         <Route path="/admin/footer" element={<AdminProtectedRoute><ManageFooter /></AdminProtectedRoute>} />
         <Route path="/admin/mortgage-services" element={<AdminProtectedRoute><ManageMortgageServices /></AdminProtectedRoute>} />
         <Route path="/admin/service-requests" element={<AdminProtectedRoute><ManageServiceRequests /></AdminProtectedRoute>} />
+        <Route path="/admin/employer-approvals" element={<AdminProtectedRoute><AdminLayout title="Employer Approvals"><EmployerApprovalCenter embedded adminMode /></AdminLayout></AdminProtectedRoute>} />
         <Route path="/admin/contact-messages" element={<AdminProtectedRoute><ContactMessages /></AdminProtectedRoute>} />
         <Route path="/admin/faqs" element={<AdminProtectedRoute><ManageFAQs /></AdminProtectedRoute>} />
         <Route path="/admin/quizzes" element={<AdminProtectedRoute><ManageQuizzes /></AdminProtectedRoute>} />

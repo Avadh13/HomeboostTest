@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 import Navbar from "../components/Navbar";
@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 type Invite = {
   full_name: string;
   email: string;
+  invite_role?: "employee" | "company" | "company_admin";
   employer_name?: string | null;
   partnership_slug?: string | null;
   expires_at?: string | null;
@@ -23,6 +24,11 @@ function InviteAccept() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  const isCompanyManagerInvite = useMemo(
+    () => invite?.invite_role === "company" || invite?.invite_role === "company_admin",
+    [invite?.invite_role],
+  );
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/invites/validate/${token}`)
@@ -66,8 +72,10 @@ function InviteAccept() {
       <section className="px-4 py-10 md:px-6 lg:py-16">
         <div className="section-container max-w-4xl">
           <div className="premium-card">
-            <p className="eyebrow text-blue-600">Employee invitation</p>
-            <h1 className="mt-3 text-4xl font-black tracking-tight md:text-6xl">Join your Home Buying Program portal.</h1>
+            <p className="eyebrow text-blue-600">{isCompanyManagerInvite ? "Company Manager invitation" : "Employee invitation"}</p>
+            <h1 className="mt-3 text-4xl font-black tracking-tight md:text-6xl">
+              {isCompanyManagerInvite ? "Activate your employer portal." : "Join your Home Buying Program portal."}
+            </h1>
             {loading ? (
               <div className="loading-state mt-8">Checking invite...</div>
             ) : error && !invite ? (
@@ -77,13 +85,20 @@ function InviteAccept() {
                 <div className="rounded-3xl bg-blue-50 p-5 ring-1 ring-blue-100">
                   <p className="text-sm font-black text-blue-700">{invite.employer_name || "Employer portal"}</p>
                   <p className="mt-1 font-bold text-slate-700">Invited email: {invite.email}</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-600">
+                    {isCompanyManagerInvite
+                      ? "Create your Company Manager account to manage employees, invitations, branding, and reports."
+                      : "Create your employee account to access your personalized portal."}
+                  </p>
                 </div>
                 <label className="grid gap-2 text-sm font-black text-slate-700">Full name<input value={fullName} onChange={(e) => setFullName(e.target.value)} required className="rounded-2xl border border-slate-200 px-4 py-3 font-semibold outline-none focus:border-blue-500" /></label>
                 <label className="grid gap-2 text-sm font-black text-slate-700">Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="rounded-2xl border border-slate-200 px-4 py-3 font-semibold outline-none focus:border-blue-500" /></label>
                 <label className="grid gap-2 text-sm font-black text-slate-700">Confirm password<input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required className="rounded-2xl border border-slate-200 px-4 py-3 font-semibold outline-none focus:border-blue-500" /></label>
                 {error && <div className="rounded-2xl bg-red-50 p-4 font-bold text-red-700">{error}</div>}
                 <div className="flex flex-wrap gap-3">
-                  <button disabled={submitting} className="btn-primary disabled:opacity-60">{submitting ? "Creating account..." : "Create Employee Account"}</button>
+                  <button disabled={submitting} className="btn-primary disabled:opacity-60">
+                    {submitting ? "Creating account..." : isCompanyManagerInvite ? "Create Company Manager Account" : "Create Employee Account"}
+                  </button>
                   <Link to="/login" className="btn-secondary">Already have account?</Link>
                 </div>
               </form>
