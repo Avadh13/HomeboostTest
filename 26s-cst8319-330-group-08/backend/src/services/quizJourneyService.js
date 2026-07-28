@@ -49,12 +49,12 @@ const getSubmissionContext = async (connection, submissionId) => {
   const [[submission]] = await connection.query(
     `SELECT qs.id, qs.quiz_id, qs.user_id, qs.partnership_id, p.team_id
      FROM quiz_submissions qs
-     LEFT JOIN partnerships p ON p.id = qs.partnership_id
+     JOIN partnerships p ON p.id = qs.partnership_id
      WHERE qs.id = ?
      LIMIT 1`,
-    [submissionId]
+    [submissionId],
   );
-  if (!submission?.user_id) return null;
+  if (!submission?.user_id || !submission?.team_id) return null;
 
   const [[readiness]] = await connection.query(
     `SELECT score, level, priority, risk_factors
@@ -62,7 +62,7 @@ const getSubmissionContext = async (connection, submissionId) => {
      WHERE latest_submission_id = ? OR user_id = ?
      ORDER BY latest_submission_id = ? DESC, id DESC
      LIMIT 1`,
-    [submissionId, submission.user_id, submissionId]
+    [submissionId, submission.user_id, submissionId],
   );
 
   const [answers] = await connection.query(
@@ -70,7 +70,7 @@ const getSubmissionContext = async (connection, submissionId) => {
      FROM quiz_answers qa
      LEFT JOIN quiz_questions qq ON qq.id = qa.question_id
      WHERE qa.submission_id = ?`,
-    [submissionId]
+    [submissionId],
   );
 
   return { submission, readiness: readiness || {}, answers };
@@ -78,7 +78,11 @@ const getSubmissionContext = async (connection, submissionId) => {
 
 const ruleMatches = (rule, context) => {
   const readiness = context.readiness || {};
-  const answerText = normalize(context.answers.map((answer) => `${answer.question_text || ""} ${answer.answer_text || ""}`).join(" "));
+  const answerText = normalize(
+    context.answers
+      .map((answer) => `${answer.question_text || ""} ${answer.answer_text || ""}`)
+      .join(" "),
+  );
 
   if (rule.readiness_level && normalize(rule.readiness_level) !== normalize(readiness.level)) return false;
   if (rule.readiness_priority && normalize(rule.readiness_priority) !== normalize(readiness.priority)) return false;
@@ -89,41 +93,70 @@ const ruleMatches = (rule, context) => {
   return true;
 };
 
-const assignJourney = async (connection, { userId, journeyId, submissionId = null, ruleId = null, assignedBy = null, source = "quiz_rule", message = null }) => {
+const assignJourney = async (
+  connection,
+  {
+    userId,
+    journeyId,
+    submissionId = null,
+    ruleId = null,
+    assignedBy = null,
+    source = "quiz_rule",
+    message = null,
+  },
+) => {
   await connection.query(
     `UPDATE employee_journey_assignments
      SET status = 'replaced', completed_at = NOW()
      WHERE user_id = ? AND status = 'active' AND journey_id <> ?`,
-    [userId, journeyId]
+    [userId, journeyId],
   );
 
   await connection.query(
     `INSERT INTO employee_journey_assignments (user_id, journey_id, assigned_by_user_id, source, status)
      VALUES (?, ?, ?, ?, 'active')
-     ON DUPLICATE KEY UPDATE status = 'active', source = VALUES(source), assigned_by_user_id = VALUES(assigned_by_user_id), assigned_at = CURRENT_TIMESTAMP, completed_at = NULL`,
-    [userId, journeyId, assignedBy, source]
+     ON DUPLICATE KEY UPDATE
+       status = 'active',
+       source = VALUES(source),
+       assigned_by_user_id = VALUES(assigned_by_user_id),
+       assigned_at = CURRENT_TIMESTAMP,
+       completed_at = NULL`,
+    [userId, journeyId, assignedBy, source],
   );
 
   await connection.query(
-    `INSERT INTO journey_assignment_logs (user_id, journey_id, submission_id, rule_id, assigned_by_user_id, source, message)
+    `INSERT INTO journey_assignment_logs
+     (user_id, journey_id, submission_id, rule_id, assigned_by_user_id, source, message)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [userId, journeyId, submissionId, ruleId, assignedBy, source, message]
+    [userId, journeyId, submissionId, ruleId, assignedBy, source, message],
   );
 };
 
-const assignJourneyForSubmission = async (connection, submissionId) => {
+const assignJourneyForSubmission = async (connection, submissionId, options = {}) => {
   await ensureQuizJourneyTables(connection);
   const context = await getSubmissionContext(connection, submissionId);
   if (!context) return null;
 
   const { submission } = context;
+  if (
+    options.restrictedTeamId &&
+    Number(options.restrictedTeamId) !== Number(submission.team_id)
+  ) {
+    return null;
+  }
+
   const [rules] = await connection.query(
-    `SELECT * FROM quiz_journey_rules
-     WHERE is_active = 1
-       AND (quiz_id IS NULL OR quiz_id = ?)
-       AND (team_id IS NULL OR team_id = ?)
-     ORDER BY priority ASC, id ASC`,
-    [submission.quiz_id, submission.team_id]
+    `SELECT qjr.*
+     FROM quiz_journey_rules qjr
+     JOIN journeys j
+       ON j.id = qjr.journey_id
+      AND j.is_active = 1
+      AND (j.team_id IS NULL OR j.team_id = ?)
+     WHERE qjr.is_active = 1
+       AND (qjr.quiz_id IS NULL OR qjr.quiz_id = ?)
+       AND (qjr.team_id IS NULL OR qjr.team_id = ?)
+     ORDER BY qjr.priority ASC, qjr.id ASC`,
+    [submission.team_id, submission.quiz_id, submission.team_id],
   );
 
   const matchedRule = rules.find((rule) => ruleMatches(rule, context));
@@ -134,34 +167,51 @@ const assignJourneyForSubmission = async (connection, submissionId) => {
       journeyId: matchedRule.journey_id,
       submissionId,
       ruleId: matchedRule.id,
+      assignedBy: options.assignedBy || null,
       source: "quiz_rule",
       message: `Assigned by rule: ${matchedRule.rule_name}`,
     });
-    return { assigned: true, journey_id: matchedRule.journey_id, rule_id: matchedRule.id, source: "quiz_rule" };
+    return {
+      assigned: true,
+      journey_id: matchedRule.journey_id,
+      rule_id: matchedRule.id,
+      source: "quiz_rule",
+    };
   }
 
   const [[fallback]] = await connection.query(
     `SELECT id FROM journeys
-     WHERE is_active = 1 AND (team_id IS NULL OR team_id = ?)
+     WHERE is_active = 1
+       AND (team_id IS NULL OR team_id = ?)
      ORDER BY is_default DESC, sort_order ASC, id ASC
      LIMIT 1`,
-    [submission.team_id]
+    [submission.team_id],
   );
 
-  if (!fallback) return { assigned: false, reason: "No matching rule or fallback journey found" };
+  if (!fallback) {
+    return { assigned: false, reason: "No matching rule or fallback journey found" };
+  }
 
   await assignJourney(connection, {
     userId: submission.user_id,
     journeyId: fallback.id,
     submissionId,
+    assignedBy: options.assignedBy || null,
     source: "default_after_quiz",
     message: "Assigned fallback journey after quiz submission",
   });
 
-  return { assigned: true, journey_id: fallback.id, rule_id: null, source: "default_after_quiz" };
+  return {
+    assigned: true,
+    journey_id: fallback.id,
+    rule_id: null,
+    source: "default_after_quiz",
+  };
 };
 
 module.exports = {
   ensureQuizJourneyTables,
   assignJourneyForSubmission,
+  getSubmissionContext,
+  ruleMatches,
 };
