@@ -4,7 +4,10 @@ const { join } = require("node:path");
 
 const projectRoot = join(__dirname, "..");
 const sourceRoot = join(projectRoot, "src");
-const extraFiles = [join(projectRoot, "scripts", "check-syntax.js")];
+const extraFiles = [
+  join(projectRoot, "scripts", "check-syntax.js"),
+  join(projectRoot, "scripts", "migrate.js"),
+];
 
 const collectJavaScriptFiles = (directory) => {
   const entries = readdirSync(directory);
