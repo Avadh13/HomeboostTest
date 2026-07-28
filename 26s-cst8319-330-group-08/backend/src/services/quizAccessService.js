@@ -136,6 +136,19 @@ const validateTextFormat = (questionType, value) => {
   }
 };
 
+const getLegacyCheckboxIds = (rawAnswer, questionOptions) => {
+  const legacyText = normalizeTextAnswer(rawAnswer?.answer_text);
+  if (!legacyText) return [];
+
+  return legacyText.split(",").map((label) => label.trim()).filter(Boolean).map((label) => {
+    const matches = questionOptions.filter((option) => String(option.option_text || "").trim() === label);
+    if (matches.length !== 1) {
+      throw quizAccessError("QUIZ_OPTION_INVALID", "A selected option does not belong to its quiz question");
+    }
+    return Number(matches[0].id);
+  });
+};
+
 const validateQuizSubmission = async (connection, user, quizId, answers) => {
   if (user?.role !== "employee") {
     throw quizAccessError("QUIZ_EMPLOYEE_REQUIRED", "Only employees can submit quizzes", 403);
@@ -221,7 +234,7 @@ const validateQuizSubmission = async (connection, user, quizId, answers) => {
     if (multiOptionQuestionTypes.has(questionType)) {
       const suppliedIds = Array.isArray(rawAnswer?.selected_option_ids)
         ? rawAnswer.selected_option_ids.map(Number)
-        : [];
+        : getLegacyCheckboxIds(rawAnswer, questionOptions);
       const uniqueIds = [...new Set(suppliedIds.filter((id) => Number.isInteger(id) && id > 0))];
       if (uniqueIds.length > 50) {
         throw quizAccessError("QUIZ_OPTIONS_TOO_MANY", "Too many options were selected");
