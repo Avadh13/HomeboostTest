@@ -12,6 +12,12 @@ const {
   validateRuleReferences,
   getSubmissionForApply,
 } = require("../src/services/quizJourneyAccessService");
+const {
+  hashOpaqueToken,
+  toPublicRegistrationStatus,
+  validateCheckoutSession,
+  claimStripeEvent,
+} = require("../src/services/paymentSecurityService");
 
 const responseRecorder = () => {
   const state = { statusCode: 200, payload: null };
@@ -27,6 +33,29 @@ const responseRecorder = () => {
     },
   };
 };
+
+const validCheckoutContext = () => ({
+  session: {
+    id: "cs_test_123",
+    payment_status: "paid",
+    amount_total: 99000,
+    currency: "cad",
+    customer_details: { email: "owner@example.com" },
+    metadata: { registration_id: "17" },
+  },
+  registration: {
+    id: 17,
+    email: "owner@example.com",
+    checkout_session_id: "cs_test_123",
+  },
+  payment: {
+    id: 4,
+    provider: "stripe",
+    provider_session_id: "cs_test_123",
+    amount_cents: 99000,
+    currency: "cad",
+  },
+});
 
 test("requireAdmin rejects unauthenticated and non-admin users", () => {
   const unauthenticatedResponse = responseRecorder();
@@ -77,6 +106,77 @@ test("Stripe webhook guard permits a signed request when configured", () => {
   assert.equal(called, true);
   if (originalSecret === undefined) delete process.env.STRIPE_WEBHOOK_SECRET;
   else process.env.STRIPE_WEBHOOK_SECRET = originalSecret;
+});
+
+test("Stripe checkout validation accepts an exact stored payment match", () => {
+  assert.equal(validateCheckoutSession(validCheckoutContext()), true);
+});
+
+test("Stripe checkout validation rejects unpaid, mismatched, or forged sessions", () => {
+  const cases = [
+    ["CHECKOUT_NOT_PAID", (context) => { context.session.payment_status = "unpaid"; }],
+    ["CHECKOUT_AMOUNT_MISMATCH", (context) => { context.session.amount_total = 1; }],
+    ["CHECKOUT_CURRENCY_MISMATCH", (context) => { context.session.currency = "usd"; }],
+    ["CHECKOUT_SESSION_MISMATCH", (context) => { context.session.id = "cs_forged"; }],
+    ["CHECKOUT_REGISTRATION_MISMATCH", (context) => { context.session.metadata.registration_id = "999"; }],
+    ["CHECKOUT_EMAIL_MISMATCH", (context) => { context.session.customer_details.email = "attacker@example.com"; }],
+  ];
+
+  for (const [expectedCode, mutate] of cases) {
+    const context = validCheckoutContext();
+    mutate(context);
+    assert.throws(
+      () => validateCheckoutSession(context),
+      (error) => error.code === expectedCode,
+    );
+  }
+});
+
+test("Stripe event claim blocks replayed event IDs", async () => {
+  const acceptedConnection = {
+    query: async () => [{ affectedRows: 1 }],
+  };
+  const replayConnection = {
+    query: async () => [{ affectedRows: 0 }],
+  };
+  const event = {
+    id: "evt_123",
+    type: "checkout.session.completed",
+    data: { object: { id: "cs_123", metadata: { registration_id: "17" } } },
+  };
+
+  assert.equal(await claimStripeEvent(acceptedConnection, event), true);
+  assert.equal(await claimStripeEvent(replayConnection, event), false);
+});
+
+test("Public registration status excludes PII and internal identifiers", () => {
+  const publicStatus = toPublicRegistrationStatus({
+    id: 17,
+    full_name: "Private Name",
+    email: "private@example.com",
+    checkout_session_id: "cs_secret",
+    team_id: 4,
+    user_id: 9,
+    status: "portal_created",
+    payment_status: "paid",
+    created_at: "2026-07-28T00:00:00Z",
+  });
+
+  assert.deepEqual(Object.keys(publicStatus).sort(), [
+    "created_at",
+    "payment_status",
+    "portal_ready",
+    "status",
+  ]);
+  assert.equal(publicStatus.portal_ready, true);
+});
+
+test("Opaque status tokens are hashed deterministically without storing raw tokens", () => {
+  const token = "A".repeat(43);
+  const hash = hashOpaqueToken(token);
+  assert.equal(hash.length, 64);
+  assert.equal(hash, hashOpaqueToken(token));
+  assert.notEqual(hash, token);
 });
 
 test("HBT provisioning never overwrites an existing incompatible user role", async () => {
