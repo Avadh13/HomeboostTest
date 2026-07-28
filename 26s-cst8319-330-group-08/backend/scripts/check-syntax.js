@@ -7,6 +7,7 @@ const sourceRoot = join(projectRoot, "src");
 const extraFiles = [
   join(projectRoot, "scripts", "check-syntax.js"),
   join(projectRoot, "scripts", "migrate.js"),
+  join(projectRoot, "scripts", "run-tests.js"),
 ];
 
 const collectJavaScriptFiles = (directory) => {
