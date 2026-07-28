@@ -98,7 +98,7 @@ const validateCheckoutSession = ({ session, registration, payment }) => {
   }
 
   const sessionEmail = getSessionEmail(session);
-  if (sessionEmail && sessionEmail !== normalizeEmail(registration.email)) {
+  if (!sessionEmail || sessionEmail !== normalizeEmail(registration.email)) {
     throw checkoutValidationError("CHECKOUT_EMAIL_MISMATCH", "Checkout customer does not match registration");
   }
 
