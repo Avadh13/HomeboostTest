@@ -4,6 +4,7 @@ const router = express.Router();
 const pool = require("../config/db");
 const authMiddleware = require("../middleware/authMiddleware");
 const quizController = require("../controllers/quizController");
+const quizSecureController = require("../controllers/quizSecureController");
 const { ensureAdvancedLeadTables, calculateReadinessForSubmission } = require("../services/readinessService");
 const { assignJourneyForSubmission } = require("../services/quizJourneyService");
 
@@ -77,7 +78,7 @@ const submitQuizWithReadiness = async (req, res, next) => {
     return originalJson(body);
   };
 
-  return quizController.submitQuiz(req, res, next);
+  return quizSecureController.submitQuiz(req, res, next);
 };
 
 const latestQuizSubmissionsOnly = async (req, res) => {
@@ -177,8 +178,8 @@ router.get("/submissions", authMiddleware, adminOrHbtOnly, latestQuizSubmissions
 router.get("/submissions/:id", authMiddleware, adminOrHbtOnly, requireSubmissionAccess, quizController.getQuizSubmissionDetails);
 router.put("/submissions/:id/follow-up-status", authMiddleware, adminOrHbtOnly, requireSubmissionAccess, quizController.updateQuizSubmissionFollowUpStatus);
 
-router.get("/", quizController.getQuizzes);
-router.get("/:quizId/questions", quizController.getQuizQuestions);
+router.get("/", authMiddleware, quizSecureController.getQuizzes);
+router.get("/:quizId/questions", authMiddleware, quizSecureController.getQuizQuestions);
 
 router.post("/", authMiddleware, adminOnly, quizController.createQuiz);
 router.put("/:id", authMiddleware, adminOnly, quizController.updateQuiz);
