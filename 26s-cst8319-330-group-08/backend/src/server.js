@@ -77,9 +77,17 @@ app.post(
   "/api/payments/stripe-webhook",
   express.raw({ type: "application/json" }),
   (req, res) => {
-    if (isProduction && !process.env.STRIPE_WEBHOOK_SECRET) {
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const signature = req.headers["stripe-signature"];
+
+    if (!webhookSecret) {
       return res.status(503).json({ status: "error", message: "Payment webhook is not configured" });
     }
+
+    if (!signature) {
+      return res.status(400).json({ status: "error", message: "Stripe signature is required" });
+    }
+
     return paymentRoutes.handleStripeWebhook(req, res);
   },
 );
