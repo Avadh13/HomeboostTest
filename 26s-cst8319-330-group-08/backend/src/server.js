@@ -9,6 +9,7 @@ const { corsOptions } = require("./config/cors");
 const { apiLimiter } = require("./middleware/rateLimiter");
 const sanitizeErrorResponse = require("./middleware/sanitizeErrorResponse");
 const errorHandler = require("./middleware/errorHandler");
+const requireStripeWebhookSignature = require("./middleware/stripeWebhookGuard");
 const authRoutes = require("./routes/authRoutes");
 const resourceRoutes = require("./routes/resourceRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -76,20 +77,8 @@ app.use(apiLimiter);
 app.post(
   "/api/payments/stripe-webhook",
   express.raw({ type: "application/json" }),
-  (req, res) => {
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    const signature = req.headers["stripe-signature"];
-
-    if (!webhookSecret) {
-      return res.status(503).json({ status: "error", message: "Payment webhook is not configured" });
-    }
-
-    if (!signature) {
-      return res.status(400).json({ status: "error", message: "Stripe signature is required" });
-    }
-
-    return paymentRoutes.handleStripeWebhook(req, res);
-  },
+  requireStripeWebhookSignature,
+  paymentRoutes.handleStripeWebhook,
 );
 
 app.use(express.json({ limit: "1mb" }));
