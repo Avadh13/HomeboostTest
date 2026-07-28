@@ -21,7 +21,12 @@ const findInviteByCredential = async (connection, credential, options = {}) => {
   const lock = options.forUpdate ? " FOR UPDATE" : "";
 
   const [[invite]] = await connection.query(
-    `SELECT ei.*, p.slug AS partnership_slug, p.team_id, e.name AS employer_name
+    `SELECT
+       ei.*,
+       p.slug AS partnership_slug,
+       p.team_id,
+       p.status AS partnership_status,
+       e.name AS employer_name
      FROM employee_invites ei
      JOIN partnerships p ON p.id = ei.partnership_id
      LEFT JOIN employers e ON e.id = p.employer_id
