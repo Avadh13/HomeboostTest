@@ -3,28 +3,17 @@ import { Link, useSearchParams } from "react-router-dom";
 import API_BASE_URL from "../api/api";
 import Navbar from "../components/Navbar";
 
-type Registration = {
-  id: number;
-  full_name: string;
-  email: string;
-  company_name: string;
+type RegistrationStatus = {
   status: string;
   payment_status: string;
-  team_id?: number | null;
-  user_id?: number | null;
-};
-
-type PortalAccess = {
-  login_email?: string;
-  login_url?: string;
-  initial_password?: string;
-  already_created?: boolean;
+  portal_ready: boolean;
+  created_at?: string;
 };
 
 type StatusResponse = {
   status?: string;
   message?: string;
-  registration?: Registration;
+  registration?: RegistrationStatus;
 };
 
 const humanize = (value?: string | null) =>
@@ -32,27 +21,28 @@ const humanize = (value?: string | null) =>
     .replace(/_/g, " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
 
+const validStatusToken = (value: string) => /^[A-Za-z0-9_-]{32,200}$/.test(value);
+
 function PaymentSuccess() {
   const [searchParams] = useSearchParams();
-  const rawRegistrationId = searchParams.get("registration") || "";
-  const registrationId = /^\d+$/.test(rawRegistrationId) ? rawRegistrationId : "";
+  const rawStatusToken = searchParams.get("status") || "";
+  const statusToken = validStatusToken(rawStatusToken) ? rawStatusToken : "";
   const demo = searchParams.get("demo") === "1";
-  const [registration, setRegistration] = useState<Registration | null>(null);
-  const [access, setAccess] = useState<PortalAccess | null>(null);
+  const [registration, setRegistration] = useState<RegistrationStatus | null>(null);
   const [message, setMessage] = useState(
-    registrationId ? "Checking enrollment status..." : "This payment link is missing a valid registration number.",
+    statusToken ? "Checking enrollment status..." : "This payment link is missing a valid status token.",
   );
-  const [loadingStatus, setLoadingStatus] = useState(Boolean(registrationId));
+  const [loadingStatus, setLoadingStatus] = useState(Boolean(statusToken));
   const [activating, setActivating] = useState(false);
   const [error, setError] = useState("");
 
   const loadStatus = useCallback(async () => {
-    if (!registrationId) return;
+    if (!statusToken) return;
 
     try {
       setLoadingStatus(true);
       setError("");
-      const response = await fetch(`${API_BASE_URL}/payments/status/${registrationId}`);
+      const response = await fetch(`${API_BASE_URL}/payments/status/${encodeURIComponent(statusToken)}`);
       const data: StatusResponse = await response.json().catch(() => ({}));
       if (!response.ok || data.status !== "success" || !data.registration) {
         throw new Error(data.message || "Enrollment status could not be loaded.");
@@ -60,10 +50,10 @@ function PaymentSuccess() {
 
       setRegistration(data.registration);
       setMessage(
-        data.registration.team_id
-          ? "Your HBT portal access has been created."
+        data.registration.portal_ready
+          ? "Your Home Buying Team portal access has been prepared."
           : data.registration.payment_status === "paid"
-            ? "Payment was received. Portal access is being prepared."
+            ? "Payment was received. Secure account activation is being prepared."
             : "Your enrollment has been recorded and is awaiting payment confirmation.",
       );
     } catch (statusError) {
@@ -73,35 +63,35 @@ function PaymentSuccess() {
     } finally {
       setLoadingStatus(false);
     }
-  }, [registrationId]);
+  }, [statusToken]);
 
   useEffect(() => {
     loadStatus();
   }, [loadStatus]);
 
   useEffect(() => {
-    if (!registrationId || demo || registration?.team_id || registration?.payment_status === "paid") return;
+    if (!statusToken || demo || registration?.portal_ready || registration?.payment_status === "paid") return;
 
     const timer = window.setInterval(loadStatus, 5000);
     return () => window.clearInterval(timer);
-  }, [demo, loadStatus, registration?.payment_status, registration?.team_id, registrationId]);
+  }, [demo, loadStatus, registration?.payment_status, registration?.portal_ready, statusToken]);
 
   const completeDemo = async () => {
-    if (!registrationId) return;
+    if (!statusToken) return;
 
     try {
       setActivating(true);
       setError("");
-      const response = await fetch(`${API_BASE_URL}/payments/demo-complete/${registrationId}`, {
+      const response = await fetch(`${API_BASE_URL}/payments/demo-complete/${encodeURIComponent(statusToken)}`, {
         method: "POST",
       });
-      const data = await response.json().catch(() => ({}));
+      const data: StatusResponse = await response.json().catch(() => ({}));
       if (!response.ok || data.status !== "success") {
         throw new Error(data.message || "Demo activation failed.");
       }
 
-      setAccess(data.access || null);
-      setMessage(data.message || "Demo payment completed. HBT portal access was created.");
+      setMessage(data.message || "Demo payment completed. Secure account activation is being prepared.");
+      if (data.registration) setRegistration(data.registration);
       await loadStatus();
     } catch (activationError) {
       setError(activationError instanceof Error ? activationError.message : "Demo activation failed.");
@@ -110,7 +100,7 @@ function PaymentSuccess() {
     }
   };
 
-  const portalReady = Boolean(registration?.team_id || access?.already_created || access?.login_email);
+  const portalReady = Boolean(registration?.portal_ready);
 
   return (
     <main className="theme-page min-h-screen overflow-hidden text-slate-950">
@@ -125,7 +115,7 @@ function PaymentSuccess() {
             </div>
             <p className="eyebrow text-emerald-600">Enrollment status</p>
             <h1 className="mt-3 text-4xl font-black tracking-tight md:text-6xl">
-              {registrationId ? "Thank you for joining the Home Buying Program." : "Invalid enrollment link."}
+              {statusToken ? "Thank you for joining the Employee Benefit Program." : "Invalid enrollment link."}
             </h1>
             <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-slate-600">
               {loadingStatus ? "Checking enrollment status..." : message}
@@ -139,8 +129,10 @@ function PaymentSuccess() {
 
             {registration && (
               <div className="mx-auto mt-8 max-w-2xl rounded-[1.5rem] bg-slate-50 p-5 text-left">
-                <p className="font-black text-slate-950">{registration.company_name}</p>
-                <p className="mt-1 break-words text-sm font-semibold text-slate-500">{registration.full_name} · {registration.email}</p>
+                <p className="font-black text-slate-950">Secure enrollment status</p>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Personal registration details are hidden on this public page.
+                </p>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   <div className="rounded-2xl bg-white p-4">
                     <p className="text-xs font-black uppercase text-slate-400">Payment</p>
@@ -148,24 +140,7 @@ function PaymentSuccess() {
                   </div>
                   <div className="rounded-2xl bg-white p-4">
                     <p className="text-xs font-black uppercase text-slate-400">Portal</p>
-                    <p className="mt-1 font-black text-slate-900">{portalReady ? "Created" : "Pending"}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {access?.initial_password && (
-              <div className="mx-auto mt-6 max-w-2xl rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-5 text-left text-emerald-900">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Temporary demo credentials</p>
-                <p className="mt-3 text-sm font-bold">Use these credentials only for testing and change the password before production use.</p>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl bg-white p-4">
-                    <p className="text-xs font-black uppercase text-slate-400">Email</p>
-                    <p className="mt-1 break-all font-black text-slate-900">{access.login_email}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white p-4">
-                    <p className="text-xs font-black uppercase text-slate-400">Temporary password</p>
-                    <p className="mt-1 break-all font-black text-slate-900">{access.initial_password}</p>
+                    <p className="mt-1 font-black text-slate-900">{portalReady ? "Prepared" : "Pending"}</p>
                   </div>
                 </div>
               </div>
@@ -174,14 +149,14 @@ function PaymentSuccess() {
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               {demo && registration && !portalReady && (
                 <button disabled={activating} type="button" onClick={completeDemo} className="btn-primary disabled:opacity-60">
-                  {activating ? "Activating..." : "Complete Demo Activation"}
+                  {activating ? "Activating..." : "Complete Demo Payment"}
                 </button>
               )}
-              {registrationId && !loadingStatus && (
+              {statusToken && !loadingStatus && (
                 <button type="button" onClick={loadStatus} className="btn-secondary">Refresh Status</button>
               )}
               <Link to="/login" className="btn-dark">Sign In</Link>
-              <Link to="/contact" className="btn-secondary">Contact Kelly</Link>
+              <Link to="/contact" className="btn-secondary">Contact Support</Link>
             </div>
           </div>
         </div>
