@@ -1,5 +1,10 @@
 const express = require("express");
 const pool = require("../config/db");
+const {
+  createRegistrationStatusToken,
+  getRegistrationByStatusToken,
+  toPublicRegistrationStatus,
+} = require("../services/paymentSecurityService");
 
 const router = express.Router();
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -68,6 +73,7 @@ const ensureSignupTables = async (connection = pool) => {
 };
 
 router.post("/start", async (req, res) => {
+  const connection = await pool.getConnection();
   try {
     const fullName = clean(req.body.full_name, 180);
     const email = clean(req.body.email, 180).toLowerCase();
@@ -81,10 +87,12 @@ router.post("/start", async (req, res) => {
       return res.status(400).json({ status: "error", message: "Enter a valid email address" });
     }
 
-    await ensureSignupTables();
+    await ensureSignupTables(connection);
+    await connection.beginTransaction();
 
-    const [result] = await pool.query(
-      `INSERT INTO hbt_registrations (full_name, email, phone, company_name, role_title, website_url, notes)
+    const [result] = await connection.query(
+      `INSERT INTO hbt_registrations
+       (full_name, email, phone, company_name, role_title, website_url, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         fullName,
@@ -98,36 +106,39 @@ router.post("/start", async (req, res) => {
     );
 
     const registrationId = result.insertId;
+    const statusToken = await createRegistrationStatusToken(connection, registrationId, 48);
     const stripe = getCheckoutClient();
 
     if (!stripe) {
       if (!demoCheckoutEnabled()) {
-        await pool.query(
+        await connection.query(
           "UPDATE hbt_registrations SET status = 'checkout_unavailable', payment_status = 'pending' WHERE id = ?",
           [registrationId],
         );
+        await connection.commit();
         return res.status(503).json({
           status: "error",
-          message: "Online checkout is temporarily unavailable. Please contact HomeBoost support.",
+          message: "Online checkout is temporarily unavailable. Please contact Employee Benefit Program support.",
         });
       }
 
       const demoSessionId = `demo_registration_${registrationId}`;
-      await pool.query(
+      await connection.query(
         "UPDATE hbt_registrations SET payment_status = 'demo_pending', checkout_session_id = ? WHERE id = ?",
         [demoSessionId, registrationId],
       );
-      await pool.query(
-        `INSERT INTO payments (registration_id, provider, provider_session_id, amount_cents, currency, status)
+      await connection.query(
+        `INSERT INTO payments
+         (registration_id, provider, provider_session_id, amount_cents, currency, status)
          VALUES (?, 'demo', ?, ?, ?, 'demo_pending')`,
         [registrationId, demoSessionId, amountCents(), currency()],
       );
+      await connection.commit();
 
       return res.status(201).json({
         status: "success",
         mode: "demo",
-        registration_id: registrationId,
-        checkout_url: `${appUrl()}/payment-success?registration=${registrationId}&demo=1`,
+        checkout_url: `${appUrl()}/payment-success?status=${encodeURIComponent(statusToken)}&demo=1`,
         message: "Demo checkout link created.",
       });
     }
@@ -135,7 +146,7 @@ router.post("/start", async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       customer_email: email,
-      success_url: `${appUrl()}/payment-success?registration=${registrationId}&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${appUrl()}/payment-success?status=${encodeURIComponent(statusToken)}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl()}/hbt-signup?cancelled=1`,
       line_items: [
         {
@@ -143,7 +154,7 @@ router.post("/start", async (req, res) => {
           price_data: {
             currency: currency(),
             unit_amount: amountCents(),
-            product_data: { name: "Home Buying Program - HBT Enrollment" },
+            product_data: { name: "Employee Benefit Program - HBT Enrollment" },
           },
         },
       ],
@@ -154,55 +165,50 @@ router.post("/start", async (req, res) => {
       throw new Error("Checkout provider did not return a valid session");
     }
 
-    await pool.query(
+    await connection.query(
       "UPDATE hbt_registrations SET checkout_session_id = ? WHERE id = ?",
       [session.id, registrationId],
     );
-    await pool.query(
-      `INSERT INTO payments (registration_id, provider, provider_session_id, amount_cents, currency, status)
+    await connection.query(
+      `INSERT INTO payments
+       (registration_id, provider, provider_session_id, amount_cents, currency, status)
        VALUES (?, 'stripe', ?, ?, ?, 'pending')`,
       [registrationId, session.id, amountCents(), currency()],
     );
+    await connection.commit();
 
     return res.status(201).json({
       status: "success",
       mode: "stripe",
-      registration_id: registrationId,
       checkout_url: session.url,
     });
   } catch (error) {
+    await connection.rollback();
     return res.status(500).json({
       status: "error",
       message: "Failed to start HBT signup",
-      error: error.message,
     });
+  } finally {
+    connection.release();
   }
 });
 
-router.get("/status/:registrationId", async (req, res) => {
+router.get("/status/:statusToken", async (req, res) => {
   try {
-    const registrationId = Number(req.params.registrationId);
-    if (!Number.isInteger(registrationId) || registrationId <= 0) {
-      return res.status(400).json({ status: "error", message: "Invalid registration number" });
-    }
-
     await ensureSignupTables();
-    const [[registration]] = await pool.query(
-      `SELECT id, full_name, email, company_name, status, payment_status, team_id, user_id, checkout_session_id, created_at
-       FROM hbt_registrations WHERE id = ? LIMIT 1`,
-      [registrationId],
-    );
-
+    const registration = await getRegistrationByStatusToken(pool, req.params.statusToken);
     if (!registration) {
-      return res.status(404).json({ status: "error", message: "Registration not found" });
+      return res.status(404).json({ status: "error", message: "Registration status is unavailable" });
     }
 
-    return res.json({ status: "success", registration });
+    return res.json({
+      status: "success",
+      registration: toPublicRegistrationStatus(registration),
+    });
   } catch (error) {
     return res.status(500).json({
       status: "error",
       message: "Failed to load registration status",
-      error: error.message,
     });
   }
 });
@@ -210,3 +216,5 @@ router.get("/status/:registrationId", async (req, res) => {
 module.exports = router;
 module.exports.ensureSignupTables = ensureSignupTables;
 module.exports.getCheckoutClient = getCheckoutClient;
+module.exports.amountCents = amountCents;
+module.exports.currency = currency;

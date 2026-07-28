@@ -4,21 +4,52 @@ const router = express.Router();
 const pool = require("../config/db");
 const authMiddleware = require("../middleware/authMiddleware");
 const quizController = require("../controllers/quizController");
+const quizSecureController = require("../controllers/quizSecureController");
 const { ensureAdvancedLeadTables, calculateReadinessForSubmission } = require("../services/readinessService");
 const { assignJourneyForSubmission } = require("../services/quizJourneyService");
 
+const adminRoles = new Set(["admin", "super_admin"]);
+const hbtRoles = new Set(["hbt_admin", "hbt_member"]);
+
 const adminOrHbtOnly = (req, res, next) => {
-  if (!req.user || !["admin", "super_admin", "hbt_admin", "hbt_member"].includes(req.user.role)) {
-    return res.status(403).json({ message: "Admin or HBT access required" });
+  if (!req.user || (!adminRoles.has(req.user.role) && !hbtRoles.has(req.user.role))) {
+    return res.status(403).json({ status: "error", message: "Admin or HBT access required" });
   }
-  next();
+  return next();
 };
 
 const adminOnly = (req, res, next) => {
-  if (!req.user || !["admin", "super_admin"].includes(req.user.role)) {
-    return res.status(403).json({ message: "Admin access required" });
+  if (!req.user || !adminRoles.has(req.user.role)) {
+    return res.status(403).json({ status: "error", message: "Admin access required" });
   }
-  next();
+  return next();
+};
+
+const requireSubmissionAccess = async (req, res, next) => {
+  try {
+    if (adminRoles.has(req.user?.role)) return next();
+
+    if (!hbtRoles.has(req.user?.role) || !req.user.team_id) {
+      return res.status(403).json({ status: "error", message: "HBT team access required" });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT qs.id
+       FROM quiz_submissions qs
+       JOIN partnerships p ON p.id = qs.partnership_id
+       WHERE qs.id = ? AND p.team_id = ?
+       LIMIT 1`,
+      [req.params.id, req.user.team_id],
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ status: "error", message: "Submission not found" });
+    }
+
+    return next();
+  } catch (error) {
+    return next(error);
+  }
 };
 
 const submitQuizWithReadiness = async (req, res, next) => {
@@ -38,7 +69,6 @@ const submitQuizWithReadiness = async (req, res, next) => {
         return originalJson({
           ...body,
           readiness_warning: "Quiz saved, but readiness/journey automation could not run automatically.",
-          readiness_error: error.message,
         });
       } finally {
         connection.release();
@@ -48,7 +78,7 @@ const submitQuizWithReadiness = async (req, res, next) => {
     return originalJson(body);
   };
 
-  return quizController.submitQuiz(req, res, next);
+  return quizSecureController.submitQuiz(req, res, next);
 };
 
 const latestQuizSubmissionsOnly = async (req, res) => {
@@ -59,13 +89,14 @@ const latestQuizSubmissionsOnly = async (req, res) => {
     let whereClause = "";
     const params = [];
 
-    if (user.role === "hbt_admin" || user.role === "hbt_member") {
+    if (hbtRoles.has(user.role)) {
+      if (!user.team_id) return res.status(403).json({ status: "error", message: "HBT account is not linked to a team" });
       whereClause = "WHERE p.team_id = ?";
       params.push(user.team_id);
     }
 
     const [submissions] = await pool.query(
-      `SELECT 
+      `SELECT
         qs.id,
         qs.quiz_id,
         qs.user_id,
@@ -101,7 +132,7 @@ const latestQuizSubmissionsOnly = async (req, res) => {
        LEFT JOIN journeys j ON j.id = ej.journey_id
        ${whereClause}
        ORDER BY qs.submitted_at DESC, qs.id DESC`,
-      params
+      params,
     );
 
     const latestMap = new Map();
@@ -122,7 +153,7 @@ const latestQuizSubmissionsOnly = async (req, res) => {
 
     for (const submission of latestSubmissions) {
       const [answers] = await pool.query(
-        `SELECT 
+        `SELECT
           qa.id,
           qa.answer_text,
           qq.question_text,
@@ -132,23 +163,23 @@ const latestQuizSubmissionsOnly = async (req, res) => {
          LEFT JOIN quiz_questions qq ON qa.question_id = qq.id
          WHERE qa.submission_id = ?
          ORDER BY qq.display_order ASC, qa.id ASC`,
-        [submission.id]
+        [submission.id],
       );
       submission.answers = answers;
     }
 
     return res.json(latestSubmissions);
   } catch (error) {
-    return res.status(500).json({ status: "error", message: "Failed to load latest quiz submissions", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to load latest quiz submissions" });
   }
 };
 
 router.get("/submissions", authMiddleware, adminOrHbtOnly, latestQuizSubmissionsOnly);
-router.get("/submissions/:id", authMiddleware, adminOrHbtOnly, quizController.getQuizSubmissionDetails);
-router.put("/submissions/:id/follow-up-status", authMiddleware, adminOrHbtOnly, quizController.updateQuizSubmissionFollowUpStatus);
+router.get("/submissions/:id", authMiddleware, adminOrHbtOnly, requireSubmissionAccess, quizController.getQuizSubmissionDetails);
+router.put("/submissions/:id/follow-up-status", authMiddleware, adminOrHbtOnly, requireSubmissionAccess, quizController.updateQuizSubmissionFollowUpStatus);
 
-router.get("/", quizController.getQuizzes);
-router.get("/:quizId/questions", quizController.getQuizQuestions);
+router.get("/", authMiddleware, quizSecureController.getQuizzes);
+router.get("/:quizId/questions", authMiddleware, quizSecureController.getQuizQuestions);
 
 router.post("/", authMiddleware, adminOnly, quizController.createQuiz);
 router.put("/:id", authMiddleware, adminOnly, quizController.updateQuiz);

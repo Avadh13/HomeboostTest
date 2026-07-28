@@ -22,7 +22,7 @@ const normalize = (row) => ({
 });
 const teamAccess = (user) => {
   if (isAdmin(user)) return { where: "", params: [] };
-  if (isHbt(user)) return { where: "WHERE p.team_id = ?", params: [user.team_id] };
+  if (isHbt(user) && user.team_id) return { where: "WHERE p.team_id = ?", params: [user.team_id] };
   return { where: "WHERE p.team_id = -1", params: [] };
 };
 
@@ -36,7 +36,7 @@ router.get("/me", protect, async (req, res) => {
        LEFT JOIN lead_pipeline lp ON lp.employee_user_id = ers.user_id
        WHERE ers.user_id = ?
        LIMIT 1`,
-      [req.user.id]
+      [req.user.id],
     );
     if (!rows.length) return res.json({ status: "success", readiness: null, recommendations: [] });
     const [recommendations] = await pool.query(
@@ -44,17 +44,18 @@ router.get("/me", protect, async (req, res) => {
        FROM employee_recommendations
        WHERE user_id = ?
        ORDER BY id ASC`,
-      [req.user.id]
+      [req.user.id],
     );
     return res.json({ status: "success", readiness: normalize(rows[0]), recommendations });
   } catch (error) {
-    return res.status(500).json({ status: "error", message: "Failed to load readiness score", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to load readiness score" });
   }
 });
 
 router.get("/hbt", protect, async (req, res) => {
   try {
     if (!isAdmin(req.user) && !isHbt(req.user)) return res.status(403).json({ status: "error", message: "HBT or Admin access required" });
+    if (isHbt(req.user) && !req.user.team_id) return res.status(403).json({ status: "error", message: "HBT account is not linked to a team" });
     await ensureAdvancedLeadTables();
     const access = teamAccess(req.user);
     const [rows] = await pool.query(
@@ -73,17 +74,18 @@ router.get("/hbt", protect, async (req, res) => {
        LEFT JOIN users advisor ON advisor.id = lp.assigned_team_member_user_id
        ${access.where}
        ORDER BY CASE ers.priority WHEN 'hot' THEN 1 WHEN 'warm' THEN 2 ELSE 3 END, ers.score DESC, ers.calculated_at DESC`,
-      access.params
+      access.params,
     );
     return res.json({ status: "success", readiness_scores: rows.map(normalize) });
   } catch (error) {
-    return res.status(500).json({ status: "error", message: "Failed to load HBT readiness scores", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to load HBT readiness scores" });
   }
 });
 
 router.get("/employee/:employeeId", protect, async (req, res) => {
   try {
     if (!isAdmin(req.user) && !isHbt(req.user)) return res.status(403).json({ status: "error", message: "HBT or Admin access required" });
+    if (isHbt(req.user) && !req.user.team_id) return res.status(403).json({ status: "error", message: "HBT account is not linked to a team" });
     await ensureAdvancedLeadTables();
     const access = teamAccess(req.user);
     const [rows] = await pool.query(
@@ -96,12 +98,12 @@ router.get("/employee/:employeeId", protect, async (req, res) => {
        LEFT JOIN lead_pipeline lp ON lp.employee_user_id = ers.user_id
        WHERE ers.user_id = ? ${access.where ? "AND p.team_id = ?" : ""}
        LIMIT 1`,
-      [req.params.employeeId, ...access.params]
+      [req.params.employeeId, ...access.params],
     );
     if (!rows.length) return res.status(404).json({ status: "error", message: "Readiness score not found" });
     return res.json({ status: "success", readiness: normalize(rows[0]) });
   } catch (error) {
-    return res.status(500).json({ status: "error", message: "Failed to load employee readiness", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to load employee readiness" });
   }
 });
 
@@ -110,23 +112,46 @@ router.post("/calculate", protect, async (req, res) => {
   try {
     const { submission_id } = req.body;
     if (!submission_id) return res.status(400).json({ status: "error", message: "submission_id is required" });
+
     await connection.beginTransaction();
+
     if (req.user.role === "employee") {
-      const [owned] = await connection.query(`SELECT id FROM quiz_submissions WHERE id = ? AND user_id = ? LIMIT 1`, [submission_id, req.user.id]);
+      const [owned] = await connection.query(
+        "SELECT id FROM quiz_submissions WHERE id = ? AND user_id = ? LIMIT 1",
+        [submission_id, req.user.id],
+      );
       if (!owned.length) {
         await connection.rollback();
-        return res.status(403).json({ status: "error", message: "Submission is not owned by this employee" });
+        return res.status(404).json({ status: "error", message: "Submission not found" });
       }
-    } else if (!isAdmin(req.user) && !isHbt(req.user)) {
+    } else if (isHbt(req.user)) {
+      if (!req.user.team_id) {
+        await connection.rollback();
+        return res.status(403).json({ status: "error", message: "HBT account is not linked to a team" });
+      }
+      const [scoped] = await connection.query(
+        `SELECT qs.id
+         FROM quiz_submissions qs
+         JOIN partnerships p ON p.id = qs.partnership_id
+         WHERE qs.id = ? AND p.team_id = ?
+         LIMIT 1`,
+        [submission_id, req.user.team_id],
+      );
+      if (!scoped.length) {
+        await connection.rollback();
+        return res.status(404).json({ status: "error", message: "Submission not found" });
+      }
+    } else if (!isAdmin(req.user)) {
       await connection.rollback();
       return res.status(403).json({ status: "error", message: "Access required" });
     }
+
     const readiness = await calculateReadinessForSubmission(connection, submission_id);
     await connection.commit();
     return res.json({ status: "success", message: "Readiness calculated", readiness });
   } catch (error) {
     await connection.rollback();
-    return res.status(500).json({ status: "error", message: "Failed to calculate readiness", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to calculate readiness" });
   } finally {
     connection.release();
   }

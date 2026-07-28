@@ -7,8 +7,10 @@ require("dotenv").config();
 const pool = require("./config/db");
 const { corsOptions } = require("./config/cors");
 const { apiLimiter } = require("./middleware/rateLimiter");
+const requestContext = require("./middleware/requestContext");
 const sanitizeErrorResponse = require("./middleware/sanitizeErrorResponse");
 const errorHandler = require("./middleware/errorHandler");
+const requireStripeWebhookSignature = require("./middleware/stripeWebhookGuard");
 const authRoutes = require("./routes/authRoutes");
 const resourceRoutes = require("./routes/resourceRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -50,6 +52,7 @@ const courseRoutes = require("./routes/courseRoutes");
 const journeyRoutes = require("./routes/journeyRoutes");
 const quizJourneyRoutes = require("./routes/quizJourneyRoutes");
 const inviteRoutes = require("./routes/inviteRoutes");
+const activationRoutes = require("./routes/activationRoutes");
 const portalBrandingRoutes = require("./routes/portalBrandingRoutes");
 const employerApprovalRoutes = require("./routes/employerApprovalRoutes");
 const reportRoutes = require("./routes/reportRoutes");
@@ -69,6 +72,7 @@ app.use((req, res, next) => {
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   next();
 });
+app.use(requestContext);
 app.use(cors(corsOptions));
 app.use(sanitizeErrorResponse);
 app.use(apiLimiter);
@@ -76,19 +80,15 @@ app.use(apiLimiter);
 app.post(
   "/api/payments/stripe-webhook",
   express.raw({ type: "application/json" }),
-  (req, res) => {
-    if (isProduction && !process.env.STRIPE_WEBHOOK_SECRET) {
-      return res.status(503).json({ status: "error", message: "Payment webhook is not configured" });
-    }
-    return paymentRoutes.handleStripeWebhook(req, res);
-  },
+  requireStripeWebhookSignature,
+  paymentRoutes.handleStripeWebhook,
 );
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use("/uploads", express.static(uploadsDir));
 
-app.get("/", (req, res) => res.send("HomeBoost backend is running"));
+app.get("/", (req, res) => res.send("Employee Benefit Program backend is running"));
 app.get("/api/health", (req, res) => res.json({ status: "success", message: "Backend API is working" }));
 
 if (!isProduction || process.env.ENABLE_DIAGNOSTIC_ROUTES === "true") {
@@ -142,7 +142,7 @@ app.use("/api/resource-recommendations", resourceRecommendationRoutes);
 app.use("/api/company-analytics", companyAnalyticsRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/hbt-signup", hbtSignupRoutes);
-app.post("/api/payments/demo-complete/:registrationId", (req, res, next) => {
+app.post("/api/payments/demo-complete/:statusToken", (req, res, next) => {
   if (process.env.ALLOW_DEMO_PAYMENT_COMPLETION !== "true") {
     return res.status(403).json({ status: "error", message: "Demo completion is disabled" });
   }
@@ -153,6 +153,7 @@ app.use("/api/courses", courseRoutes);
 app.use("/api/journeys", journeyRoutes);
 app.use("/api/quiz-journey-rules", quizJourneyRoutes);
 app.use("/api/invites", inviteRoutes);
+app.use("/api/activation", activationRoutes);
 app.use("/api/portal-branding", portalBrandingRoutes);
 app.use("/api/employer-approval", employerApprovalRoutes);
 app.use("/api/reports", reportRoutes);
