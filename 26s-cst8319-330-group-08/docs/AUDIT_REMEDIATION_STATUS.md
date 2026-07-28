@@ -27,8 +27,8 @@ This file tracks the repository audit findings. `Implemented` means code and reg
 
 | ID | Status | Notes |
 |---|---|---|
-| H-01 | Open | Separate employee-visible quiz catalog from Admin catalog; filter active/team/partnership content. |
-| H-02 | Open | Validate active quiz, question membership, required answers, duplicate IDs, onboarding/repeat policy transactionally. |
+| H-01 | Implemented | Quiz list and question endpoints now require authentication. Admins see all quizzes; HBT roles see active global/their-team quizzes; Employees see only active quizzes available to their active partnership through global/team and `quiz_partnerships` rules. Company and anonymous users cannot enumerate quizzes. Admin UI now labels employee-catalog versus assigned-partnership visibility accurately. |
+| H-02 | Implemented | Employee submission validates quiz accessibility, active partnership, question membership, duplicate question IDs, required answers, option ownership, answer length and type-specific formats. Choice answers are canonicalized from stored options, and submission plus audit event are transactional. Repeat/onboarding policy remains part of H-17 rather than this validation finding. |
 | H-03 | Open | Restrict HBT Member resource/recommendation configuration privileges. |
 | H-04 | Open | Add explicit role authorization to partnership and event mutations. |
 | H-05 | Open | Protect last Super Admin, self-demotion, promotion, and disabling. |
@@ -40,8 +40,8 @@ This file tracks the repository audit findings. `Implemented` means code and reg
 | H-11 | Open | JWT remains in localStorage; refresh/session revocation design not implemented. |
 | H-12 | Open | Separate global release QA from HBT tenant UAT. |
 | H-13 | Open | Neutralize formula-prefixed CSV cells and add tests. |
-| H-14 | Partial | Ordered migration runner and `schema_migrations` added; new security/invite/employer-approval schemas moved to migrations. Runtime DDL remains in other modules. |
-| H-15 | Partial | Node unit regression suites now run in CI without database secrets. Disposable-DB integration suite remains. |
+| H-14 | Partial | Ordered migration runner and `schema_migrations` added; new security, invite, employer-approval, and quiz-visibility schemas moved to migrations. Runtime DDL remains in other modules. |
+| H-15 | Partial | Node unit regression suites now run in CI without database secrets, including quiz tenant/answer validation. Disposable-DB integration suite remains. |
 | H-16 | Open | Frontend component and Playwright suites remain. |
 | H-17 | Open | Server-derived onboarding gate remains. |
 | H-18 | Open | Employee checklist-item progress remains. |
@@ -54,15 +54,15 @@ This file tracks the repository audit findings. `Implemented` means code and reg
 
 | ID | Status | Notes |
 |---|---|---|
-| D-01 | Partial | Stripe, employer approval, contact deletion, invite acceptance/create/resend/revoke, activation, and journey assignment use transactions. Remaining multi-table controllers require conversion. |
+| D-01 | Partial | Stripe, employer approval, contact deletion, invite acceptance/create/resend/revoke, activation, journey assignment, and quiz submission use transactions. Remaining multi-table controllers require conversion. |
 | D-02 | Partial | Added affected-row checks to remediated routes. Repository-wide completion remains. |
 | D-03 | Partial | Remediated routes return sanitized errors. Existing route-local `error.message` responses remain elsewhere. |
-| D-04 | Partial | New security status-token table has a foreign key; additional controlled lifecycle constraints remain. |
+| D-04 | Partial | New security status-token table has a foreign key; quiz partnership mapping has controlled foreign keys. Additional lifecycle constraints remain. |
 | D-05 | Open | Persistent encrypted object/private storage, scanning, retention, and recovery remain. |
 | D-06 | Open | Replace synchronous large-file hashing in document paths. |
 | D-07 | Open | Replace in-process rate limiter with Redis-compatible shared limiter. |
 | D-08 | Open | Add signup/payment-start idempotency key. |
-| D-09 | Partial | Immutable `audit_logs` schema/service added with redaction, correlation ID, and IP HMAC. Events cover contact deletion, uploads, activation, invites, employer approvals, and contacts. Repository-wide privileged event coverage remains. |
+| D-09 | Partial | Immutable `audit_logs` schema/service added with redaction, correlation ID, and IP HMAC. Events cover contact deletion, uploads, activation, invites, employer approvals, contacts, and quiz submission. Repository-wide privileged event coverage remains. |
 
 ## Frontend and layout
 
@@ -103,6 +103,7 @@ This file tracks the repository audit findings. `Implemented` means code and reg
 - HomeBoost CI: backend unit tests/syntax and frontend build pass.
 - QA Reimplementation Checks: pass.
 - Vercel preview: success.
+- Quiz security regression suite covers anonymous/company denial, partnership visibility, required/duplicate/foreign questions, option ownership, canonicalization, checkbox compatibility, and migration structure.
 - Pull request remains draft, open, mergeable, and unmerged.
 
 ## Release blockers
@@ -112,5 +113,5 @@ The application must not be called production-ready until:
 1. All Critical implementations pass live integration tests.
 2. New migrations are executed successfully on a disposable fresh database and a production-like copy.
 3. Stripe signed webhook tests pass with Stripe CLI/test mode.
-4. Remaining High findings H-01 through H-22 are closed or explicitly accepted by the client and security owner.
+4. Remaining High findings are closed or explicitly accepted by the client and security owner.
 5. Onboarding, checklist progress, email delivery, backup/restore, accessibility, and role-based E2E suites pass.
