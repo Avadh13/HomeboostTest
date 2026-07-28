@@ -4,6 +4,14 @@ const assert = require("node:assert/strict");
 const { requireAdmin } = require("../src/middleware/roleMiddleware");
 const requireStripeWebhookSignature = require("../src/middleware/stripeWebhookGuard");
 const { provisionHbtFromRegistration } = require("../src/services/hbtProvisionService");
+const {
+  getAssignmentScope,
+  getActiveAssignedStep,
+} = require("../src/services/journeyAccessService");
+const {
+  validateRuleReferences,
+  getSubmissionForApply,
+} = require("../src/services/quizJourneyAccessService");
 
 const responseRecorder = () => {
   const state = { statusCode: 200, payload: null };
@@ -94,4 +102,120 @@ test("HBT provisioning never overwrites an existing incompatible user role", asy
     () => provisionHbtFromRegistration(17, connection),
     (error) => error.code === "HBT_ACCOUNT_CONFLICT" && error.statusCode === 409,
   );
+});
+
+test("HBT Admin cannot assign a journey to an employee from another team", async () => {
+  const connection = {
+    query: async () => [[{
+      employee_id: 50,
+      partnership_id: 10,
+      employee_team_id: 8,
+      journey_id: 12,
+      journey_team_id: 8,
+      journey_is_active: 1,
+    }]],
+  };
+
+  const scope = await getAssignmentScope(
+    { id: 2, role: "hbt_admin", team_id: 7 },
+    50,
+    12,
+    connection,
+  );
+  assert.equal(scope, null);
+});
+
+test("HBT Admin can assign a team or global journey to an employee in their team", async () => {
+  for (const journeyTeamId of [7, null]) {
+    const connection = {
+      query: async () => [[{
+        employee_id: 50,
+        partnership_id: 10,
+        employee_team_id: 7,
+        journey_id: 12,
+        journey_team_id: journeyTeamId,
+        journey_is_active: 1,
+      }]],
+    };
+
+    const scope = await getAssignmentScope(
+      { id: 2, role: "hbt_admin", team_id: 7 },
+      50,
+      12,
+      connection,
+    );
+    assert.equal(scope.employee_id, 50);
+    assert.equal(scope.journey_id, 12);
+  }
+});
+
+test("Employee step completion requires an active assignment containing that step", async () => {
+  const deniedConnection = { query: async () => [[]] };
+  assert.equal(await getActiveAssignedStep(25, 900, deniedConnection), null);
+
+  const allowedConnection = {
+    query: async () => [[{ id: 900, journey_id: 33 }]],
+  };
+  const step = await getActiveAssignedStep(25, 900, allowedConnection);
+  assert.deepEqual(step, { id: 900, journey_id: 33 });
+});
+
+test("HBT Admin cannot create a quiz journey rule using another team's journey", async () => {
+  const connection = {
+    query: async (sql) => {
+      if (sql.includes("FROM journeys")) {
+        return [[{ id: 44, team_id: 9, is_active: 1 }]];
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+
+  const references = await validateRuleReferences(
+    { role: "hbt_admin", team_id: 7 },
+    { journey_id: 44 },
+    connection,
+  );
+  assert.equal(references, null);
+});
+
+test("HBT Admin can create a rule using an authorized team quiz and journey", async () => {
+  const connection = {
+    query: async (sql) => {
+      if (sql.includes("FROM journeys")) {
+        return [[{ id: 44, team_id: 7, is_active: 1 }]];
+      }
+      if (sql.includes("FROM quizzes")) {
+        return [[{ id: 19, team_id: 7, is_global: 0, is_active: 1 }]];
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+
+  const references = await validateRuleReferences(
+    { role: "hbt_admin", team_id: 7 },
+    { journey_id: 44, quiz_id: 19 },
+    connection,
+  );
+  assert.equal(references.teamId, 7);
+  assert.equal(references.journeyId, 44);
+  assert.equal(references.quizId, 19);
+});
+
+test("Manual quiz journey apply is blocked across HBT teams", async () => {
+  const connection = {
+    query: async () => [[{
+      id: 82,
+      quiz_id: 4,
+      user_id: 90,
+      partnership_id: 3,
+      team_id: 8,
+    }]],
+  };
+
+  const submission = await getSubmissionForApply(
+    { role: "hbt_admin", team_id: 7 },
+    82,
+    connection,
+  );
+  assert.equal(submission, null);
 });
