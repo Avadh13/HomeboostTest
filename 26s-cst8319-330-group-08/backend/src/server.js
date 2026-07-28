@@ -7,6 +7,7 @@ require("dotenv").config();
 const pool = require("./config/db");
 const { corsOptions } = require("./config/cors");
 const { apiLimiter } = require("./middleware/rateLimiter");
+const requestContext = require("./middleware/requestContext");
 const sanitizeErrorResponse = require("./middleware/sanitizeErrorResponse");
 const errorHandler = require("./middleware/errorHandler");
 const requireStripeWebhookSignature = require("./middleware/stripeWebhookGuard");
@@ -70,6 +71,7 @@ app.use((req, res, next) => {
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   next();
 });
+app.use(requestContext);
 app.use(cors(corsOptions));
 app.use(sanitizeErrorResponse);
 app.use(apiLimiter);
@@ -85,7 +87,7 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use("/uploads", express.static(uploadsDir));
 
-app.get("/", (req, res) => res.send("HomeBoost backend is running"));
+app.get("/", (req, res) => res.send("Employee Benefit Program backend is running"));
 app.get("/api/health", (req, res) => res.json({ status: "success", message: "Backend API is working" }));
 
 if (!isProduction || process.env.ENABLE_DIAGNOSTIC_ROUTES === "true") {
@@ -139,7 +141,7 @@ app.use("/api/resource-recommendations", resourceRecommendationRoutes);
 app.use("/api/company-analytics", companyAnalyticsRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/hbt-signup", hbtSignupRoutes);
-app.post("/api/payments/demo-complete/:registrationId", (req, res, next) => {
+app.post("/api/payments/demo-complete/:statusToken", (req, res, next) => {
   if (process.env.ALLOW_DEMO_PAYMENT_COMPLETION !== "true") {
     return res.status(403).json({ status: "error", message: "Demo completion is disabled" });
   }
