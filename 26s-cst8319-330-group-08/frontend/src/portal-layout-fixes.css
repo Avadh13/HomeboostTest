@@ -1,58 +1,86 @@
 /*
- * Authenticated portal layout
+ * Unified authenticated portal header
  *
- * Employee, Company, HBT Admin, and HBT Member portals use a compact
- * horizontal navigation row. The HBT Admin portal groups its larger route set
- * into six top-level menu sections with dropdown submenus. Admin routes remain
- * excluded because AdminLayout owns the admin sidebar.
+ * Employee, Company, HBT Admin, and HBT Member portals use one fixed header.
+ * HBT Admin keeps the grouped menu/dropdowns while the old second navigation
+ * strip is removed. Admin routes are excluded because AdminLayout owns them.
  */
 
 :root {
-  --hb-portal-topbar-height: 76px;
-  --hb-portal-nav-height: 60px;
+  --hb-portal-header-height: 88px;
 }
 
 body.hb-portal-mode {
   overflow-x: hidden;
 }
 
-.hb-portal-sidebar {
-  position: fixed !important;
-  inset: var(--hb-portal-topbar-height) 0 auto 0 !important;
-  z-index: 69 !important;
-  display: flex !important;
-  width: 100% !important;
-  height: var(--hb-portal-nav-height) !important;
-  flex-direction: row !important;
-  align-items: stretch !important;
-  overflow: visible !important;
-  border-right: 0 !important;
-  border-bottom: 1px solid var(--hb-ui-line) !important;
-  background: rgba(255, 255, 255, 0.98) !important;
-  box-shadow: 0 6px 18px rgba(24, 39, 75, 0.045) !important;
-  transform: none !important;
-  transition: none !important;
-  backdrop-filter: blur(16px);
-}
-
+/* The former second navigation rail no longer exists in the portal shell. */
+.hb-portal-sidebar,
 .hb-portal-brand,
-.hb-portal-sidebar-footer {
+.hb-portal-sidebar-footer,
+.hb-portal-menu-button,
+.hb-portal-backdrop {
   display: none !important;
 }
 
-.hb-portal-nav {
+.hb-portal-topbar.hb-portal-unified-header {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 90 !important;
+  box-sizing: border-box;
+  display: grid !important;
+  width: 100% !important;
+  height: var(--hb-portal-header-height) !important;
+  min-height: var(--hb-portal-header-height) !important;
+  grid-template-columns: minmax(170px, auto) minmax(520px, 1fr) minmax(150px, 230px) auto !important;
+  align-items: center !important;
+  gap: clamp(0.65rem, 1vw, 1.1rem) !important;
+  overflow: visible !important;
+  border-bottom: 1px solid var(--hb-ui-line) !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  padding: 0.75rem clamp(1rem, 1.8vw, 2rem) !important;
+  box-shadow: 0 5px 20px rgba(24, 39, 75, 0.06) !important;
+  backdrop-filter: blur(18px);
+}
+
+.hb-portal-unified-header .hb-portal-topbar-left {
+  display: flex !important;
+  min-width: 0;
+  align-items: center;
+}
+
+.hb-portal-unified-header .hb-portal-kicker {
+  margin: 0;
+  color: var(--hb-ui-primary);
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.hb-portal-unified-header .hb-portal-topbar-left h1 {
+  margin: 0.15rem 0 0;
+  overflow: hidden;
+  color: var(--hb-ui-ink);
+  font-size: 1.18rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Primary navigation now lives inside the same top bar. */
+.hb-portal-unified-header .hb-portal-nav {
   position: relative;
   display: flex !important;
-  width: 100% !important;
+  width: auto !important;
   min-width: 0;
   min-height: 0;
-  flex: 1 1 auto !important;
   flex-direction: row !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: clamp(0.35rem, 0.8vw, 0.75rem) !important;
+  gap: clamp(0.2rem, 0.45vw, 0.55rem) !important;
   overflow: visible !important;
-  padding: 0.55rem clamp(0.75rem, 2vw, 1.5rem) !important;
+  padding: 0 !important;
 }
 
 .hb-portal-link,
@@ -63,14 +91,14 @@ body.hb-portal-mode {
   flex: 0 0 auto !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 0.4rem !important;
+  gap: 0.38rem !important;
   border: 1px solid transparent !important;
   border-radius: 10px !important;
   background: transparent !important;
-  padding: 0.45rem 0.85rem !important;
+  padding: 0.48rem 0.78rem !important;
   color: #526071 !important;
   font: inherit;
-  font-size: 0.86rem !important;
+  font-size: 0.82rem !important;
   font-weight: 850 !important;
   line-height: 1 !important;
   white-space: nowrap !important;
@@ -119,7 +147,7 @@ body.hb-portal-mode {
   line-height: 1 !important;
 }
 
-/* Grouped HBT navigation */
+/* Grouped HBT dropdown navigation */
 .hb-portal-menu-group {
   position: relative;
   flex: 0 0 auto;
@@ -128,7 +156,7 @@ body.hb-portal-mode {
 .hb-portal-menu-caret {
   display: inline-block;
   margin-left: 0.05rem;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   line-height: 1;
   transition: transform 160ms ease;
 }
@@ -139,9 +167,9 @@ body.hb-portal-mode {
 
 .hb-portal-submenu {
   position: absolute;
-  top: calc(100% + 0.65rem);
+  top: calc(100% + 0.8rem);
   left: 0;
-  z-index: 120;
+  z-index: 150;
   display: grid;
   width: max-content;
   min-width: 235px;
@@ -202,27 +230,135 @@ body.hb-portal-mode {
   color: var(--hb-ui-primary-dark);
 }
 
-/* Keep the utility/header row full width above navigation. */
-.hb-portal-topbar {
-  box-sizing: border-box;
-  left: 0 !important;
-  z-index: 70 !important;
-  width: 100% !important;
+/* Compact search inside the unified bar. */
+.hb-portal-unified-header .hb-portal-search {
+  display: flex !important;
   min-width: 0;
+  min-height: 42px;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid #dce3ec;
+  border-radius: 11px;
+  background: #f9fbfd;
+  padding: 0 0.75rem;
+  color: #8a97a8;
 }
 
-.hb-portal-menu-button,
-.hb-portal-backdrop {
+.hb-portal-unified-header .hb-portal-search:focus-within {
+  border-color: #78a9e9;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(11, 99, 216, 0.08);
+}
+
+.hb-portal-unified-header .hb-portal-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  color: var(--hb-ui-ink);
+  font-size: 0.82rem;
+  outline: 0;
+}
+
+.hb-portal-unified-header .hb-portal-user-actions {
+  display: flex !important;
+  align-items: center;
+  justify-self: end;
+  gap: 0.55rem;
+}
+
+.hb-portal-unified-header .hb-portal-alert-button,
+.hb-portal-profile-icon {
+  position: relative;
+  display: grid !important;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border: 1px solid var(--hb-ui-line);
+  border-radius: 11px;
+  background: #ffffff;
+  color: #526071;
+  transition: 150ms ease;
+}
+
+.hb-portal-unified-header .hb-portal-alert-button:hover,
+.hb-portal-profile-icon:hover {
+  border-color: #b8cce6;
+  background: #f4f8fd;
+}
+
+.hb-portal-unified-header .hb-portal-alert-button > span:last-child:not(:first-child) {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  min-width: 19px;
+  height: 19px;
+  place-items: center;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #e33d52;
+  color: #ffffff;
+  font-size: 0.58rem;
+  font-weight: 900;
+}
+
+.hb-portal-profile-icon .hb-portal-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--hb-ui-primary-soft);
+  color: var(--hb-ui-primary-dark);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.hb-portal-profile-icon .hb-portal-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* The old large HBT Admin profile card is intentionally hidden. */
+.hb-portal-profile-link,
+.hb-portal-profile-copy,
+.hb-portal-chevron {
   display: none !important;
 }
 
+.hb-portal-logout-button {
+  min-height: 42px;
+  border: 1px solid #fecaca;
+  border-radius: 11px;
+  background: #fff5f5;
+  padding: 0 0.9rem;
+  color: #c73545;
+  font-size: 0.8rem;
+  font-weight: 900;
+  cursor: pointer;
+  transition: 150ms ease;
+}
+
+.hb-portal-logout-button:hover {
+  border-color: #fca5a5;
+  background: #fee2e2;
+  color: #b42318;
+}
+
+/* Full-width portal content now starts below one header, not two bars. */
 body.hb-portal-mode main {
   box-sizing: border-box;
   width: 100% !important;
   max-width: 100% !important;
   min-height: 100vh !important;
   margin-left: 0 !important;
-  padding-top: calc(var(--hb-portal-topbar-height) + var(--hb-portal-nav-height) + 20px) !important;
+  padding-top: calc(var(--hb-portal-header-height) + 20px) !important;
   padding-right: clamp(1rem, 2vw, 1.5rem) !important;
   padding-left: clamp(1rem, 2vw, 1.5rem) !important;
   overflow-x: clip;
@@ -314,103 +450,120 @@ body.hb-portal-mode .hb-portal-support-content select {
   font-weight: 800;
 }
 
-@media (max-width: 1100px) {
-  .hb-portal-topbar {
-    gap: 0.75rem;
-    padding-right: 1rem;
-    padding-left: 1rem;
-  }
-
-  .hb-portal-nav {
-    gap: 0.25rem !important;
-    padding-right: 0.5rem !important;
-    padding-left: 0.5rem !important;
+@media (max-width: 1450px) {
+  .hb-portal-topbar.hb-portal-unified-header {
+    grid-template-columns: minmax(150px, auto) minmax(470px, 1fr) 170px auto !important;
+    gap: 0.55rem !important;
+    padding-right: 1rem !important;
+    padding-left: 1rem !important;
   }
 
   .hb-portal-link,
   .hb-portal-menu-trigger {
-    padding-right: 0.62rem !important;
-    padding-left: 0.62rem !important;
-    font-size: 0.78rem !important;
+    padding-right: 0.58rem !important;
+    padding-left: 0.58rem !important;
+    font-size: 0.76rem !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  .hb-portal-topbar.hb-portal-unified-header {
+    grid-template-columns: minmax(145px, auto) minmax(430px, 1fr) auto !important;
+  }
+
+  .hb-portal-unified-header .hb-portal-search {
+    display: none !important;
+  }
+
+  .hb-portal-unified-header .hb-portal-nav {
+    gap: 0.12rem !important;
+  }
+
+  .hb-portal-link,
+  .hb-portal-menu-trigger {
+    padding-right: 0.48rem !important;
+    padding-left: 0.48rem !important;
+    font-size: 0.72rem !important;
   }
 }
 
 @media (max-width: 900px) {
   :root {
-    --hb-portal-topbar-height: 72px;
-    --hb-portal-nav-height: 56px;
+    --hb-portal-header-height: 78px;
   }
 
-  .hb-portal-sidebar,
-  .hb-portal-sidebar.is-open {
-    inset: var(--hb-portal-topbar-height) 0 auto 0 !important;
-    height: var(--hb-portal-nav-height) !important;
-    transform: none !important;
+  .hb-portal-topbar.hb-portal-unified-header {
+    grid-template-columns: 1fr auto !important;
+    gap: 0.45rem !important;
+    padding: 0.65rem 0.75rem !important;
   }
 
-  .hb-portal-nav {
-    justify-content: center !important;
-    gap: 0.15rem !important;
-    padding: 0.45rem 0.25rem !important;
+  .hb-portal-unified-header .hb-portal-topbar-left {
+    display: none !important;
+  }
+
+  .hb-portal-unified-header .hb-portal-nav {
+    justify-content: flex-start !important;
+    gap: 0 !important;
   }
 
   .hb-portal-link,
   .hb-portal-menu-trigger {
     min-height: 36px !important;
-    padding: 0.35rem 0.5rem !important;
-    font-size: 0.72rem !important;
+    padding: 0.35rem 0.42rem !important;
+    font-size: 0.68rem !important;
   }
 
   .hb-portal-submenu {
-    top: calc(100% + 0.55rem);
+    top: calc(100% + 0.65rem);
     min-width: 220px;
   }
 
-  .hb-portal-topbar {
-    left: 0 !important;
-    width: 100% !important;
-    padding-right: 1rem;
-    padding-left: 1rem;
+  .hb-portal-logout-button {
+    padding-right: 0.7rem;
+    padding-left: 0.7rem;
   }
 
   body.hb-portal-mode main {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin-left: 0 !important;
-    padding-top: calc(var(--hb-portal-topbar-height) + var(--hb-portal-nav-height) + 16px) !important;
+    padding-top: calc(var(--hb-portal-header-height) + 16px) !important;
     padding-right: 1rem !important;
     padding-left: 1rem !important;
-  }
-
-  body.hb-portal-mode .hb-portal-support-content {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin-left: 0 !important;
   }
 }
 
 @media (max-width: 640px) {
   :root {
-    --hb-portal-nav-height: 52px;
+    --hb-portal-header-height: 124px;
   }
 
-  .hb-portal-nav {
-    gap: 0 !important;
-    padding-right: 0.15rem !important;
-    padding-left: 0.15rem !important;
+  .hb-portal-topbar.hb-portal-unified-header {
+    grid-template-columns: 1fr auto !important;
+    grid-template-rows: auto auto !important;
+    align-content: center !important;
+    row-gap: 0.45rem !important;
+  }
+
+  .hb-portal-unified-header .hb-portal-nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: center !important;
+  }
+
+  .hb-portal-unified-header .hb-portal-user-actions {
+    grid-column: 2;
+    grid-row: 1;
   }
 
   .hb-portal-link,
   .hb-portal-menu-trigger {
-    min-height: 34px !important;
-    padding-right: 0.36rem !important;
-    padding-left: 0.36rem !important;
-    font-size: 0.66rem !important;
+    min-height: 33px !important;
+    padding: 0.3rem 0.32rem !important;
+    font-size: 0.62rem !important;
   }
 
   .hb-portal-menu-caret {
     margin-left: 0;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
   }
 
   .hb-portal-menu-trigger > .hb-portal-badge {
@@ -418,13 +571,31 @@ body.hb-portal-mode .hb-portal-support-content select {
   }
 
   .hb-portal-submenu {
-    min-width: 210px;
+    min-width: 205px;
     max-width: calc(100vw - 1rem);
   }
 
   .hb-portal-submenu-link {
     min-height: 40px;
     font-size: 0.78rem;
+  }
+
+  .hb-portal-unified-header .hb-portal-alert-button,
+  .hb-portal-profile-icon {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+  }
+
+  .hb-portal-profile-icon .hb-portal-avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .hb-portal-logout-button {
+    min-height: 38px;
+    padding: 0 0.6rem;
+    font-size: 0.72rem;
   }
 
   body.hb-portal-mode main {
