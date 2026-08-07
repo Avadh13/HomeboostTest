@@ -364,6 +364,10 @@ body.hb-portal-mode main {
   overflow-x: clip;
 }
 
+body.hb-portal-mode.hb-portal-menu-open main {
+  padding-top: calc(var(--hb-portal-header-height) + 172px) !important;
+}
+
 body.hb-portal-mode main > * {
   min-width: 0;
   max-width: 100%;
@@ -529,6 +533,10 @@ body.hb-portal-mode .hb-portal-support-content select {
     padding-right: 1rem !important;
     padding-left: 1rem !important;
   }
+
+  body.hb-portal-mode.hb-portal-menu-open main {
+    padding-top: calc(var(--hb-portal-header-height) + 164px) !important;
+  }
 }
 
 @media (max-width: 640px) {
@@ -573,6 +581,10 @@ body.hb-portal-mode .hb-portal-support-content select {
   .hb-portal-submenu {
     min-width: 205px;
     max-width: calc(100vw - 1rem);
+  }
+
+  body.hb-portal-mode.hb-portal-menu-open main {
+    padding-top: calc(var(--hb-portal-header-height) + 156px) !important;
   }
 
   .hb-portal-submenu-link {

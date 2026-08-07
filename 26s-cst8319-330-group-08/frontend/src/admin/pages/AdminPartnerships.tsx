@@ -94,7 +94,6 @@ function AdminPartnerships() {
   useEffect(() => { loadData(); }, []);
 
   const generateSlug = (value: string) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "");
-  const selectedTeamName = teams.find((team) => String(team.id) === form.team_id)?.name || "No HBT assigned yet";
 
   const filteredPartnerships = useMemo(() => {
     const query = search.trim().toLowerCase();

@@ -4,6 +4,7 @@ import API_BASE_URL from "../../api/api";
 import AdminLayout from "../components/AdminLayout";
 import ChatWidget from "../../components/ChatWidget";
 import { useToast } from "../../components/ToastProvider";
+import { buildAuthHeaders, handleUnauthorizedResponse } from "../../utils/auth";
 
 type ContactMessage = {
   id: number;
@@ -44,6 +45,13 @@ type MetricCardProps = {
 
 const roleLabel = (role?: string) => (role || "user").replace(/_/g, " ");
 const initials = (name?: string, fallback = "U") => (name || fallback).trim().charAt(0).toUpperCase() || fallback;
+const unwrapArray = <T,>(value: unknown, key?: string): T[] => {
+  if (Array.isArray(value)) return value as T[];
+  if (key && value && typeof value === "object" && Array.isArray((value as Record<string, unknown>)[key])) {
+    return (value as Record<string, unknown>)[key] as T[];
+  }
+  return [];
+};
 
 function MetricCard({ label, value, helper, accent, glow, href }: MetricCardProps) {
   return (
@@ -76,37 +84,40 @@ function AdminDashboard() {
   const [totalHBTs, setTotalHBTs] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const token = localStorage.getItem("token");
-
   useEffect(() => {
-    const headers = { Authorization: `Bearer ${token}` };
+    const headers = buildAuthHeaders();
+    const fetchJson = async (url: string, init: RequestInit = {}) => {
+      const response = await fetch(url, init);
+      if (handleUnauthorizedResponse(response)) return null;
+      return response.json();
+    };
 
     Promise.all([
-      fetch(`${API_BASE_URL}/users`, { headers }).then((res) => res.json()),
-      fetch(`${API_BASE_URL}/resources`).then((res) => res.json()),
-      fetch(`${API_BASE_URL}/pricing`).then((res) => res.json()),
-      fetch(`${API_BASE_URL}/faqs`).then((res) => res.json()),
-      fetch(`${API_BASE_URL}/contact`, { headers }).then((res) => res.json()),
-      fetch(`${API_BASE_URL}/quizzes`).then((res) => res.json()),
-      fetch(`${API_BASE_URL}/hbts`, { headers }).then((res) => res.json()),
-      fetch(`${API_BASE_URL}/admin-partnerships`, { headers }).then((res) => res.json()),
+      fetchJson(`${API_BASE_URL}/users`, { headers }),
+      fetchJson(`${API_BASE_URL}/resources`, { headers }),
+      fetchJson(`${API_BASE_URL}/pricing`),
+      fetchJson(`${API_BASE_URL}/faqs`),
+      fetchJson(`${API_BASE_URL}/contact`, { headers }),
+      fetchJson(`${API_BASE_URL}/quizzes`, { headers }),
+      fetchJson(`${API_BASE_URL}/hbts`, { headers }),
+      fetchJson(`${API_BASE_URL}/admin-partnerships`, { headers }),
     ])
       .then(([usersData, resources, pricing, faqs, messagesData, quizzes, hbts, partnershipsData]) => {
-        setUsers(Array.isArray(usersData) ? usersData : []);
-        setTotalResources(Array.isArray(resources) ? resources.length : 0);
-        setTotalPricing(Array.isArray(pricing) ? pricing.length : 0);
-        setTotalFAQs(Array.isArray(faqs) ? faqs.length : 0);
-        setMessages(Array.isArray(messagesData) ? messagesData : []);
-        setTotalQuizzes(Array.isArray(quizzes) ? quizzes.length : 0);
-        setTotalHBTs(Array.isArray(hbts) ? hbts.length : 0);
-        setPartnerships(Array.isArray(partnershipsData) ? partnershipsData : []);
+        setUsers(unwrapArray<User>(usersData, "users"));
+        setTotalResources(unwrapArray(resources, "resources").length);
+        setTotalPricing(unwrapArray(pricing, "plans").length);
+        setTotalFAQs(unwrapArray(faqs, "faqs").length);
+        setMessages(unwrapArray<ContactMessage>(messagesData, "messages"));
+        setTotalQuizzes(unwrapArray(quizzes, "quizzes").length);
+        setTotalHBTs(unwrapArray(hbts, "hbts").length);
+        setPartnerships(unwrapArray<Partnership>(partnershipsData, "partnerships"));
       })
       .catch((error) => {
         console.error("Dashboard load error:", error);
         toast.error("Failed to load dashboard stats.");
       })
       .finally(() => setLoading(false));
-  }, [token, toast]);
+  }, [toast]);
 
   const totalUsers = users.length;
   const totalMessages = messages.length;
@@ -170,7 +181,7 @@ function AdminDashboard() {
               <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">System Health</p>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Active User Rate</p>
                     <h2 className="mt-2 text-3xl font-black text-white">{activeRate}%</h2>
                     <p className="mt-1 text-sm font-semibold text-slate-400">{activeUsers} active users</p>
                   </div>
