@@ -63,6 +63,14 @@ const employeeLinks: NavLinkItem[] = [
   { to: "/profile", label: "My Profile", icon: "○" },
 ];
 
+const employeeMenu: PortalMenuEntry[] = [
+  { label: "Dashboard", to: "/employee-portal" },
+  { label: "Journey", to: "/employee/journey" },
+  { label: "Learning", items: employeeLinks.slice(2, 4) },
+  { label: "Communication", items: employeeLinks.slice(4, 6) },
+  { label: "Account", items: employeeLinks.slice(6) },
+];
+
 const companyLinks: NavLinkItem[] = [
   { to: "/company/dashboard", label: "Dashboard", icon: "⌂" },
   { to: "/company/employer-approval", label: "Employer Approval", shortLabel: "Approval", icon: "✓" },
@@ -72,6 +80,14 @@ const companyLinks: NavLinkItem[] = [
   { to: "/company/messages", label: "Communication", shortLabel: "Messages", icon: "✉" },
   { to: "/notifications", label: "Notifications", shortLabel: "Alerts", icon: "◉" },
   { to: "/profile", label: "My Profile", icon: "○" },
+];
+
+const companyMenu: PortalMenuEntry[] = [
+  { label: "Dashboard", to: "/company/dashboard" },
+  { label: "Employees", items: companyLinks.slice(1, 3) },
+  { label: "Portal", items: companyLinks.slice(3, 5) },
+  { label: "Communication", items: companyLinks.slice(5, 7) },
+  { label: "Account", items: companyLinks.slice(7) },
 ];
 
 const hbtAdminLinks: NavLinkItem[] = [
@@ -114,6 +130,14 @@ const hbtMemberLinks: NavLinkItem[] = [
   { to: "/profile", label: "My Profile", icon: "○" },
 ];
 
+const hbtMemberMenu: PortalMenuEntry[] = [
+  { label: "Dashboard", to: "/hbt/member-dashboard" },
+  { label: "Learning", items: hbtMemberLinks.slice(1, 3) },
+  { label: "Insights", items: hbtMemberLinks.slice(3, 4) },
+  { label: "Communication", items: hbtMemberLinks.slice(4, 6) },
+  { label: "Account", items: hbtMemberLinks.slice(6) },
+];
+
 const adminLinks: NavLinkItem[] = [
   { to: "/admin", label: "Admin Dashboard", shortLabel: "Admin", icon: "⌂" },
   { to: "/admin/reports", label: "Reports", icon: "▥" },
@@ -132,6 +156,16 @@ const linksForUser = (user: StoredUser | null): NavLinkItem[] => {
   return publicLinks;
 };
 
+const menuForUser = (user: StoredUser | null, links: NavLinkItem[]): PortalMenuEntry[] => {
+  if (user?.role === "employee") return employeeMenu;
+  if (user?.role === "company_admin" || user?.role === "company") return companyMenu;
+  if (user?.role === "hbt_admin") return hbtAdminMenu;
+  if (user?.role === "hbt_member") return hbtMemberMenu;
+
+  // Admin routes use AdminLayout and do not mount this portal header.
+  return links.map((link) => ({ label: link.label, to: link.to }));
+};
+
 function NavbarContent() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -148,10 +182,7 @@ function NavbarContent() {
   const dashboardPath = dashboardPathForRole(user?.role);
 
   const links = useMemo(() => (portalMode ? linksForUser(user) : publicLinks), [portalMode, user?.role]);
-  const portalMenu = useMemo<PortalMenuEntry[]>(
-    () => (user?.role === "hbt_admin" ? hbtAdminMenu : links.map((link) => ({ label: link.label, to: link.to }))),
-    [links, user?.role],
-  );
+  const portalMenu = useMemo<PortalMenuEntry[]>(() => menuForUser(user, links), [links, user?.role]);
 
   useEffect(() => {
     document.body.classList.toggle("hb-portal-mode", portalMode);
