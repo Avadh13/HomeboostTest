@@ -3,6 +3,7 @@ import API_BASE_URL from "../../api/api";
 import AdminLayout from "../components/AdminLayout";
 import ChatWidget from "../../components/ChatWidget";
 import { useToast } from "../../components/ToastProvider";
+import { readStoredToken } from "../../utils/auth";
 
 type ContactMessage = {
   id: number;
@@ -45,15 +46,38 @@ function ContactMessages() {
     });
   }, [messages, search, statusFilter]);
 
+  const requireAdminToken = () => {
+    const token = readStoredToken();
+    if (!token) {
+      toast.error("Your admin session has expired. Please sign in again.");
+      return null;
+    }
+    return token;
+  };
+
   const loadMessages = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/contact`);
-      const data = await response.json();
+      const token = requireAdminToken();
+      if (!token) {
+        setMessages([]);
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/contact`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.message || `Failed to load messages (${response.status})`);
+      }
+
       setMessages(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Messages load error:", error);
-      toast.error("Failed to load contact messages.");
+      toast.error(error instanceof Error ? error.message : "Failed to load discovery call requests.");
+      setMessages([]);
     } finally {
       setLoading(false);
     }
@@ -65,7 +89,13 @@ function ContactMessages() {
 
   const markAsRead = async (id: number) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/contact/${id}/read`, { method: "PUT" });
+      const token = requireAdminToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/contact/${id}/read`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
@@ -86,7 +116,13 @@ function ContactMessages() {
     if (!confirmDelete) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/contact/${message.id}`, { method: "DELETE" });
+      const token = requireAdminToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/contact/${message.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
@@ -110,19 +146,39 @@ function ContactMessages() {
       return;
     }
 
-    await Promise.all(unreadVisible.map((message) => fetch(`${API_BASE_URL}/contact/${message.id}/read`, { method: "PUT" })));
-    toast.success("Visible messages marked as read.");
-    loadMessages();
+    const token = requireAdminToken();
+    if (!token) return;
+
+    try {
+      const responses = await Promise.all(
+        unreadVisible.map((message) =>
+          fetch(`${API_BASE_URL}/contact/${message.id}/read`, {
+            method: "PUT",
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ),
+      );
+
+      if (responses.some((response) => !response.ok)) {
+        toast.error("Some messages could not be marked as read.");
+      } else {
+        toast.success("Visible messages marked as read.");
+      }
+      loadMessages();
+    } catch (error) {
+      console.error("Mark visible read error:", error);
+      toast.error("Could not update visible messages.");
+    }
   };
 
   return (
-    <AdminLayout title="Contact Messages">
+    <AdminLayout title="Discovery Call Requests">
       <div className="mb-5 grid gap-4 xl:grid-cols-[1fr_320px]">
         <div className="theme-panel">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-200">Inbox</p>
-          <h2 className="mt-2 text-2xl font-black tracking-tight">Contact message center</h2>
+          <h2 className="mt-2 text-2xl font-black tracking-tight">Discovery call request center</h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-violet-100">
-            Review employer and employee inquiries, filter unread messages, and keep the admin inbox clean.
+            Review discovery call requests submitted from the public contact page, filter unread messages, and keep the admin inbox clean.
           </p>
           <button type="button" onClick={markAllVisibleRead} className="mt-4 rounded-full bg-white px-4 py-2 text-xs font-black text-violet-800 hover:bg-violet-50">
             Mark Visible Read
@@ -148,7 +204,7 @@ function ContactMessages() {
         <div className="premium-card overflow-hidden p-0">
           <div className="border-b border-slate-100 p-4">
             <div className="grid gap-3 md:grid-cols-[1fr_160px]">
-              <input className="form-field" placeholder="Search messages..." value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input className="form-field" placeholder="Search requests..." value={search} onChange={(e) => setSearch(e.target.value)} />
               <select className="form-field" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="all">All</option>
                 <option value="unread">Unread</option>
@@ -158,7 +214,7 @@ function ContactMessages() {
           </div>
 
           {loading ? (
-            <div className="p-8 text-center font-bold text-slate-500">Loading messages...</div>
+            <div className="p-8 text-center font-bold text-slate-500">Loading requests...</div>
           ) : (
             <div className="max-h-[680px] overflow-y-auto">
               {filteredMessages.map((msg) => {
@@ -185,7 +241,7 @@ function ContactMessages() {
                 );
               })}
 
-              {filteredMessages.length === 0 && <div className="p-8 text-center text-slate-500">No messages found.</div>}
+              {filteredMessages.length === 0 && <div className="p-8 text-center text-slate-500">No discovery call requests found.</div>}
             </div>
           )}
         </div>
@@ -195,7 +251,7 @@ function ContactMessages() {
             <div>
               <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="eyebrow">Message details</p>
+                  <p className="eyebrow">Request details</p>
                   <h2 className="mt-1 text-2xl font-black text-slate-950">{selectedMessage.full_name || selectedMessage.name || "Website Visitor"}</h2>
                   <p className="mt-1 text-sm font-semibold text-slate-500">{selectedMessage.created_at ? new Date(selectedMessage.created_at).toLocaleString() : "No date"}</p>
                 </div>
@@ -229,8 +285,8 @@ function ContactMessages() {
           ) : (
             <div className="flex min-h-[380px] flex-col items-center justify-center text-center">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-100 text-3xl font-black text-violet-700">✉</div>
-              <h2 className="text-2xl font-black text-slate-950">Select a message</h2>
-              <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500">Choose any message from the inbox list to review details, mark it read, reply by email, or delete it.</p>
+              <h2 className="text-2xl font-black text-slate-950">Select a request</h2>
+              <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500">Choose any discovery call request to review its details, mark it read, reply by email, or delete it.</p>
             </div>
           )}
         </div>
