@@ -21,6 +21,12 @@ type NavLinkItem = {
   icon: string;
 };
 
+type PortalMenuEntry = {
+  label: string;
+  to?: string;
+  items?: NavLinkItem[];
+};
+
 type MessageThreadSummary = { unread_count?: number | string | null };
 type NavbarProps = { globalInstance?: boolean };
 type NavbarHostProps = { globalMounted: boolean; children: ReactNode };
@@ -89,6 +95,15 @@ const hbtAdminLinks: NavLinkItem[] = [
   { to: "/profile", label: "My Profile", icon: "○" },
 ];
 
+const hbtAdminMenu: PortalMenuEntry[] = [
+  { label: "Dashboard", to: "/hbt/dashboard" },
+  { label: "People", items: hbtAdminLinks.slice(1, 4) },
+  { label: "Learning", items: hbtAdminLinks.slice(4, 8) },
+  { label: "Programs", items: hbtAdminLinks.slice(8, 12) },
+  { label: "Insights", items: hbtAdminLinks.slice(13, 15) },
+  { label: "More", items: [hbtAdminLinks[12], ...hbtAdminLinks.slice(15)] },
+];
+
 const hbtMemberLinks: NavLinkItem[] = [
   { to: "/hbt/member-dashboard", label: "Dashboard", icon: "⌂" },
   { to: "/hbt/quiz-submissions", label: "Quiz Submissions", shortLabel: "Submissions", icon: "✓" },
@@ -120,6 +135,7 @@ const linksForUser = (user: StoredUser | null): NavLinkItem[] => {
 function NavbarContent() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [portalMenuOpen, setPortalMenuOpen] = useState<string | null>(null);
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const navRef = useRef<HTMLElement | null>(null);
@@ -132,6 +148,10 @@ function NavbarContent() {
   const dashboardPath = dashboardPathForRole(user?.role);
 
   const links = useMemo(() => (portalMode ? linksForUser(user) : publicLinks), [portalMode, user?.role]);
+  const portalMenu = useMemo<PortalMenuEntry[]>(
+    () => (user?.role === "hbt_admin" ? hbtAdminMenu : links.map((link) => ({ label: link.label, to: link.to }))),
+    [links, user?.role],
+  );
 
   useEffect(() => {
     document.body.classList.toggle("hb-portal-mode", portalMode);
@@ -142,12 +162,21 @@ function NavbarContent() {
   useEffect(() => {
     setOpen(false);
     setSearch("");
+    setPortalMenuOpen(null);
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!portalMode || !navRef.current) return;
-    navRef.current.querySelector<HTMLElement>(".hb-portal-link.is-active")?.scrollIntoView({ block: "nearest" });
-  }, [location.pathname, portalMode]);
+    if (!portalMenuOpen) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!navRef.current?.contains(event.target as Node)) {
+        setPortalMenuOpen(null);
+      }
+    };
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [portalMenuOpen]);
 
   useEffect(() => {
     if (!portalMode || !token) {
@@ -204,6 +233,7 @@ function NavbarContent() {
   const handleLogout = () => {
     clearStoredSession();
     setOpen(false);
+    setPortalMenuOpen(null);
     navigate("/login", { replace: true });
   };
 
@@ -220,38 +250,71 @@ function NavbarContent() {
   if (portalMode && user) {
     return (
       <>
-        <aside className={`hb-portal-sidebar ${open ? "is-open" : ""}`} data-hb-portal-navigation>
-          <div className="hb-portal-brand">
-            <Link to={dashboardPath} aria-label={`${BRAND.name} portal dashboard`}>
-              <BrandLogo className="h-12 w-[230px]" />
-            </Link>
-            <p>Secure Employee & Partner Portal</p>
-          </div>
-
+        <div className="hb-portal-sidebar" data-hb-portal-navigation>
           <nav ref={navRef} className="hb-portal-nav" aria-label="Portal navigation">
-            {links.map((link) => {
-              const badgeCount = badgeFor(link);
-              const active = isActive(link.to);
+            {portalMenu.map((entry) => {
+              if (entry.to) {
+                const sourceLink = links.find((link) => link.to === entry.to);
+                const badgeCount = sourceLink ? badgeFor(sourceLink) : 0;
+                const active = isActive(entry.to);
+
+                return (
+                  <Link
+                    key={entry.to}
+                    to={entry.to}
+                    className={`hb-portal-link ${active ? "is-active" : ""}`}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    <span className="hb-portal-link-label">{entry.label}</span>
+                    {badgeCount > 0 && <span className="hb-portal-badge">{formatBadge(badgeCount)}</span>}
+                  </Link>
+                );
+              }
+
+              const items = entry.items || [];
+              const active = items.some((item) => isActive(item.to));
+              const openGroup = portalMenuOpen === entry.label;
+              const groupBadge = items.reduce((sum, item) => sum + badgeFor(item), 0);
+
               return (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  className={`hb-portal-link ${active ? "is-active" : ""}`}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <span className="hb-portal-link-icon" aria-hidden="true">{link.icon}</span>
-                  <span className="hb-portal-link-label">{link.label}</span>
-                  {badgeCount > 0 && <span className="hb-portal-badge">{formatBadge(badgeCount)}</span>}
-                </Link>
+                <div key={entry.label} className={`hb-portal-menu-group ${active ? "is-active" : ""} ${openGroup ? "is-open" : ""}`}>
+                  <button
+                    type="button"
+                    className="hb-portal-menu-trigger"
+                    onClick={() => setPortalMenuOpen((current) => (current === entry.label ? null : entry.label))}
+                    aria-haspopup="menu"
+                    aria-expanded={openGroup}
+                  >
+                    <span>{entry.label}</span>
+                    {groupBadge > 0 && <span className="hb-portal-badge">{formatBadge(groupBadge)}</span>}
+                    <span className="hb-portal-menu-caret" aria-hidden="true">⌄</span>
+                  </button>
+
+                  {openGroup && (
+                    <div className="hb-portal-submenu" role="menu" aria-label={`${entry.label} menu`}>
+                      {items.map((item) => {
+                        const itemActive = isActive(item.to);
+                        const badgeCount = badgeFor(item);
+                        return (
+                          <Link
+                            key={item.to}
+                            to={item.to}
+                            role="menuitem"
+                            onClick={() => setPortalMenuOpen(null)}
+                            className={`hb-portal-submenu-link ${itemActive ? "is-active" : ""}`}
+                          >
+                            <span>{item.label}</span>
+                            {badgeCount > 0 && <span className="hb-portal-badge">{formatBadge(badgeCount)}</span>}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </nav>
-
-          <div className="hb-portal-sidebar-footer">
-            <Link to="/contact" className="hb-portal-help-link"><span aria-hidden="true">?</span>Support</Link>
-            <button type="button" onClick={handleLogout} className="hb-portal-logout"><span aria-hidden="true">↪</span>Logout</button>
-          </div>
-        </aside>
+        </div>
 
         <header className="hb-portal-topbar">
           <div className="hb-portal-topbar-left">
