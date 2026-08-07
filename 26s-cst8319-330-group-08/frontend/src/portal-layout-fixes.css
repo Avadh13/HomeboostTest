@@ -1,48 +1,144 @@
 /*
- * Portal layout corrections
+ * Authenticated portal layout
  *
- * The authenticated navigation is fixed to the left. Every route page and
- * every supplemental dashboard panel uses the same remaining viewport column.
+ * Employee, Company, HBT Admin, and HBT Member portals use a horizontal
+ * navigation bar. Admin routes are intentionally excluded because App.tsx
+ * suppresses the global Navbar there and AdminLayout owns the admin sidebar.
  */
 
 :root {
-  --hb-portal-sidebar-width: 264px;
   --hb-portal-topbar-height: 76px;
+  --hb-portal-nav-height: 68px;
 }
 
 body.hb-portal-mode {
   overflow-x: hidden;
 }
 
+/* Convert the former left portal rail into a horizontal navigation row. */
 .hb-portal-sidebar {
-  width: var(--hb-portal-sidebar-width);
+  position: fixed !important;
+  inset: var(--hb-portal-topbar-height) 0 auto 0 !important;
+  z-index: 69 !important;
+  display: flex !important;
+  width: 100% !important;
+  height: var(--hb-portal-nav-height) !important;
+  flex-direction: row !important;
+  align-items: stretch !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid var(--hb-ui-line) !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  box-shadow: 0 8px 22px rgba(24, 39, 75, 0.05) !important;
+  transform: none !important;
+  transition: none !important;
+  backdrop-filter: blur(16px);
 }
 
-.hb-portal-brand,
-.hb-portal-sidebar-footer {
-  flex: 0 0 auto;
+.hb-portal-brand {
+  display: flex !important;
+  width: 220px;
+  flex: 0 0 220px !important;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid #edf1f6;
+  border-bottom: 0 !important;
+  padding: 0.45rem 1rem !important;
+}
+
+.hb-portal-brand a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 185px;
+}
+
+.hb-portal-brand img,
+.hb-portal-brand svg {
+  width: auto !important;
+  max-width: 185px !important;
+  height: auto !important;
+  max-height: 46px !important;
+}
+
+.hb-portal-brand p {
+  display: none !important;
 }
 
 .hb-portal-nav {
+  display: flex !important;
+  min-width: 0;
   min-height: 0;
-  overscroll-behavior: contain;
+  flex: 1 1 auto !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  overscroll-behavior-x: contain;
+  padding: 0.65rem clamp(0.75rem, 1.5vw, 1.25rem) !important;
+  scrollbar-width: thin;
   scrollbar-gutter: stable;
 }
 
+.hb-portal-link {
+  display: inline-flex !important;
+  min-width: max-content;
+  min-height: 42px !important;
+  flex: 0 0 auto;
+  grid-template-columns: none !important;
+  align-items: center;
+  gap: 0.45rem !important;
+  border: 1px solid transparent;
+  border-radius: 10px !important;
+  padding: 0.45rem 0.8rem !important;
+  white-space: nowrap;
+}
+
+.hb-portal-link:hover {
+  border-color: #dbe7f5;
+}
+
+.hb-portal-link.is-active {
+  border-color: var(--hb-ui-primary) !important;
+}
+
+.hb-portal-link-icon {
+  width: 28px !important;
+  height: 28px !important;
+  flex: 0 0 28px;
+}
+
+.hb-portal-link-label {
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+.hb-portal-sidebar-footer {
+  display: none !important;
+}
+
+/* Keep the utility/header row full width above the horizontal navigation. */
 .hb-portal-topbar {
   box-sizing: border-box;
-  left: var(--hb-portal-sidebar-width);
-  width: calc(100% - var(--hb-portal-sidebar-width));
+  left: 0 !important;
+  z-index: 70 !important;
+  width: 100% !important;
   min-width: 0;
 }
 
+.hb-portal-menu-button,
+.hb-portal-backdrop {
+  display: none !important;
+}
+
+/* Every non-admin portal page now receives the full viewport width. */
 body.hb-portal-mode main {
   box-sizing: border-box;
-  width: calc(100% - var(--hb-portal-sidebar-width)) !important;
-  max-width: calc(100% - var(--hb-portal-sidebar-width)) !important;
+  width: 100% !important;
+  max-width: 100% !important;
   min-height: 100vh !important;
-  margin-left: var(--hb-portal-sidebar-width) !important;
-  padding-top: calc(var(--hb-portal-topbar-height) + 20px) !important;
+  margin-left: 0 !important;
+  padding-top: calc(var(--hb-portal-topbar-height) + var(--hb-portal-nav-height) + 20px) !important;
   padding-right: clamp(1rem, 2vw, 1.5rem) !important;
   padding-left: clamp(1rem, 2vw, 1.5rem) !important;
   overflow-x: clip;
@@ -53,7 +149,11 @@ body.hb-portal-mode main > * {
   max-width: 100%;
 }
 
-/* Components rendered after <Routes> use the same portal content column. */
+body.hb-portal-mode footer {
+  margin-left: 0 !important;
+}
+
+/* Components rendered after <Routes> use the same full-width content column. */
 .hb-portal-support-content {
   width: 100%;
   min-width: 0;
@@ -65,9 +165,9 @@ body.hb-portal-mode main > * {
 
 body.hb-portal-mode .hb-portal-support-content {
   box-sizing: border-box;
-  width: calc(100% - var(--hb-portal-sidebar-width));
-  max-width: calc(100% - var(--hb-portal-sidebar-width));
-  margin-left: var(--hb-portal-sidebar-width);
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
   overflow-x: clip;
 }
 
@@ -77,7 +177,7 @@ body.hb-portal-mode .hb-portal-support-content > * {
   max-width: 100%;
 }
 
-/* Prevent wide content from forcing any portal page below the sidebar. */
+/* Prevent wide dashboard content from breaking the viewport. */
 body.hb-portal-mode main img,
 body.hb-portal-mode main video,
 body.hb-portal-mode main canvas,
@@ -109,7 +209,7 @@ body.hb-portal-mode .hb-portal-support-content select {
   max-width: 100%;
 }
 
-/* Keep the global theme switch clear of the fixed portal sidebar. */
+/* Keep the global theme switch clear of portal content. */
 .hb-floating-theme-control {
   position: fixed;
   bottom: 1.25rem;
@@ -118,7 +218,7 @@ body.hb-portal-mode .hb-portal-support-content select {
 }
 
 .hb-floating-theme-control.is-portal {
-  left: calc(var(--hb-portal-sidebar-width) + 1rem);
+  left: 1rem !important;
 }
 
 /* The mobile public menu can contain links and a logout button. */
@@ -134,6 +234,17 @@ body.hb-portal-mode .hb-portal-support-content select {
 }
 
 @media (max-width: 1100px) {
+  .hb-portal-brand {
+    width: 190px;
+    flex-basis: 190px !important;
+  }
+
+  .hb-portal-brand a,
+  .hb-portal-brand img,
+  .hb-portal-brand svg {
+    max-width: 155px !important;
+  }
+
   .hb-portal-topbar {
     gap: 0.75rem;
     padding-right: 1rem;
@@ -142,34 +253,96 @@ body.hb-portal-mode .hb-portal-support-content select {
 }
 
 @media (max-width: 900px) {
+  :root {
+    --hb-portal-topbar-height: 72px;
+    --hb-portal-nav-height: 62px;
+  }
+
+  .hb-portal-sidebar,
+  .hb-portal-sidebar.is-open {
+    inset: var(--hb-portal-topbar-height) 0 auto 0 !important;
+    height: var(--hb-portal-nav-height) !important;
+    transform: none !important;
+  }
+
+  .hb-portal-brand {
+    width: 165px;
+    flex-basis: 165px !important;
+    padding-right: 0.75rem !important;
+    padding-left: 0.75rem !important;
+  }
+
+  .hb-portal-brand a,
+  .hb-portal-brand img,
+  .hb-portal-brand svg {
+    max-width: 135px !important;
+  }
+
+  .hb-portal-nav {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+
+  .hb-portal-link {
+    min-height: 38px !important;
+    padding: 0.4rem 0.7rem !important;
+    font-size: 0.82rem !important;
+  }
+
+  .hb-portal-link-icon {
+    width: 25px !important;
+    height: 25px !important;
+    flex-basis: 25px;
+    font-size: 0.8rem !important;
+  }
+
   .hb-portal-topbar {
-    left: 0;
-    width: 100%;
+    left: 0 !important;
+    width: 100% !important;
+    padding-right: 1rem;
+    padding-left: 1rem;
   }
 
   body.hb-portal-mode main {
     width: 100% !important;
     max-width: 100% !important;
     margin-left: 0 !important;
-    padding-top: 88px !important;
+    padding-top: calc(var(--hb-portal-topbar-height) + var(--hb-portal-nav-height) + 16px) !important;
     padding-right: 1rem !important;
     padding-left: 1rem !important;
   }
 
   body.hb-portal-mode .hb-portal-support-content {
-    width: 100%;
-    max-width: 100%;
-    margin-left: 0;
-  }
-
-  .hb-floating-theme-control.is-portal {
-    left: 1rem;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
   }
 }
 
 @media (max-width: 640px) {
   :root {
-    --hb-portal-topbar-height: 72px;
+    --hb-portal-nav-height: 58px;
+  }
+
+  .hb-portal-brand {
+    display: none !important;
+  }
+
+  .hb-portal-nav {
+    padding-right: 0.65rem !important;
+    padding-left: 0.65rem !important;
+  }
+
+  .hb-portal-link {
+    min-height: 36px !important;
+    gap: 0.35rem !important;
+    padding: 0.35rem 0.65rem !important;
+  }
+
+  .hb-portal-link-icon {
+    width: 23px !important;
+    height: 23px !important;
+    flex-basis: 23px;
   }
 
   body.hb-portal-mode main {
