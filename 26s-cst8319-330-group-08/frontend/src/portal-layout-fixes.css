@@ -1,21 +1,22 @@
 /*
  * Authenticated portal layout
  *
- * Employee, Company, HBT Admin, and HBT Member portals use a horizontal
- * navigation bar. Admin routes are intentionally excluded because App.tsx
- * suppresses the global Navbar there and AdminLayout owns the admin sidebar.
+ * Employee, Company, HBT Admin, and HBT Member portals use a compact,
+ * text-only horizontal navigation row. Admin routes are intentionally excluded
+ * because App.tsx suppresses the global Navbar there and AdminLayout owns the
+ * admin sidebar.
  */
 
 :root {
   --hb-portal-topbar-height: 76px;
-  --hb-portal-nav-height: 68px;
+  --hb-portal-nav-height: 58px;
 }
 
 body.hb-portal-mode {
   overflow-x: hidden;
 }
 
-/* Convert the former left portal rail into a horizontal navigation row. */
+/* Convert the former left portal rail into one full-width horizontal row. */
 .hb-portal-sidebar {
   position: fixed !important;
   inset: var(--hb-portal-topbar-height) 0 auto 0 !important;
@@ -28,89 +29,88 @@ body.hb-portal-mode {
   border-right: 0 !important;
   border-bottom: 1px solid var(--hb-ui-line) !important;
   background: rgba(255, 255, 255, 0.98) !important;
-  box-shadow: 0 8px 22px rgba(24, 39, 75, 0.05) !important;
+  box-shadow: 0 6px 18px rgba(24, 39, 75, 0.045) !important;
   transform: none !important;
   transition: none !important;
   backdrop-filter: blur(16px);
 }
 
+/* The portal logo is intentionally removed from the horizontal navigation. */
 .hb-portal-brand {
-  display: flex !important;
-  width: 220px;
-  flex: 0 0 220px !important;
-  align-items: center;
-  justify-content: center;
-  border-right: 1px solid #edf1f6;
-  border-bottom: 0 !important;
-  padding: 0.45rem 1rem !important;
-}
-
-.hb-portal-brand a {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  max-width: 185px;
-}
-
-.hb-portal-brand img,
-.hb-portal-brand svg {
-  width: auto !important;
-  max-width: 185px !important;
-  height: auto !important;
-  max-height: 46px !important;
-}
-
-.hb-portal-brand p {
   display: none !important;
 }
 
 .hb-portal-nav {
   display: flex !important;
+  width: 100% !important;
   min-width: 0;
   min-height: 0;
   flex: 1 1 auto !important;
   flex-direction: row !important;
   align-items: center !important;
-  gap: 0.35rem !important;
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
-  overscroll-behavior-x: contain;
-  padding: 0.65rem clamp(0.75rem, 1.5vw, 1.25rem) !important;
-  scrollbar-width: thin;
-  scrollbar-gutter: stable;
+  justify-content: center !important;
+  gap: clamp(0.08rem, 0.22vw, 0.28rem) !important;
+  overflow: hidden !important;
+  padding: 0.5rem clamp(0.4rem, 0.8vw, 0.9rem) !important;
+  scrollbar-width: none !important;
+}
+
+.hb-portal-nav::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .hb-portal-link {
   display: inline-flex !important;
-  min-width: max-content;
-  min-height: 42px !important;
-  flex: 0 0 auto;
+  min-width: 0 !important;
+  min-height: 38px !important;
+  flex: 0 1 auto !important;
   grid-template-columns: none !important;
-  align-items: center;
-  gap: 0.45rem !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
   border: 1px solid transparent;
-  border-radius: 10px !important;
-  padding: 0.45rem 0.8rem !important;
-  white-space: nowrap;
+  border-radius: 9px !important;
+  padding: 0.35rem clamp(0.28rem, 0.48vw, 0.62rem) !important;
+  color: #526071;
+  font-size: clamp(0.68rem, 0.76vw, 0.86rem) !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
 }
 
 .hb-portal-link:hover {
   border-color: #dbe7f5;
+  background: #f4f8fd;
+  color: var(--hb-ui-primary-dark);
 }
 
 .hb-portal-link.is-active {
   border-color: var(--hb-ui-primary) !important;
+  background: var(--hb-ui-primary) !important;
+  color: #ffffff !important;
+  box-shadow: 0 5px 14px rgba(11, 99, 216, 0.16) !important;
 }
 
+/* Remove the individual navigation icons/logos as requested. */
 .hb-portal-link-icon {
-  width: 28px !important;
-  height: 28px !important;
-  flex: 0 0 28px;
+  display: none !important;
 }
 
 .hb-portal-link-label {
+  min-width: 0 !important;
   overflow: visible !important;
   text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+
+.hb-portal-badge {
+  min-width: 18px !important;
+  height: 18px !important;
+  margin-left: 0.28rem;
+  padding: 0 0.28rem !important;
+  font-size: 0.58rem !important;
 }
 
 .hb-portal-sidebar-footer {
@@ -131,7 +131,7 @@ body.hb-portal-mode {
   display: none !important;
 }
 
-/* Every non-admin portal page now receives the full viewport width. */
+/* Every non-admin portal page receives the full viewport width. */
 body.hb-portal-mode main {
   box-sizing: border-box;
   width: 100% !important;
@@ -233,29 +233,46 @@ body.hb-portal-mode .hb-portal-support-content select {
   font-weight: 800;
 }
 
+/* Tighten spacing progressively without reintroducing a horizontal slider. */
+@media (max-width: 1500px) {
+  .hb-portal-nav {
+    gap: 0.08rem !important;
+    padding-right: 0.35rem !important;
+    padding-left: 0.35rem !important;
+  }
+
+  .hb-portal-link {
+    padding-right: 0.34rem !important;
+    padding-left: 0.34rem !important;
+    font-size: 0.7rem !important;
+  }
+}
+
 @media (max-width: 1100px) {
-  .hb-portal-brand {
-    width: 190px;
-    flex-basis: 190px !important;
-  }
-
-  .hb-portal-brand a,
-  .hb-portal-brand img,
-  .hb-portal-brand svg {
-    max-width: 155px !important;
-  }
-
   .hb-portal-topbar {
     gap: 0.75rem;
     padding-right: 1rem;
     padding-left: 1rem;
+  }
+
+  .hb-portal-link {
+    padding-right: 0.24rem !important;
+    padding-left: 0.24rem !important;
+    font-size: 0.64rem !important;
+  }
+
+  .hb-portal-badge {
+    min-width: 16px !important;
+    height: 16px !important;
+    margin-left: 0.15rem;
+    font-size: 0.52rem !important;
   }
 }
 
 @media (max-width: 900px) {
   :root {
     --hb-portal-topbar-height: 72px;
-    --hb-portal-nav-height: 62px;
+    --hb-portal-nav-height: 54px;
   }
 
   .hb-portal-sidebar,
@@ -265,35 +282,17 @@ body.hb-portal-mode .hb-portal-support-content select {
     transform: none !important;
   }
 
-  .hb-portal-brand {
-    width: 165px;
-    flex-basis: 165px !important;
-    padding-right: 0.75rem !important;
-    padding-left: 0.75rem !important;
-  }
-
-  .hb-portal-brand a,
-  .hb-portal-brand img,
-  .hb-portal-brand svg {
-    max-width: 135px !important;
-  }
-
   .hb-portal-nav {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.5rem !important;
+    justify-content: flex-start !important;
+    gap: 0 !important;
+    overflow: hidden !important;
+    padding: 0.4rem 0.2rem !important;
   }
 
   .hb-portal-link {
-    min-height: 38px !important;
-    padding: 0.4rem 0.7rem !important;
-    font-size: 0.82rem !important;
-  }
-
-  .hb-portal-link-icon {
-    width: 25px !important;
-    height: 25px !important;
-    flex-basis: 25px;
-    font-size: 0.8rem !important;
+    min-height: 34px !important;
+    padding: 0.28rem 0.2rem !important;
+    font-size: 0.58rem !important;
   }
 
   .hb-portal-topbar {
@@ -321,28 +320,23 @@ body.hb-portal-mode .hb-portal-support-content select {
 
 @media (max-width: 640px) {
   :root {
-    --hb-portal-nav-height: 58px;
-  }
-
-  .hb-portal-brand {
-    display: none !important;
+    --hb-portal-nav-height: 50px;
   }
 
   .hb-portal-nav {
-    padding-right: 0.65rem !important;
-    padding-left: 0.65rem !important;
+    padding-right: 0.1rem !important;
+    padding-left: 0.1rem !important;
   }
 
   .hb-portal-link {
-    min-height: 36px !important;
-    gap: 0.35rem !important;
-    padding: 0.35rem 0.65rem !important;
+    min-height: 32px !important;
+    padding-right: 0.14rem !important;
+    padding-left: 0.14rem !important;
+    font-size: 0.52rem !important;
   }
 
-  .hb-portal-link-icon {
-    width: 23px !important;
-    height: 23px !important;
-    flex-basis: 23px;
+  .hb-portal-badge {
+    display: none !important;
   }
 
   body.hb-portal-mode main {
