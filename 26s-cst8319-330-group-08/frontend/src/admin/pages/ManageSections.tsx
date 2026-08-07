@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import API_BASE_URL from "../../api/api";
 import AdminLayout from "../components/AdminLayout";
 import { useToast } from "../../components/ToastProvider";
+import { buildAuthHeaders, handleUnauthorizedResponse } from "../../utils/auth";
 
 type Section = {
   id: number;
@@ -154,7 +155,7 @@ function ManageSections() {
   const saveSection = async (section: Section, orderOverride?: number) => {
     const response = await fetch(`${API_BASE_URL}/sections/${section.id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: buildAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         page_id: section.page_id,
         section_key: section.section_key,
@@ -169,6 +170,7 @@ function ManageSections() {
       }),
     });
 
+    if (handleUnauthorizedResponse(response)) throw new Error("Unauthorized");
     if (!response.ok) throw new Error(`Failed to update section ${section.id}`);
   };
 
@@ -232,10 +234,11 @@ function ManageSections() {
     try {
       const response = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: buildAuthHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ page_id: pageId, section_key: sectionKey.trim(), title, subtitle, content, image_url: imageUrl, button_text: buttonText, button_link: buttonLink, display_order: displayOrder, is_active: isActive }),
       });
       const data = await response.json().catch(() => ({}));
+      if (handleUnauthorizedResponse(response)) return;
       if (!response.ok) { toast.error(data.message || "Section save failed."); return; }
       toast.success(editingId ? "Section updated successfully." : "Section created successfully.");
       closeDrawer();
@@ -251,8 +254,9 @@ function ManageSections() {
     if (!confirmDelete) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/sections/${section.id}`, { method: "DELETE" });
+      const response = await fetch(`${API_BASE_URL}/sections/${section.id}`, { method: "DELETE", headers: buildAuthHeaders() });
       const data = await response.json().catch(() => ({}));
+      if (handleUnauthorizedResponse(response)) return;
       if (!response.ok) { toast.error(data.message || "Delete failed."); return; }
       toast.success("Section deleted.");
       loadSections();

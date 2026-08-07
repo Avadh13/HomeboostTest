@@ -39,6 +39,55 @@ const FOLLOW_UP_OPTIONS = [
   { value: "not_interested", label: "Not Interested" },
 ];
 
+type MiniBarChartProps = {
+  title: string;
+  subtitle: string;
+  data: { label: string; value: number }[];
+  maxValue: number;
+  barClassName: string;
+};
+
+function MiniBarChart({ title, subtitle, data, maxValue, barClassName }: MiniBarChartProps) {
+  return (
+    <div className="rounded-3xl bg-white p-6 shadow">
+      <div className="mb-5">
+        <h3 className="text-xl font-black text-slate-950">{title}</h3>
+        <p className="text-sm text-slate-500">{subtitle}</p>
+      </div>
+
+      <div className="space-y-4">
+        {data.length === 0 && (
+          <p className="text-sm text-slate-500">No data available.</p>
+        )}
+
+        {data.map((item) => {
+          const width = Math.max((item.value / maxValue) * 100, 6);
+
+          return (
+            <div key={item.label}>
+              <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+                <span className="max-w-[220px] truncate font-semibold text-slate-700">
+                  {item.label}
+                </span>
+                <span className="font-black text-slate-950">
+                  {item.value}
+                </span>
+              </div>
+
+              <div className="h-4 rounded-full bg-slate-100">
+                <div
+                  className={`h-4 rounded-full ${barClassName}`}
+                  style={{ width: `${width}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function QuizSubmissions() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [selectedDetails, setSelectedDetails] =
@@ -319,59 +368,6 @@ function QuizSubmissions() {
     return (status || "new")
       .replace("_", " ")
       .replace(/\b\w/g, (char) => char.toUpperCase());
-  };
-
-  const MiniBarChart = ({
-    title,
-    subtitle,
-    data,
-    maxValue,
-    barClassName,
-  }: {
-    title: string;
-    subtitle: string;
-    data: { label: string; value: number }[];
-    maxValue: number;
-    barClassName: string;
-  }) => {
-    return (
-      <div className="rounded-3xl bg-white p-6 shadow">
-        <div className="mb-5">
-          <h3 className="text-xl font-black text-slate-950">{title}</h3>
-          <p className="text-sm text-slate-500">{subtitle}</p>
-        </div>
-
-        <div className="space-y-4">
-          {data.length === 0 && (
-            <p className="text-sm text-slate-500">No data available.</p>
-          )}
-
-          {data.map((item) => {
-            const width = Math.max((item.value / maxValue) * 100, 6);
-
-            return (
-              <div key={item.label}>
-                <div className="mb-1 flex items-center justify-between gap-3 text-sm">
-                  <span className="max-w-[220px] truncate font-semibold text-slate-700">
-                    {item.label}
-                  </span>
-                  <span className="font-black text-slate-950">
-                    {item.value}
-                  </span>
-                </div>
-
-                <div className="h-4 rounded-full bg-slate-100">
-                  <div
-                    className={`h-4 rounded-full ${barClassName}`}
-                    style={{ width: `${width}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
   };
 
   return (

@@ -40,6 +40,21 @@ export const readStoredToken = () => {
   return window.localStorage.getItem("token");
 };
 
+export const buildAuthHeaders = (extraHeaders: Record<string, string> = {}) => {
+  const token = readStoredToken();
+  return {
+    ...extraHeaders,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
+export const handleUnauthorizedResponse = (response: Response) => {
+  if (response.status !== 401) return false;
+  clearStoredSession();
+  if (typeof window !== "undefined") window.location.assign("/admin/login");
+  return true;
+};
+
 export const clearStoredSession = () => {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem("token");

@@ -182,7 +182,15 @@ function ChatWidget() {
     try {
       setSending(true);
 
-      const bodyData: any = {
+      const bodyData: {
+        subject: string;
+        message_body: string;
+        recipient_id?: number;
+        employee_id?: number;
+        partnership_id?: number | null;
+        assigned_member_id?: number | null;
+        contact_type?: string;
+      } = {
         subject,
         message_body: messageBody,
       };

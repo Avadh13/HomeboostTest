@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import API_BASE_URL from "../../api/api";
 import AdminLayout from "../components/AdminLayout";
 import { useToast } from "../../components/ToastProvider";
+import { buildAuthHeaders, handleUnauthorizedResponse } from "../../utils/auth";
 
 type Card = {
   id: number;
@@ -123,7 +124,7 @@ function ManageCards() {
   const saveCard = async (card: Card, orderOverride?: number) => {
     const response = await fetch(`${API_BASE_URL}/cards/${card.id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: buildAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         section_id: card.section_id,
         title: card.title,
@@ -136,6 +137,7 @@ function ManageCards() {
       }),
     });
 
+    if (handleUnauthorizedResponse(response)) throw new Error("Unauthorized");
     if (!response.ok) throw new Error(`Failed to update card ${card.id}`);
   };
 
@@ -199,10 +201,11 @@ function ManageCards() {
     try {
       const response = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: buildAuthHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ section_id: sectionId, title, description, image_url: imageUrl, button_text: buttonText, button_link: buttonLink, display_order: displayOrder, is_active: isActive }),
       });
       const data = await response.json().catch(() => ({}));
+      if (handleUnauthorizedResponse(response)) return;
       if (!response.ok) { toast.error(data.message || "Card save failed."); return; }
       toast.success(editingId ? "Card updated successfully." : "Card created successfully.");
       closeDrawer();
@@ -217,8 +220,9 @@ function ManageCards() {
     const confirmDelete = confirm(`Delete card: ${card.title}?`);
     if (!confirmDelete) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/cards/${card.id}`, { method: "DELETE" });
+      const response = await fetch(`${API_BASE_URL}/cards/${card.id}`, { method: "DELETE", headers: buildAuthHeaders() });
       const data = await response.json().catch(() => ({}));
+      if (handleUnauthorizedResponse(response)) return;
       if (!response.ok) { toast.error(data.message || "Delete failed."); return; }
       toast.success("Card deleted.");
       loadCards();
