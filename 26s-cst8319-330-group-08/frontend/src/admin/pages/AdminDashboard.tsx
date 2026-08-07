@@ -181,7 +181,7 @@ function AdminDashboard() {
               <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">System Health</p>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Active User Rate</p>
                     <h2 className="mt-2 text-3xl font-black text-white">{activeRate}%</h2>
                     <p className="mt-1 text-sm font-semibold text-slate-400">{activeUsers} active users</p>
                   </div>

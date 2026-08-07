@@ -134,3 +134,86 @@ test("document upload returns uploaded message when multer saves a file", async 
     pool.query = originalQuery;
   }
 });
+
+test("HBT member cannot mutate HBT configuration routes", async () => {
+  const originalQuery = pool.query;
+  const token = jwt.sign({ id: 77 }, process.env.JWT_SECRET);
+
+  pool.query = async (sql) => {
+    if (String(sql).includes("FROM users")) {
+      return [[{
+        id: 77,
+        full_name: "HBT Member",
+        email: "member@example.com",
+        role: "hbt_member",
+        team_id: 5,
+        partnership_id: null,
+        is_active: 1,
+      }]];
+    }
+    throw new Error(`Unexpected query after auth: ${sql}`);
+  };
+
+  try {
+    const cases = [
+      ["partnership create", require("../src/routes/partnershipRoutes"), "/", "POST"],
+      ["event create", require("../src/routes/eventRoutes"), "/hbt", "POST"],
+      ["event delete", require("../src/routes/eventRoutes"), "/hbt/12", "DELETE"],
+      ["recommendation rule create", require("../src/routes/resourceRecommendationRoutes"), "/admin/rules", "POST"],
+      ["recommendation rule update", require("../src/routes/resourceRecommendationRoutes"), "/admin/rules/12", "PUT"],
+      ["recommendation rule delete", require("../src/routes/resourceRecommendationRoutes"), "/admin/rules/12", "DELETE"],
+    ];
+
+    for (const [label, router, path, method] of cases) {
+      const response = await request(appFor(router), path, {
+        method,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: method === "DELETE" ? undefined : JSON.stringify({ title: "Denied", resource_id: 1 }),
+      });
+      assert.equal(response.status, 403, `${label} should reject HBT member mutation`);
+    }
+  } finally {
+    pool.query = originalQuery;
+  }
+});
+
+test("user management protects Super Admin demotion and self-disable", async () => {
+  const originalQuery = pool.query;
+  const token = jwt.sign({ id: 1 }, process.env.JWT_SECRET);
+
+  pool.query = async (sql, params) => {
+    const text = String(sql);
+    if (text.includes("FROM users") && text.includes("WHERE id = ?") && Number(params?.[0]) === 1) {
+      return [[{
+        id: 1,
+        full_name: "Root Admin",
+        email: "root@example.com",
+        role: "super_admin",
+        team_id: null,
+        partnership_id: null,
+        is_active: 1,
+      }]];
+    }
+    if (text.includes("COUNT(*) AS count")) return [[{ count: 1 }]];
+    throw new Error(`Unexpected query: ${sql}`);
+  };
+
+  try {
+    const router = require("../src/routes/userRoutes");
+    const demotionResponse = await request(appFor(router), "/1/role", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ role: "admin" }),
+    });
+    assert.equal(demotionResponse.status, 403);
+
+    const disableResponse = await request(appFor(router), "/1/status", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ is_active: 0 }),
+    });
+    assert.equal(disableResponse.status, 403);
+  } finally {
+    pool.query = originalQuery;
+  }
+});

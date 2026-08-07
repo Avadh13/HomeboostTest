@@ -4,9 +4,8 @@ const protect = require("../middleware/authMiddleware");
 
 const router = express.Router();
 const adminRoles = ["admin", "super_admin"];
-const hbtRoles = ["hbt_admin", "hbt_member"];
 const isAdmin = (user) => adminRoles.includes(user?.role);
-const isHbt = (user) => hbtRoles.includes(user?.role);
+const canManageRecommendationRules = (user) => isAdmin(user) || user?.role === "hbt_admin";
 
 const ensureRecommendationTables = async (connection = pool) => {
   await connection.query(`CREATE TABLE IF NOT EXISTS employee_readiness_scores (
@@ -232,7 +231,7 @@ router.post("/:resourceId/view", protect, async (req, res) => {
 
 router.get("/admin/rules", protect, async (req, res) => {
   try {
-    if (!isAdmin(req.user) && !isHbt(req.user)) return res.status(403).json({ status: "error", message: "Admin or HBT access required" });
+    if (!canManageRecommendationRules(req.user)) return res.status(403).json({ status: "error", message: "Admin or HBT Admin access required" });
     await ensureRecommendationTables();
     const [rules] = await pool.query(
       `SELECT rr.*, r.title AS resource_title
@@ -248,7 +247,7 @@ router.get("/admin/rules", protect, async (req, res) => {
 
 router.post("/admin/rules", protect, async (req, res) => {
   try {
-    if (!isAdmin(req.user) && !isHbt(req.user)) return res.status(403).json({ status: "error", message: "Admin or HBT access required" });
+    if (!canManageRecommendationRules(req.user)) return res.status(403).json({ status: "error", message: "Admin or HBT Admin access required" });
     await ensureRecommendationTables();
     const { resource_id, readiness_level, priority, keyword, rule_label, is_active } = req.body;
     if (!resource_id) return res.status(400).json({ status: "error", message: "resource_id is required" });
@@ -265,7 +264,7 @@ router.post("/admin/rules", protect, async (req, res) => {
 
 router.put("/admin/rules/:id", protect, async (req, res) => {
   try {
-    if (!isAdmin(req.user) && !isHbt(req.user)) return res.status(403).json({ status: "error", message: "Admin or HBT access required" });
+    if (!canManageRecommendationRules(req.user)) return res.status(403).json({ status: "error", message: "Admin or HBT Admin access required" });
     await ensureRecommendationTables();
     const { resource_id, readiness_level, priority, keyword, rule_label, is_active } = req.body;
     await pool.query(
@@ -282,7 +281,7 @@ router.put("/admin/rules/:id", protect, async (req, res) => {
 
 router.delete("/admin/rules/:id", protect, async (req, res) => {
   try {
-    if (!isAdmin(req.user) && !isHbt(req.user)) return res.status(403).json({ status: "error", message: "Admin or HBT access required" });
+    if (!canManageRecommendationRules(req.user)) return res.status(403).json({ status: "error", message: "Admin or HBT Admin access required" });
     await ensureRecommendationTables();
     await pool.query("DELETE FROM resource_recommendation_rules WHERE id = ?", [req.params.id]);
     return res.json({ status: "success", message: "Recommendation rule deleted" });

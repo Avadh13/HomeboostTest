@@ -231,7 +231,7 @@ import API_BASE_URL from "../api/api";
      { key: "overview", label: "Overview" },
      { key: "requirements", label: "Client Requirements", count: testCases.length },
      { key: "blockers", label: "Critical Blockers", count: summary?.critical_blocker_count || 0 },
-     { key: "system", label: "System Health" },
+     { key: "system", label: "Readiness Checks" },
    ];
 
    const metricCards = [

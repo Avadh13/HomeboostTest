@@ -143,10 +143,10 @@ function ManageSections() {
     setSectionKey("video_walkthrough");
     setTitle("Video walkthrough");
     setSubtitle("Show the employee journey in seconds.");
-    setContent("Use this section for the final promo video, a Loom walkthrough, or a short demo showing how employees enter their employer portal and book next steps.");
+    setContent("Use this section for the approved promo video, a Loom walkthrough, or a short overview showing how employees enter their employer portal and book next steps.");
     setImageUrl(defaultPoster);
-    setButtonText("Watch demo");
-    setButtonLink("https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4");
+    setButtonText("Watch walkthrough");
+    setButtonLink("");
     setDisplayOrder(3);
     setIsActive(1);
     setDrawerOpen(true);

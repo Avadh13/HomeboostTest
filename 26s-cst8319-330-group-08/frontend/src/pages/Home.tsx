@@ -7,7 +7,7 @@ const heroImage = "https://images.unsplash.com/photo-1560518883-ce09059eeffa?aut
 const advisorImage = "https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1200&q=80";
 const meetingImage = "https://images.unsplash.com/photo-1556761175-4b46a572b786?auto=format&fit=crop&w=1200&q=80";
 const videoPoster = "https://images.unsplash.com/photo-1560520653-9e0e4c89eb11?auto=format&fit=crop&w=1400&q=80";
-const demoVideoUrl = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
+const walkthroughVideoUrl = "";
 
 type FAQ = { id: number; question: string; answer: string; page_slug?: string };
 
@@ -81,7 +81,7 @@ function Home() {
             </div>
 
             <div className="mt-10 grid max-w-2xl grid-cols-3 gap-3">
-              {[["0$", "Cost to employers"], ["HBT", "Team portal"], ["Stripe", "Secure checkout"]].map(([value, label]) => (
+              {[["$0", "Cost to employers"], ["HBT", "Team portal"], ["Stripe", "Secure checkout"]].map(([value, label]) => (
                 <div key={label} className="rounded-3xl border border-white bg-white/75 p-5 shadow-sm backdrop-blur-xl">
                   <p className="text-3xl font-black text-blue-700">{value}</p>
                   <p className="mt-1 text-sm font-bold text-slate-500">{label}</p>
@@ -122,20 +122,28 @@ function Home() {
             <div>
               <p className="text-sm font-black uppercase tracking-[0.25em] text-violet-200">Video walkthrough</p>
               <h2 className="mt-4 text-4xl font-black tracking-tight md:text-5xl">See how the employee portal experience works.</h2>
-              <p className="mt-5 text-lg leading-relaxed text-violet-100">Use this section for Kelly's final program demo video, a Loom walkthrough, or a short overview of how employees complete onboarding and connect with their Home Buying Team.</p>
+              <p className="mt-5 text-lg leading-relaxed text-violet-100">Show prospects how employees complete onboarding, review resources, take readiness quizzes, and connect with their Home Buying Team.</p>
             </div>
             <div className="mt-8 grid gap-3">
-              {["Program overview", "Employee portal demo", "HBT advisor workflow"].map((highlight) => (
+              {["Program overview", "Employee portal walkthrough", "HBT advisor workflow"].map((highlight) => (
                 <div key={highlight} className="rounded-2xl bg-white/10 px-4 py-3 font-bold text-violet-50 backdrop-blur">✓ {highlight}</div>
               ))}
             </div>
           </div>
 
           <div className="overflow-hidden rounded-[2rem] bg-slate-950 shadow-xl">
-            {isDirectVideoUrl(demoVideoUrl) ? (
-              <video src={demoVideoUrl} poster={videoPoster} controls className="aspect-video h-full w-full object-cover" />
+            {walkthroughVideoUrl && isDirectVideoUrl(walkthroughVideoUrl) ? (
+              <video src={walkthroughVideoUrl} poster={videoPoster} controls className="aspect-video h-full w-full object-cover" />
+            ) : walkthroughVideoUrl ? (
+              <iframe src={walkthroughVideoUrl} title="Home Buying Program video walkthrough" className="aspect-video h-full w-full" allowFullScreen />
             ) : (
-              <iframe src={demoVideoUrl} title="Home Buying Program video walkthrough" className="aspect-video h-full w-full" allowFullScreen />
+              <div className="grid aspect-video h-full w-full place-items-center bg-slate-900 px-6 text-center">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-200">Walkthrough ready</p>
+                  <h3 className="mt-3 text-3xl font-black text-white">Add the approved program video here</h3>
+                  <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-slate-300">The page no longer depends on sample stock footage. Add an approved MP4, WebM, or embed URL when the final walkthrough is available.</p>
+                </div>
+              </div>
             )}
           </div>
         </div>
