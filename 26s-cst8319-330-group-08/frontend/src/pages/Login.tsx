@@ -109,9 +109,6 @@ function Login() {
       <section className="relative hidden h-screen overflow-hidden lg:block">
         <img src={loginImage} alt="Modern home interior" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-br from-slate-950/90 via-indigo-950/70 to-violet-900/40" />
-        <Link to="/" className="absolute left-8 top-8 rounded-3xl bg-white/90 px-4 py-3 shadow-xl backdrop-blur-xl transition hover:-translate-y-0.5 xl:left-10 xl:top-10">
-          <BrandLogo className="h-14 w-[240px] xl:h-16 xl:w-[260px]" />
-        </Link>
 
         <div className="absolute bottom-8 left-8 right-8 rounded-[2rem] border border-white/15 bg-white/15 p-6 text-white backdrop-blur-xl xl:bottom-10 xl:left-10 xl:right-10 xl:p-8">
           <p className="text-xs font-black uppercase tracking-[0.25em] text-violet-100 xl:text-sm">One login</p>
