@@ -74,6 +74,11 @@ jobs:
       INTEGRATION_DB_USER: root
       INTEGRATION_DB_PASSWORD: root
       INTEGRATION_DB_NAME: homeboost_security_integration
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: homeboost_security_integration
       JWT_SECRET: integration-only-jwt-secret-not-for-production
     steps:
       - name: Checkout
