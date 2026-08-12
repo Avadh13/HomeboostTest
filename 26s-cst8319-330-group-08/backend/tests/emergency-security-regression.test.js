@@ -64,12 +64,16 @@ test("HBT Member creation uses activation instead of shared passwords", () => {
 
 test("recommendation mutations exclude HBT Members and enforce team ownership", () => {
   const source = read("src/routes/resourceRecommendationRoutes.js");
+  const managerGuard = source.slice(
+    source.indexOf("const requireRuleManager"),
+    source.indexOf("const resolveRuleTeamId"),
+  );
 
   assert.match(source, /const isHbtAdmin/);
-  assert.match(source, /Admin or HBT Admin access required/);
+  assert.match(managerGuard, /!isAdmin\(req\.user\) && !isHbtAdmin\(req\.user\)/);
+  assert.match(managerGuard, /Admin or HBT Admin access required/);
   assert.match(source, /team_id IS NULL OR team_id = \?/);
   assert.match(source, /AND team_id = \?/);
-  assert.doesNotMatch(source, /if \(!isAdmin\(req\.user\) && !isHbt\(req\.user\)\).*create recommendation rule/s);
 });
 
 test("emergency migration clears plaintext invite credentials and adds rule ownership", () => {
