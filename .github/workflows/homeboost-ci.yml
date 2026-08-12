@@ -49,3 +49,42 @@ jobs:
         run: npm ci
       - name: Run backend checks
         run: npm test
+
+  backend-security-integration:
+    name: Security integration (MySQL)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: 26s-cst8319-330-group-08/backend
+    env:
+      INTEGRATION_DB_HOST: 127.0.0.1
+      INTEGRATION_DB_PORT: 3306
+      INTEGRATION_DB_USER: root
+      INTEGRATION_DB_PASSWORD: root
+      INTEGRATION_DB_NAME: homeboost_security_integration
+      JWT_SECRET: integration-only-jwt-secret-not-for-production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: 26s-cst8319-330-group-08/backend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run disposable database security tests
+        run: npm run test:integration
