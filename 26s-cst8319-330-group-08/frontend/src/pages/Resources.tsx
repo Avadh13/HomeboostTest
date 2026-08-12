@@ -20,11 +20,14 @@ type Resource = {
 
 type ViewFilter = "all" | "journey" | "saved";
 
-const fallbackImages = [
-  "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=1200&q=80",
-];
+const resourceSymbol = (type?: string) => {
+  const normalized = String(type || "article").toLowerCase();
+  if (normalized.includes("video")) return "▶";
+  if (normalized.includes("check")) return "✓";
+  if (normalized.includes("tool") || normalized.includes("calc")) return "⌁";
+  if (normalized.includes("pdf") || normalized.includes("guide")) return "PDF";
+  return "EBP";
+};
 
 function Resources() {
   const toast = useToast();
@@ -67,13 +70,7 @@ function Resources() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message || "Could not update saved resource");
-      setResources((current) =>
-        current.map((item) =>
-          item.id === resource.id
-            ? { ...item, is_bookmarked: !resource.is_bookmarked }
-            : item,
-        ),
-      );
+      setResources((current) => current.map((item) => item.id === resource.id ? { ...item, is_bookmarked: !resource.is_bookmarked } : item));
       toast.success(resource.is_bookmarked ? "Removed from saved resources." : "Saved resource.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not update saved resource.");
@@ -84,14 +81,8 @@ function Resources() {
     loadResources();
   }, []);
 
-  const categories = useMemo(
-    () => [...new Set(resources.map((resource) => resource.category).filter(Boolean))].sort(),
-    [resources],
-  );
-  const types = useMemo(
-    () => [...new Set(resources.map((resource) => resource.resource_type || resource.type).filter(Boolean))].sort(),
-    [resources],
-  );
+  const categories = useMemo(() => [...new Set(resources.map((resource) => resource.category).filter(Boolean))].sort(), [resources]);
+  const types = useMemo(() => [...new Set(resources.map((resource) => resource.resource_type || resource.type).filter(Boolean))].sort(), [resources]);
   const journeyCount = resources.filter((resource) => resource.in_journey).length;
   const savedCount = resources.filter((resource) => resource.is_bookmarked).length;
 
@@ -99,19 +90,10 @@ function Resources() {
     const query = search.trim().toLowerCase();
     return resources.filter((resource) => {
       const resourceType = resource.resource_type || resource.type || "article";
-      const matchesSearch =
-        !query ||
-        [resource.title, resource.description, resource.category, resourceType]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(query);
+      const matchesSearch = !query || [resource.title, resource.description, resource.category, resourceType].filter(Boolean).join(" ").toLowerCase().includes(query);
       const matchesCategory = categoryFilter === "all" || resource.category === categoryFilter;
       const matchesType = typeFilter === "all" || resourceType === typeFilter;
-      const matchesView =
-        viewFilter === "all" ||
-        (viewFilter === "journey" && resource.in_journey) ||
-        (viewFilter === "saved" && resource.is_bookmarked);
+      const matchesView = viewFilter === "all" || (viewFilter === "journey" && resource.in_journey) || (viewFilter === "saved" && resource.is_bookmarked);
       return matchesSearch && matchesCategory && matchesType && matchesView;
     });
   }, [categoryFilter, resources, search, typeFilter, viewFilter]);
@@ -119,7 +101,6 @@ function Resources() {
   return (
     <main className="theme-page min-h-screen">
       <Navbar />
-
       <section className="px-4 py-7 md:px-6 md:py-9">
         <div className="section-container space-y-5">
           <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-7">
@@ -127,9 +108,7 @@ function Resources() {
               <div>
                 <p className="eyebrow">Employee Resource Library</p>
                 <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 md:text-4xl">Resources</h1>
-                <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 md:text-base">
-                  Browse guides, checklists, videos, and planning tools selected for your home-buying journey.
-                </p>
+                <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 md:text-base">Browse the guides, checklists, videos, and planning tools currently assigned to your partnership.</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Link to="/employee/journey" className="btn-secondary">View Journey</Link>
@@ -155,33 +134,12 @@ function Resources() {
 
           <section className="premium-card space-y-4">
             <div className="flex flex-wrap gap-2">
-              {[
-                ["all", "All Resources"],
-                ["journey", "My Journey"],
-                ["saved", "Saved"],
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setViewFilter(value as ViewFilter)}
-                  className={`rounded-xl px-4 py-2 text-sm font-black transition ${
-                    viewFilter === value
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"
-                  }`}
-                >
-                  {label}
-                </button>
+              {[["all", "All Resources"], ["journey", "My Journey"], ["saved", "Saved"]].map(([value, label]) => (
+                <button key={value} type="button" onClick={() => setViewFilter(value as ViewFilter)} className={`rounded-xl px-4 py-2 text-sm font-black transition ${viewFilter === value ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>{label}</button>
               ))}
             </div>
-
             <div className="grid gap-3 md:grid-cols-[1fr_210px_190px_auto] md:items-center">
-              <input
-                className="form-field"
-                placeholder="Search resources..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
+              <input className="form-field" placeholder="Search resources..." value={search} onChange={(event) => setSearch(event.target.value)} />
               <select className="form-field" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
                 <option value="all">All categories</option>
                 {categories.map((category) => <option key={category} value={category}>{category}</option>)}
@@ -195,71 +153,31 @@ function Resources() {
           </section>
 
           {loading ? (
-            <section className="loading-state p-8 text-center">
-              <div className="mx-auto mb-5 h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
-              <p className="font-black text-slate-700">Loading resources...</p>
-            </section>
+            <section className="loading-state p-8 text-center"><div className="mx-auto mb-5 h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" /><p className="font-black text-slate-700">Loading resources...</p></section>
           ) : filteredResources.length === 0 ? (
-            <section className="empty-state p-10 text-center">
-              <h2 className="text-2xl font-black text-slate-950">No resources found</h2>
-              <p className="mx-auto mt-2 max-w-xl text-slate-600">Try clearing the filters or message your advisor for guidance.</p>
-              <div className="mt-6 flex flex-wrap justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearch("");
-                    setCategoryFilter("all");
-                    setTypeFilter("all");
-                    setViewFilter("all");
-                  }}
-                  className="btn-secondary"
-                >
-                  Clear Filters
-                </button>
-                <Link to="/employee/messages" className="btn-primary">Message Advisor</Link>
-              </div>
-            </section>
+            <section className="empty-state p-10 text-center"><h2 className="text-2xl font-black text-slate-950">No resources found</h2><p className="mx-auto mt-2 max-w-xl text-slate-600">Try clearing the filters or message your advisor for guidance.</p></section>
           ) : (
             <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {filteredResources.map((resource, index) => {
+              {filteredResources.map((resource) => {
                 const resourceType = resource.resource_type || resource.type || "article";
                 return (
-                  <Link
-                    key={resource.id}
-                    to={`/resources/${resource.id}`}
-                    className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
-                  >
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        toggleBookmark(resource);
-                      }}
-                      className={`absolute right-4 top-4 z-10 rounded-lg px-3 py-1.5 text-xs font-black shadow-sm ${
-                        resource.is_bookmarked
-                          ? "bg-emerald-600 text-white"
-                          : "bg-white/95 text-slate-700"
-                      }`}
-                    >
-                      {resource.is_bookmarked ? "Saved" : "Save"}
-                    </button>
-
-                    <div className="relative h-44 bg-slate-100">
-                      <img
-                        src={resource.image_url || fallbackImages[index % fallbackImages.length]}
-                        alt={resource.title}
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                      />
+                  <Link key={resource.id} to={`/resources/${resource.id}`} className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+                    <button type="button" onClick={(event) => { event.preventDefault(); toggleBookmark(resource); }} className={`absolute right-4 top-4 z-10 rounded-lg px-3 py-1.5 text-xs font-black shadow-sm ${resource.is_bookmarked ? "bg-emerald-600 text-white" : "bg-white text-slate-700"}`}>{resource.is_bookmarked ? "Saved" : "Save"}</button>
+                    <div className="relative h-44 overflow-hidden bg-gradient-to-br from-blue-700 via-indigo-700 to-slate-900">
+                      {resource.image_url ? (
+                        <img src={resource.image_url} alt={resource.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-3xl font-black tracking-widest text-white/90">{resourceSymbol(resourceType)}</div>
+                      )}
                       <div className="absolute inset-x-4 bottom-4 flex flex-wrap gap-2">
                         {resource.in_journey && <span className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-black uppercase text-white">Journey</span>}
-                        {resource.category && <span className="rounded-lg bg-white/95 px-3 py-1 text-xs font-black uppercase text-blue-700">{resource.category}</span>}
+                        {resource.category && <span className="rounded-lg bg-white px-3 py-1 text-xs font-black uppercase text-blue-700">{resource.category}</span>}
                         <span className="rounded-lg bg-slate-950/85 px-3 py-1 text-xs font-black uppercase text-white">{resourceType}</span>
                       </div>
                     </div>
-
                     <div className="p-5">
                       <h2 className="text-xl font-black text-slate-950">{resource.title}</h2>
-                      <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-600">{resource.description || "Open this resource for more guidance."}</p>
+                      <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-600">{resource.description || "Open this assigned resource for details."}</p>
                       <p className="mt-5 text-sm font-black text-blue-700">View Details →</p>
                     </div>
                   </Link>
@@ -267,20 +185,6 @@ function Resources() {
               })}
             </section>
           )}
-
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="eyebrow">Personalized help</p>
-                <h2 className="mt-2 text-2xl font-black text-slate-950 md:text-3xl">Need help choosing the next resource?</h2>
-                <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">Use your journey, take the readiness quiz, or message your Home Buying Team for the next best step.</p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <Link to="/employee/journey" className="btn-secondary">Open Journey</Link>
-                <Link to="/employee/messages" className="btn-primary">Message Advisor</Link>
-              </div>
-            </div>
-          </section>
         </div>
       </section>
     </main>
