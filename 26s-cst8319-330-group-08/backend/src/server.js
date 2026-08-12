@@ -142,6 +142,12 @@ app.use("/api/resource-recommendations", resourceRecommendationRoutes);
 app.use("/api/company-analytics", companyAnalyticsRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/hbt-signup", hbtSignupRoutes);
+app.post("/api/payments/demo-complete/:statusToken", (req, res, next) => {
+  if (process.env.ALLOW_DEMO_PAYMENT_COMPLETION !== "true") {
+    return res.status(403).json({ status: "error", message: "Demo completion is disabled" });
+  }
+  return next();
+});
 app.use("/api/payments", paymentRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/journeys", journeyRoutes);

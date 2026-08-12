@@ -11,6 +11,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const getCheckoutClient = () => {
   if (!process.env.STRIPE_SECRET_KEY) return null;
+
   try {
     const Stripe = require("stripe");
     return new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -20,6 +21,7 @@ const getCheckoutClient = () => {
 };
 
 const clean = (value, max = 255) => String(value || "").trim().slice(0, max);
+const demoCheckoutEnabled = () => process.env.ALLOW_DEMO_PAYMENT_COMPLETION === "true";
 const appUrl = () => (process.env.FRONTEND_URL || process.env.CLIENT_URL || "http://localhost:5173").replace(/\/+$/, "");
 const amountCents = () => {
   const value = Number(process.env.HBT_PROGRAM_PRICE_CENTS || 99000);
@@ -71,27 +73,20 @@ const ensureSignupTables = async (connection = pool) => {
 };
 
 router.post("/start", async (req, res) => {
-  const fullName = clean(req.body.full_name, 180);
-  const email = clean(req.body.email, 180).toLowerCase();
-  const companyName = clean(req.body.company_name, 180);
-
-  if (!fullName || !email || !companyName) {
-    return res.status(400).json({ status: "error", message: "Full name, email, and company name are required" });
-  }
-  if (!EMAIL_PATTERN.test(email)) {
-    return res.status(400).json({ status: "error", message: "Enter a valid email address" });
-  }
-
-  const stripe = getCheckoutClient();
-  if (!stripe) {
-    return res.status(503).json({
-      status: "error",
-      message: "Online checkout is temporarily unavailable. Please contact Employee Benefit Program support.",
-    });
-  }
-
   const connection = await pool.getConnection();
   try {
+    const fullName = clean(req.body.full_name, 180);
+    const email = clean(req.body.email, 180).toLowerCase();
+    const companyName = clean(req.body.company_name, 180);
+
+    if (!fullName || !email || !companyName) {
+      return res.status(400).json({ status: "error", message: "Full name, email, and company name are required" });
+    }
+
+    if (!EMAIL_PATTERN.test(email)) {
+      return res.status(400).json({ status: "error", message: "Enter a valid email address" });
+    }
+
     await ensureSignupTables(connection);
     await connection.beginTransaction();
 
@@ -112,6 +107,41 @@ router.post("/start", async (req, res) => {
 
     const registrationId = result.insertId;
     const statusToken = await createRegistrationStatusToken(connection, registrationId, 48);
+    const stripe = getCheckoutClient();
+
+    if (!stripe) {
+      if (!demoCheckoutEnabled()) {
+        await connection.query(
+          "UPDATE hbt_registrations SET status = 'checkout_unavailable', payment_status = 'pending' WHERE id = ?",
+          [registrationId],
+        );
+        await connection.commit();
+        return res.status(503).json({
+          status: "error",
+          message: "Online checkout is temporarily unavailable. Please contact Employee Benefit Program support.",
+        });
+      }
+
+      const demoSessionId = `demo_registration_${registrationId}`;
+      await connection.query(
+        "UPDATE hbt_registrations SET payment_status = 'demo_pending', checkout_session_id = ? WHERE id = ?",
+        [demoSessionId, registrationId],
+      );
+      await connection.query(
+        `INSERT INTO payments
+         (registration_id, provider, provider_session_id, amount_cents, currency, status)
+         VALUES (?, 'demo', ?, ?, ?, 'demo_pending')`,
+        [registrationId, demoSessionId, amountCents(), currency()],
+      );
+      await connection.commit();
+
+      return res.status(201).json({
+        status: "success",
+        mode: "demo",
+        checkout_url: `${appUrl()}/payment-success?status=${encodeURIComponent(statusToken)}&demo=1`,
+        message: "Demo checkout link created.",
+      });
+    }
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -149,11 +179,15 @@ router.post("/start", async (req, res) => {
 
     return res.status(201).json({
       status: "success",
+      mode: "stripe",
       checkout_url: session.url,
     });
   } catch (error) {
     await connection.rollback();
-    return res.status(500).json({ status: "error", message: "Failed to start HBT signup" });
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to start HBT signup",
+    });
   } finally {
     connection.release();
   }
@@ -166,9 +200,16 @@ router.get("/status/:statusToken", async (req, res) => {
     if (!registration) {
       return res.status(404).json({ status: "error", message: "Registration status is unavailable" });
     }
-    return res.json({ status: "success", registration: toPublicRegistrationStatus(registration) });
-  } catch {
-    return res.status(500).json({ status: "error", message: "Failed to load registration status" });
+
+    return res.json({
+      status: "success",
+      registration: toPublicRegistrationStatus(registration),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to load registration status",
+    });
   }
 });
 
