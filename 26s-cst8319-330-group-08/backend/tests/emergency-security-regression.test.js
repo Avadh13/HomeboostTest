@@ -33,6 +33,23 @@ test("all employee invite producers use the shared secure lifecycle", () => {
   assert.doesNotMatch(companyManager, /inviteCode\s*=/);
 });
 
+test("employee invite refresh rejects an existing non-employee invitation", () => {
+  const lifecycle = read("src/services/inviteLifecycleService.js");
+  assert.match(lifecycle, /SELECT id, status, invite_role/);
+  assert.match(lifecycle, /existingInvite\.invite_role !== "employee"/);
+  assert.match(lifecycle, /INVITE_ROLE_CONFLICT/);
+});
+
+test("Company Dashboard surfaces one-time invitation credentials before reload", () => {
+  const dashboard = read("../frontend/src/pages/CompanyDashboard.tsx");
+  assert.match(dashboard, /freshDeliveries/);
+  assert.match(dashboard, /payload\.delivery as InviteDelivery/);
+  assert.match(dashboard, /payload\.invited_employees/);
+  assert.match(dashboard, /Download Secure CSV/);
+  assert.match(dashboard, /invite_link/);
+  assert.match(dashboard, /invite_code/);
+});
+
 test("enrollment revocation never deletes employee users", () => {
   const enrollment = read("src/controllers/enrollmentController.js");
   assert.doesNotMatch(enrollment, /DELETE\s+FROM\s+users/i);
