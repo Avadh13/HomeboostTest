@@ -1,9 +1,8 @@
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import API_BASE_URL from "../../api/api";
-import AdminLayout from "../components/AdminLayout";
-import ChatWidget from "../../components/ChatWidget";
 import { useToast } from "../../components/ToastProvider";
+import AdminLayout from "../components/AdminLayout";
 
 type ContactMessage = {
   id: number;
@@ -33,33 +32,78 @@ type Partnership = {
   status: string;
 };
 
+type EmployerApproval = {
+  id: number;
+  requested_company_name?: string;
+  approval_status?: string;
+  requested_at?: string;
+};
+
 type MetricCardProps = {
   label: string;
-  value: number;
+  value: number | string;
   helper: string;
-  accent: string;
-  glow: string;
+  href: string;
+};
+
+type ContentStatProps = {
+  label: string;
+  value: number;
   href: string;
 };
 
 const roleLabel = (role?: string) => (role || "user").replace(/_/g, " ");
-const initials = (name?: string, fallback = "U") => (name || fallback).trim().charAt(0).toUpperCase() || fallback;
+const initials = (name?: string, fallback = "U") =>
+  (name || fallback).trim().charAt(0).toUpperCase() || fallback;
 
-function MetricCard({ label, value, helper, accent, glow, href }: MetricCardProps) {
+const formatDate = (value?: string) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-CA", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+};
+
+const asArray = <T,>(value: unknown, property?: string): T[] => {
+  if (Array.isArray(value)) return value as T[];
+  if (property && value && typeof value === "object") {
+    const nested = (value as Record<string, unknown>)[property];
+    if (Array.isArray(nested)) return nested as T[];
+  }
+  return [];
+};
+
+function MetricCard({ label, value, helper, href }: MetricCardProps) {
   return (
     <Link
       to={href}
-      className="group relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-slate-950/20 backdrop-blur transition hover:-translate-y-1 hover:bg-white/[0.09]"
+      className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
     >
-      <div className={`absolute -right-10 -top-10 h-28 w-28 rounded-full ${glow} blur-2xl transition group-hover:scale-125`} />
-      <div className="relative">
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
-          <span className={`h-3 w-3 rounded-full ${accent} shadow-lg`} />
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</p>
+          <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">{value}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-500">{helper}</p>
         </div>
-        <h2 className="mt-4 text-4xl font-black tracking-tight text-white md:text-5xl">{value}</h2>
-        <p className="mt-2 text-sm font-semibold text-slate-400">{helper}</p>
+        <span className="mt-1 h-3 w-3 rounded-full bg-blue-600 ring-4 ring-blue-50" />
       </div>
+    </Link>
+  );
+}
+
+function ContentStat({ label, value, href }: ContentStatProps) {
+  return (
+    <Link
+      to={href}
+      className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition hover:border-blue-200 hover:bg-blue-50"
+    >
+      <span className="text-sm font-bold text-slate-700">{label}</span>
+      <span className="rounded-lg bg-white px-2.5 py-1 text-sm font-black text-slate-950 shadow-sm ring-1 ring-slate-200">
+        {value}
+      </span>
     </Link>
   );
 }
@@ -69,297 +113,407 @@ function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [partnerships, setPartnerships] = useState<Partnership[]>([]);
+  const [approvals, setApprovals] = useState<EmployerApproval[]>([]);
   const [totalResources, setTotalResources] = useState(0);
   const [totalPricing, setTotalPricing] = useState(0);
   const [totalFAQs, setTotalFAQs] = useState(0);
   const [totalQuizzes, setTotalQuizzes] = useState(0);
   const [totalHBTs, setTotalHBTs] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [failedSources, setFailedSources] = useState<string[]>([]);
 
   const token = localStorage.getItem("token");
 
   useEffect(() => {
-    const headers = { Authorization: `Bearer ${token}` };
+    let cancelled = false;
 
-    Promise.all([
-      fetch(`${API_BASE_URL}/users`, { headers }).then((res) => res.json()),
-      fetch(`${API_BASE_URL}/resources`).then((res) => res.json()),
-      fetch(`${API_BASE_URL}/pricing`).then((res) => res.json()),
-      fetch(`${API_BASE_URL}/faqs`).then((res) => res.json()),
-      fetch(`${API_BASE_URL}/contact`, { headers }).then((res) => res.json()),
-      fetch(`${API_BASE_URL}/quizzes`).then((res) => res.json()),
-      fetch(`${API_BASE_URL}/hbts`, { headers }).then((res) => res.json()),
-      fetch(`${API_BASE_URL}/admin-partnerships`, { headers }).then((res) => res.json()),
-    ])
-      .then(([usersData, resources, pricing, faqs, messagesData, quizzes, hbts, partnershipsData]) => {
-        setUsers(Array.isArray(usersData) ? usersData : []);
-        setTotalResources(Array.isArray(resources) ? resources.length : 0);
-        setTotalPricing(Array.isArray(pricing) ? pricing.length : 0);
-        setTotalFAQs(Array.isArray(faqs) ? faqs.length : 0);
-        setMessages(Array.isArray(messagesData) ? messagesData : []);
-        setTotalQuizzes(Array.isArray(quizzes) ? quizzes.length : 0);
-        setTotalHBTs(Array.isArray(hbts) ? hbts.length : 0);
-        setPartnerships(Array.isArray(partnershipsData) ? partnershipsData : []);
-      })
-      .catch((error) => {
-        console.error("Dashboard load error:", error);
-        toast.error("Failed to load dashboard stats.");
-      })
-      .finally(() => setLoading(false));
+    const loadDashboard = async () => {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      const headers = { Authorization: `Bearer ${token}` };
+      const sources = [
+        ["users", `${API_BASE_URL}/users`, true],
+        ["resources", `${API_BASE_URL}/resources`, true],
+        ["pricing", `${API_BASE_URL}/pricing`, false],
+        ["faqs", `${API_BASE_URL}/faqs`, false],
+        ["contact", `${API_BASE_URL}/contact`, true],
+        ["quizzes", `${API_BASE_URL}/quizzes`, true],
+        ["hbts", `${API_BASE_URL}/hbts`, true],
+        ["partnerships", `${API_BASE_URL}/admin-partnerships`, true],
+        ["approvals", `${API_BASE_URL}/employer-approval/requests`, true],
+      ] as const;
+
+      const results = await Promise.allSettled(
+        sources.map(async ([name, url, needsAuth]) => {
+          const response = await fetch(url, needsAuth ? { headers } : undefined);
+          if (!response.ok) {
+            throw new Error(`${name}:${response.status}`);
+          }
+          return { name, data: await response.json() };
+        }),
+      );
+
+      if (cancelled) return;
+
+      const failures: string[] = [];
+      results.forEach((result, index) => {
+        const sourceName = sources[index][0];
+        if (result.status === "rejected") {
+          failures.push(sourceName);
+          return;
+        }
+
+        const { data } = result.value;
+        switch (sourceName) {
+          case "users":
+            setUsers(asArray<User>(data, "users"));
+            break;
+          case "resources":
+            setTotalResources(asArray(data, "resources").length);
+            break;
+          case "pricing":
+            setTotalPricing(asArray(data, "pricing").length);
+            break;
+          case "faqs":
+            setTotalFAQs(asArray(data, "faqs").length);
+            break;
+          case "contact":
+            setMessages(asArray<ContactMessage>(data, "messages"));
+            break;
+          case "quizzes":
+            setTotalQuizzes(asArray(data, "quizzes").length);
+            break;
+          case "hbts":
+            setTotalHBTs(asArray(data, "hbts").length);
+            break;
+          case "partnerships":
+            setPartnerships(asArray<Partnership>(data, "partnerships"));
+            break;
+          case "approvals":
+            setApprovals(asArray<EmployerApproval>(data, "requests"));
+            break;
+        }
+      });
+
+      setFailedSources(failures);
+      if (failures.length > 0) {
+        toast.error("Some dashboard data could not be loaded.");
+      }
+      setLoading(false);
+    };
+
+    loadDashboard().catch(() => {
+      if (!cancelled) {
+        setFailedSources(["dashboard"]);
+        setLoading(false);
+        toast.error("Failed to load dashboard data.");
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [token, toast]);
 
   const totalUsers = users.length;
-  const totalMessages = messages.length;
-  const unreadMessages = messages.filter((message) => Number(message.is_read) === 0).length;
   const activeUsers = users.filter((user) => Number(user.is_active) === 1).length;
   const disabledUsers = users.filter((user) => Number(user.is_active) === 0).length;
   const employeeCount = users.filter((user) => user.role === "employee").length;
   const hbtCount = users.filter((user) => user.role === "hbt_admin" || user.role === "hbt_member").length;
   const companyCount = users.filter((user) => user.role === "company_admin" || user.role === "company").length;
   const adminCount = users.filter((user) => user.role === "admin" || user.role === "super_admin").length;
+  const unreadMessages = messages.filter((message) => Number(message.is_read) === 0).length;
   const activePartnerships = partnerships.filter((partnership) => partnership.status === "active").length;
-  const maxContentValue = Math.max(totalResources, totalPricing, totalFAQs, totalQuizzes, totalMessages, 1);
-  const activeRate = totalUsers > 0 ? Math.round((activeUsers / totalUsers) * 100) : 0;
-  const partnershipRate = partnerships.length > 0 ? Math.round((activePartnerships / partnerships.length) * 100) : 0;
+  const pendingApprovals = approvals.filter(
+    (approval) => approval.approval_status === "pending" || approval.approval_status === "needs_info",
+  ).length;
+  const activeUserRate = totalUsers > 0 ? Math.round((activeUsers / totalUsers) * 100) : 0;
+  const activePartnershipRate = partnerships.length > 0
+    ? Math.round((activePartnerships / partnerships.length) * 100)
+    : 0;
 
-  const contentBars = [
-    { label: "Resources", value: totalResources, color: "from-sky-400 to-blue-500" },
-    { label: "Pricing", value: totalPricing, color: "from-violet-400 to-purple-500" },
-    { label: "FAQs", value: totalFAQs, color: "from-amber-300 to-orange-500" },
-    { label: "Quizzes", value: totalQuizzes, color: "from-emerald-300 to-green-500" },
-    { label: "Contact", value: totalMessages, color: "from-pink-400 to-rose-500" },
+  const recentUsers = useMemo(
+    () => [...users]
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+      .slice(0, 5),
+    [users],
+  );
+
+  const recentMessages = useMemo(
+    () => [...messages]
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+      .slice(0, 4),
+    [messages],
+  );
+
+  const latestPartnerships = useMemo(
+    () => [...partnerships].sort((a, b) => Number(b.id) - Number(a.id)).slice(0, 5),
+    [partnerships],
+  );
+
+  const roleBreakdown = [
+    { label: "Employees", value: employeeCount },
+    { label: "HBT users", value: hbtCount },
+    { label: "Company managers", value: companyCount },
+    { label: "Admins", value: adminCount },
   ];
-
-  const roleBars = [
-    { label: "Employees", value: employeeCount, color: "from-cyan-400 to-blue-500" },
-    { label: "HBT Users", value: hbtCount, color: "from-violet-400 to-fuchsia-500" },
-    { label: "Companies", value: companyCount, color: "from-emerald-300 to-teal-500" },
-    { label: "Admins", value: adminCount, color: "from-amber-300 to-orange-500" },
-  ];
-
-  const recentUsers = useMemo(() => users.slice(0, 5), [users]);
-  const recentMessages = useMemo(() => messages.slice(0, 4), [messages]);
-  const latestPartnerships = useMemo(() => partnerships.slice(0, 4), [partnerships]);
 
   return (
     <AdminLayout title="Dashboard">
-      <div className="overflow-hidden rounded-[2rem] border border-slate-800 bg-[#0b1220] text-white shadow-2xl shadow-slate-950/30">
-        <div className="relative overflow-hidden p-5 md:p-7">
-          <div className="absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-sky-500/20 blur-3xl" />
-          <div className="absolute right-0 top-20 h-80 w-80 rounded-full bg-violet-500/20 blur-3xl" />
-          <div className="absolute bottom-0 left-0 h-72 w-72 rounded-full bg-fuchsia-500/10 blur-3xl" />
-
-          <section className="relative grid gap-5 xl:grid-cols-[1.4fr_0.6fr]">
-            <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-xl md:p-8">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-sky-400/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-sky-300 ring-1 ring-sky-400/20">HomeBoost Test</span>
-                <span className="rounded-full bg-violet-400/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-violet-200 ring-1 ring-violet-400/20">Theme 2</span>
-              </div>
-              <h1 className="mt-5 max-w-4xl text-4xl font-black tracking-tight text-white md:text-6xl">Modern admin analytics dashboard</h1>
-              <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-300 md:text-base">
-                Track users, HBT teams, partnerships, content, quizzes, and contact requests from one dark control center.
+      <div className="space-y-6">
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">Platform overview</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 md:text-4xl">
+                Employee Benefit Program administration
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-slate-600 md:text-base">
+                Live operational data for users, Home Buying Teams, employer partnerships, approvals, content, and contact requests.
               </p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link to="/admin/partnerships" className="rounded-full bg-sky-400 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-sky-400/20 hover:bg-sky-300">Add Partnership</Link>
-                <Link to="/admin/hbts" className="rounded-full bg-white/10 px-5 py-3 text-sm font-black text-white ring-1 ring-white/15 hover:bg-white/15">Add HBT Team</Link>
-                <Link to="/admin/messages" className="rounded-full bg-violet-500/20 px-5 py-3 text-sm font-black text-violet-100 ring-1 ring-violet-400/25 hover:bg-violet-500/30">Open Messages</Link>
-              </div>
             </div>
 
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">System Health</p>
-                    <h2 className="mt-2 text-3xl font-black text-white">{activeRate}%</h2>
-                    <p className="mt-1 text-sm font-semibold text-slate-400">{activeUsers} active users</p>
-                  </div>
-                  <div className="grid h-24 w-24 place-items-center rounded-full bg-[conic-gradient(#22d3ee_var(--progress),rgba(255,255,255,0.10)_0)]" style={{ "--progress": `${activeRate * 3.6}deg` } as CSSProperties}>
-                    <div className="grid h-16 w-16 place-items-center rounded-full bg-[#0b1220] text-lg font-black text-sky-300">{activeRate}%</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Active Portals</p>
-                <div className="mt-4 flex items-end justify-between gap-3">
-                  <div>
-                    <h2 className="text-4xl font-black text-white">{activePartnerships}</h2>
-                    <p className="mt-1 text-sm font-semibold text-slate-400">of {partnerships.length} partnerships</p>
-                  </div>
-                  <span className="rounded-2xl bg-emerald-400/10 px-4 py-2 text-sm font-black text-emerald-300 ring-1 ring-emerald-400/20">{partnershipRate}% active</span>
-                </div>
-              </div>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                to="/admin/employer-approvals"
+                className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+              >
+                Review employer approvals
+              </Link>
+              <Link
+                to="/admin/hbts"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              >
+                Manage HBT teams
+              </Link>
+              <Link
+                to="/admin/contact-messages"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              >
+                Open contact forms
+              </Link>
             </div>
-          </section>
+          </div>
+        </section>
 
-          {loading ? (
-            <div className="relative mt-5 rounded-[1.5rem] border border-white/10 bg-white/[0.06] p-8 text-center font-bold text-slate-300">Loading dashboard stats...</div>
-          ) : (
-            <>
-              <section className="relative mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <MetricCard label="Total Users" value={totalUsers} helper={`${activeUsers} active / ${disabledUsers} disabled`} accent="bg-sky-400" glow="bg-sky-400/30" href="/admin/users" />
-                <MetricCard label="HBT Teams" value={totalHBTs} helper="Advisor teams onboarded" accent="bg-violet-400" glow="bg-violet-400/30" href="/admin/hbts" />
-                <MetricCard label="Partnerships" value={partnerships.length} helper={`${activePartnerships} active company portals`} accent="bg-emerald-400" glow="bg-emerald-400/30" href="/admin/partnerships" />
-                <MetricCard label="Unread" value={unreadMessages} helper={`${totalMessages} total contact forms`} accent="bg-pink-400" glow="bg-pink-400/30" href="/admin/contact-messages" />
-              </section>
+        {failedSources.length > 0 ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-900">
+            Some live dashboard sources are temporarily unavailable: {failedSources.join(", ")}. Other cards continue to show the data that loaded successfully.
+          </div>
+        ) : null}
 
-              <section className="relative mt-5 grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-                <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl md:p-6">
-                  <div className="mb-5 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-300">Role Distribution</p>
-                      <h2 className="mt-1 text-2xl font-black text-white">Access mix</h2>
-                    </div>
-                    <Link to="/admin/users" className="rounded-full bg-white/10 px-3 py-2 text-xs font-black text-slate-200 hover:bg-white/15">Open Users</Link>
-                  </div>
+        {loading ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm font-bold text-slate-500 shadow-sm">
+            Loading live dashboard data...
+          </div>
+        ) : (
+          <>
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="Total users"
+                value={totalUsers}
+                helper={`${activeUsers} active · ${disabledUsers} disabled`}
+                href="/admin/users"
+              />
+              <MetricCard
+                label="HBT teams"
+                value={totalHBTs}
+                helper="Home Buying Teams onboarded"
+                href="/admin/hbts"
+              />
+              <MetricCard
+                label="Partnerships"
+                value={partnerships.length}
+                helper={`${activePartnerships} active employer portals`}
+                href="/admin/partnerships"
+              />
+              <MetricCard
+                label="Pending approvals"
+                value={pendingApprovals}
+                helper={`${unreadMessages} unread contact forms`}
+                href="/admin/employer-approvals"
+              />
+            </section>
 
-                  <div className="space-y-4">
-                    {roleBars.map((item) => {
-                      const width = totalUsers > 0 ? Math.max((item.value / totalUsers) * 100, 6) : 6;
-                      return (
-                        <div key={item.label}>
-                          <div className="mb-2 flex justify-between text-sm font-bold text-slate-300"><span>{item.label}</span><span>{item.value}</span></div>
-                          <div className="h-3 overflow-hidden rounded-full bg-white/10"><div className={`h-3 rounded-full bg-gradient-to-r ${item.color}`} style={{ width: `${width}%` }} /></div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl md:p-6">
-                  <div className="mb-5 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-300">CMS Activity</p>
-                      <h2 className="mt-1 text-2xl font-black text-white">Content overview</h2>
-                    </div>
-                    <Link to="/admin/resources" className="rounded-full bg-white/10 px-3 py-2 text-xs font-black text-slate-200 hover:bg-white/15">Open CMS</Link>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {contentBars.map((item) => {
-                      const width = Math.max((item.value / maxContentValue) * 100, 6);
-                      return (
-                        <div key={item.label} className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-                          <div className="flex items-center justify-between text-sm font-bold text-slate-300"><span>{item.label}</span><span className="text-white">{item.value}</span></div>
-                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className={`h-2 rounded-full bg-gradient-to-r ${item.color}`} style={{ width: `${width}%` }} /></div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </section>
-
-              <section className="relative mt-5 grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-                <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl md:p-6">
-                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-300">Latest Activity</p>
-                      <h2 className="mt-1 text-2xl font-black text-white">Recent users</h2>
-                    </div>
-                    <Link to="/admin/users" className="rounded-full bg-white/10 px-4 py-2 text-xs font-black text-slate-200 hover:bg-white/15">View All</Link>
-                  </div>
-
-                  <div className="space-y-3">
-                    {recentUsers.map((user) => (
-                      <div key={user.id} className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-                        <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
-                          <div className="flex min-w-0 items-center gap-4">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-400/15 text-base font-black text-sky-300 ring-1 ring-sky-400/20">
-                              {initials(user.full_name || user.email)}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="break-words text-base font-black leading-snug text-white md:text-lg">{user.full_name || "Unnamed user"}</p>
-                              <p className="mt-0.5 truncate text-sm font-semibold text-slate-400">{user.email}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex max-w-full flex-wrap gap-2 2xl:max-w-[420px] 2xl:justify-end">
-                            <span className="max-w-full rounded-full bg-violet-400/10 px-3 py-1 text-xs font-black capitalize text-violet-200 ring-1 ring-violet-400/20">
-                              {roleLabel(user.role)}
-                            </span>
-                            {user.hbt_name && (
-                              <span className="max-w-full truncate rounded-full bg-sky-400/10 px-3 py-1 text-xs font-black text-sky-200 ring-1 ring-sky-400/20 2xl:max-w-[210px]">
-                                {user.hbt_name}
-                              </span>
-                            )}
-                            {user.employer_name && (
-                              <span className="max-w-full truncate rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-black text-emerald-200 ring-1 ring-emerald-400/20 2xl:max-w-[190px]">
-                                {user.employer_name}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {recentUsers.length === 0 && <p className="text-sm font-bold text-slate-400">No users found.</p>}
-                  </div>
-                </div>
-
-                <div className="grid gap-5">
-                  <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl md:p-6">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-pink-300">Quick Actions</p>
-                    <div className="mt-4 grid gap-3">
-                      <Link to="/admin/partnerships" className="rounded-2xl bg-sky-400 px-4 py-3 text-sm font-black text-slate-950 shadow-lg shadow-sky-400/20 hover:bg-sky-300">Create Employer Partnership</Link>
-                      <Link to="/admin/hbts" className="rounded-2xl bg-violet-500/20 px-4 py-3 text-sm font-black text-violet-100 ring-1 ring-violet-400/25 hover:bg-violet-500/30">Add Home Buying Team</Link>
-                      <Link to="/admin/builder" className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-slate-100 ring-1 ring-white/10 hover:bg-white/15">Open Builder Mode</Link>
-                      <Link to="/admin/contact-messages" className="rounded-2xl bg-rose-500/15 px-4 py-3 text-sm font-black text-rose-200 ring-1 ring-rose-400/20 hover:bg-rose-500/20">Review Contact Forms</Link>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl md:p-6">
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-300">Partnerships</p>
-                        <h2 className="mt-1 text-xl font-black text-white">Latest portals</h2>
-                      </div>
-                      <Link to="/admin/partnerships" className="text-xs font-black text-sky-300 hover:text-sky-200">Open</Link>
-                    </div>
-                    <div className="space-y-3">
-                      {latestPartnerships.map((partnership) => (
-                        <div key={partnership.id} className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="font-black text-white">{partnership.employer_name}</p>
-                              <p className="mt-1 text-xs font-semibold text-slate-400">{partnership.hbt_name} · /{partnership.slug}</p>
-                            </div>
-                            <span className={`rounded-full px-3 py-1 text-xs font-black capitalize ${partnership.status === "active" ? "bg-emerald-400/10 text-emerald-300 ring-1 ring-emerald-400/20" : "bg-amber-400/10 text-amber-300 ring-1 ring-amber-400/20"}`}>{partnership.status}</span>
-                          </div>
-                        </div>
-                      ))}
-                      {latestPartnerships.length === 0 && <p className="text-sm font-bold text-slate-400">No partnerships found.</p>}
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <section className="relative mt-5 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl md:p-6">
-                <div className="mb-5 flex items-center justify-between gap-3">
+            <section className="grid gap-6 xl:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Active user rate</p>
+                <div className="mt-4 flex items-end justify-between gap-4">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-rose-300">Inbox</p>
-                    <h2 className="mt-1 text-2xl font-black text-white">Recent contact messages</h2>
+                    <p className="text-4xl font-black tracking-tight text-slate-950">{activeUserRate}%</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-500">{activeUsers} of {totalUsers} accounts active</p>
                   </div>
-                  <Link to="/admin/contact-messages" className="rounded-full bg-white/10 px-3 py-2 text-xs font-black text-slate-200 hover:bg-white/15">Open Inbox</Link>
+                  <span className="rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-blue-700">Account status</span>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {recentMessages.map((message) => (
-                    <div key={message.id} className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <p className="font-black text-white">{message.name || "Website Visitor"}</p>
-                        <span className={`rounded-full px-3 py-1 text-xs font-black ${Number(message.is_read) === 0 ? "bg-rose-400/10 text-rose-300 ring-1 ring-rose-400/20" : "bg-emerald-400/10 text-emerald-300 ring-1 ring-emerald-400/20"}`}>{Number(message.is_read) === 0 ? "Unread" : "Read"}</span>
-                      </div>
-                      <p className="text-xs font-semibold text-slate-400">{message.email || "No email"}</p>
-                      <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-slate-300">{message.message || "No message preview available."}</p>
+                <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-blue-600" style={{ width: `${activeUserRate}%` }} />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Active partnerships</p>
+                <div className="mt-4 flex items-end justify-between gap-4">
+                  <div>
+                    <p className="text-4xl font-black tracking-tight text-slate-950">{activePartnerships}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-500">of {partnerships.length} employer portals</p>
+                  </div>
+                  <span className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-700">{activePartnershipRate}% active</span>
+                </div>
+                <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-emerald-500" style={{ width: `${activePartnershipRate}%` }} />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Role distribution</p>
+                    <h3 className="mt-1 text-xl font-black text-slate-950">Current accounts</h3>
+                  </div>
+                  <Link to="/admin/users" className="text-sm font-black text-blue-600 hover:text-blue-700">Manage</Link>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {roleBreakdown.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between gap-4">
+                      <span className="text-sm font-semibold text-slate-600">{item.label}</span>
+                      <span className="text-sm font-black text-slate-950">{item.value}</span>
                     </div>
                   ))}
-                  {recentMessages.length === 0 && <p className="text-sm font-bold text-slate-400">No messages found.</p>}
                 </div>
-              </section>
-            </>
-          )}
-        </div>
+              </div>
+            </section>
+
+            <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-600">Users</p>
+                    <h3 className="mt-1 text-xl font-black text-slate-950">Recent accounts</h3>
+                  </div>
+                  <Link to="/admin/users" className="text-sm font-black text-blue-600 hover:text-blue-700">View all</Link>
+                </div>
+
+                <div className="mt-5 divide-y divide-slate-100">
+                  {recentUsers.length === 0 ? (
+                    <p className="py-8 text-center text-sm font-semibold text-slate-500">No users found.</p>
+                  ) : recentUsers.map((user) => (
+                    <div key={user.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-sm font-black text-blue-700">
+                          {initials(user.full_name)}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black text-slate-950">{user.full_name}</p>
+                          <p className="truncate text-xs font-semibold text-slate-500">{user.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black capitalize text-slate-600">
+                          {roleLabel(user.role)}
+                        </span>
+                        {(user.employer_name || user.hbt_name) ? (
+                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700">
+                            {user.employer_name || user.hbt_name}
+                          </span>
+                        ) : null}
+                        <span className="text-xs font-semibold text-slate-400">{formatDate(user.created_at)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-600">Content</p>
+                    <h3 className="mt-1 text-xl font-black text-slate-950">Published inventory</h3>
+                  </div>
+                  <Link to="/admin/resources" className="text-sm font-black text-blue-600 hover:text-blue-700">Open content</Link>
+                </div>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                  <ContentStat label="Resources" value={totalResources} href="/admin/resources" />
+                  <ContentStat label="Pricing plans" value={totalPricing} href="/admin/pricing" />
+                  <ContentStat label="FAQs" value={totalFAQs} href="/admin/faqs" />
+                  <ContentStat label="Quizzes" value={totalQuizzes} href="/admin/quizzes" />
+                </div>
+              </div>
+            </section>
+
+            <section className="grid gap-6 xl:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-600">Partnerships</p>
+                    <h3 className="mt-1 text-xl font-black text-slate-950">Latest employer portals</h3>
+                  </div>
+                  <Link to="/admin/partnerships" className="text-sm font-black text-blue-600 hover:text-blue-700">View all</Link>
+                </div>
+
+                <div className="mt-5 divide-y divide-slate-100">
+                  {latestPartnerships.length === 0 ? (
+                    <p className="py-8 text-center text-sm font-semibold text-slate-500">No partnerships found.</p>
+                  ) : latestPartnerships.map((partnership) => (
+                    <div key={partnership.id} className="flex items-center justify-between gap-4 py-4">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black text-slate-950">{partnership.employer_name || "Employer partnership"}</p>
+                        <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                          {partnership.hbt_name || "Unassigned HBT"} · {partnership.slug || `Partnership #${partnership.id}`}
+                        </p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${
+                        partnership.status === "active"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-slate-100 text-slate-600"
+                      }`}>
+                        {partnership.status || "unknown"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-600">Inbox</p>
+                    <h3 className="mt-1 text-xl font-black text-slate-950">Recent contact forms</h3>
+                  </div>
+                  <Link to="/admin/contact-messages" className="text-sm font-black text-blue-600 hover:text-blue-700">Open inbox</Link>
+                </div>
+
+                <div className="mt-5 divide-y divide-slate-100">
+                  {recentMessages.length === 0 ? (
+                    <p className="py-8 text-center text-sm font-semibold text-slate-500">No contact messages found.</p>
+                  ) : recentMessages.map((message) => (
+                    <div key={message.id} className="py-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black text-slate-950">{message.name || "Website visitor"}</p>
+                          <p className="truncate text-xs font-semibold text-slate-500">{message.email || "No email"}</p>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black ${
+                          Number(message.is_read) === 0
+                            ? "bg-blue-50 text-blue-700"
+                            : "bg-slate-100 text-slate-500"
+                        }`}>
+                          {Number(message.is_read) === 0 ? "Unread" : "Read"}
+                        </span>
+                      </div>
+                      {message.message ? (
+                        <p className="mt-2 line-clamp-2 text-sm font-medium leading-5 text-slate-600">{message.message}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </>
+        )}
       </div>
-      <ChatWidget />
     </AdminLayout>
   );
 }
