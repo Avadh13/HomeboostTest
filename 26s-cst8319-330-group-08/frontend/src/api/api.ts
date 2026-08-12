@@ -28,6 +28,7 @@ const codespaceBackendApiUrl =
     : "";
 
 const getApiBaseUrl = () => {
+  // Local PC: use local Node backend unless the developer explicitly points to another API.
   if (import.meta.env.DEV && isLocalBrowser) {
     if (!envApiUrl || envApiUrl.includes("railway.app") || envApiUrl.includes("app.github.dev")) {
       return localFallbackApiUrl;
@@ -35,14 +36,15 @@ const getApiBaseUrl = () => {
     return envApiUrl;
   }
 
-  // Codespaces uses the shared Railway backend unless an explicit Codespaces backend is enabled.
+  // GitHub Codespaces frontend: default to Railway backend for stable demo data.
+  // To test a Codespaces backend instead, set VITE_USE_CODESPACE_BACKEND=true.
   if (import.meta.env.DEV && isCodespacesBrowser) {
     if (useCodespaceBackend && codespaceBackendApiUrl) return codespaceBackendApiUrl;
     if (envApiUrl && !envApiUrl.includes("app.github.dev") && !envApiUrl.includes("localhost")) return envApiUrl;
     return railwayFallbackApiUrl;
   }
 
-  // Vercel production/preview uses its configured API URL first and the production Railway API as fallback.
+  // Vercel production/preview: use Vercel env first, Railway fallback second.
   return envApiUrl || railwayFallbackApiUrl;
 };
 

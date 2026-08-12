@@ -22,33 +22,40 @@ Tenant-scoped operations must derive `team_id` and `partnership_id` from the aut
 
 For inaccessible tenant objects, return `404` where practical to avoid object enumeration.
 
-Centralized access services currently include `journeyAccessService`, `quizJourneyAccessService`, quiz submission access middleware, readiness submission access checks, and employer approval partnership access checks.
+Centralized access services currently include:
+
+- `journeyAccessService`
+- `quizJourneyAccessService`
+- Quiz submission access middleware
+- Readiness submission access checks
+- Employer approval partnership access checks
 
 ## Authentication and account activation
 
 - JWTs are signed only by the backend.
 - Inactive users are rejected by authentication middleware.
-- New HBT accounts are created inactive where the activation workflow applies.
-- Passwords are created through single-use activation invitations for invitation-based roles.
-- Activation tokens are generated from cryptographic randomness and only token hashes are stored.
+- New HBT accounts are created inactive.
+- Passwords are created through single-use activation invitations.
+- Activation tokens are generated from 256 bits of cryptographic randomness.
+- Only SHA-256 token hashes are stored.
 - Activation tokens expire, can be revoked, and become unusable after acceptance.
+- Passwords require at least eight characters, uppercase, lowercase, and a number.
 - Existing accounts are never silently converted to another role or moved to another tenant.
 
 Current limitation: access JWTs remain in browser localStorage. A future session-hardening change must evaluate HttpOnly SameSite cookies or a short-lived access/rotating refresh-token design.
 
 ## Invitations
 
-- New invitation links and codes use cryptographic random generation.
+- New invitation links and six-digit codes are generated with `crypto`.
 - Only hashes are stored in `employee_invites`.
+- Plaintext legacy invitation credentials are backfilled to hashes and cleared by migration.
 - Raw link/code values are returned only at creation or resend time.
 - List endpoints never return tokens, codes, or hashes.
-- Resend invalidates previous credentials.
+- Resend revokes previous credentials.
 - Revoke clears usable credential hashes.
 - Acceptance is transactional and audited.
 
 ## Stripe
-
-Production HBT enrollment is Stripe-only. There is no public demo payment-completion endpoint and no synthetic checkout fallback.
 
 Production webhook handling requires:
 
@@ -56,25 +63,69 @@ Production webhook handling requires:
 - `STRIPE_WEBHOOK_SECRET`
 - A valid `stripe-signature`
 
-For `checkout.session.completed`, the backend verifies Stripe signature, event uniqueness, event type, paid status, registration metadata, stored checkout-session ID, stored Stripe payment/session ID, exact amount, exact currency, and customer email.
+For `checkout.session.completed`, the backend verifies:
 
-Payment update and HBT provisioning occur in one database transaction. Replayed event IDs are acknowledged without repeating side effects. When Stripe is not configured, HBT enrollment fails closed with a service-unavailable response instead of creating a synthetic payment.
+- Stripe signature
+- Event ID uniqueness
+- Event type
+- `payment_status === paid`
+- Registration metadata
+- Stored registration checkout-session ID
+- Stored payment provider/session ID
+- Exact amount
+- Exact currency
+- Customer email
 
-Historical records from an earlier demo-payment implementation may remain in the database for audit/history, but production payment summaries, lists, receipts, and status mutations exclude those records.
+Payment update and HBT provisioning occur in one database transaction. Replayed event IDs are acknowledged without repeating side effects.
 
 ## Public enrollment status
 
-Public payment/enrollment status URLs use opaque tokens. The database stores only token hashes. Responses expose only registration state, payment state, whether portal preparation is complete, and creation timestamp. They do not expose name, email, user ID, team ID, registration ID, Stripe session ID, or credentials.
+Public payment/enrollment status URLs use opaque tokens. The database stores only token hashes. Responses expose only:
+
+- Registration state
+- Payment state
+- Whether portal preparation is complete
+- Creation timestamp
+
+They do not expose name, email, user ID, team ID, registration ID, Stripe session ID, or credentials.
 
 ## Uploads
 
-The image upload route requires Admin/Super Admin/HBT Admin, accepts one file up to the configured limit, identifies approved image types by magic bytes, selects extension server-side, uses randomized filenames, rejects traversal, hashes content, and records an audit event.
+The image upload route:
 
-Remaining controls before full production readiness include image decode/re-encode, malware scanning, managed object storage, per-user/team quota, retention/cleanup, and replacement of unrestricted static-directory serving with managed asset delivery.
+- Requires Admin/Super Admin/HBT Admin
+- Accepts one file up to 5 MiB
+- Buffers before writing
+- Identifies JPEG/PNG/WebP by magic bytes
+- Selects extension server-side
+- Uses UUID filenames
+- Rejects path traversal
+- Writes with exclusive-create permissions
+- Calculates SHA-256
+- Records an audit event
+
+Remaining controls before production:
+
+- Decode/re-encode images
+- Malware scanning
+- Object storage
+- Per-user/team quota
+- Retention/cleanup
+- Replace unrestricted static-directory serving with managed asset delivery
 
 ## Audit logging
 
-`audit_logs` is append-only at the application layer. Events contain actor ID/role, action, entity type/ID, tenant scope, request correlation ID, protected request metadata, result, sanitized metadata, and timestamp.
+`audit_logs` is append-only at the application layer. Events contain:
+
+- Actor ID and role
+- Action
+- Entity type and ID
+- Team/partnership scope
+- Request correlation ID
+- HMAC-protected IP metadata
+- Success/failure result
+- Sanitized metadata
+- Timestamp
 
 Never log passwords, password hashes, JWTs, raw tokens, API keys, secrets, file contents, or sensitive financial data.
 
@@ -97,13 +148,12 @@ Never log passwords, password hashes, JWTs, raw tokens, API keys, secrets, file 
 - `HBT_PROGRAM_CURRENCY`
 - `AUDIT_IP_HASH_SECRET`
 
-Production safety settings:
+Production safety flags:
 
+- `ALLOW_DEMO_PAYMENT_COMPLETION=false`
 - `ENABLE_DIAGNOSTIC_ROUTES=false`
 - `ALLOW_LOCAL_ORIGINS=false`
 - `ALLOW_CODESPACES_ORIGINS=false`
-
-There is intentionally no environment switch that re-enables demo payment completion.
 
 Never place server secrets in frontend `VITE_` variables.
 
