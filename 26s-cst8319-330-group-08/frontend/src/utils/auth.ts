@@ -40,11 +40,26 @@ export const readStoredToken = () => {
   return window.localStorage.getItem("token");
 };
 
+export const buildAuthHeaders = (extraHeaders: Record<string, string> = {}) => {
+  const token = readStoredToken();
+  return {
+    ...extraHeaders,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 export const clearStoredSession = () => {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem("token");
   window.localStorage.removeItem("user");
   document.body.classList.remove("hb-portal-mode");
+};
+
+export const handleUnauthorizedResponse = (response: Response) => {
+  if (response.status !== 401) return false;
+  clearStoredSession();
+  if (typeof window !== "undefined") window.location.assign("/login");
+  return true;
 };
 
 export const hasStoredSession = () => Boolean(readStoredToken() && readStoredUser());
