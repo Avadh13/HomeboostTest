@@ -11,6 +11,10 @@ const {
   publicInvitePayload,
   deliveryPayload,
 } = require("../services/inviteSecurityService");
+const {
+  InviteLifecycleError,
+  createOrRefreshEmployeeInvite,
+} = require("../services/inviteLifecycleService");
 const { recordAuditEvent } = require("../services/auditLogService");
 
 const router = express.Router();
@@ -19,8 +23,6 @@ const companyRoles = ["company", "company_admin"];
 const canInvite = (user) => adminRoles.includes(user?.role) || user?.role === "hbt_admin" || companyRoles.includes(user?.role);
 const allowedInviteRoles = new Set(["employee", "company", "company_admin"]);
 const clean = (value, max = 255) => String(value || "").trim().slice(0, max);
-const emailClean = (value) => clean(value, 255).toLowerCase();
-const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
 const ensureInviteTables = async () => undefined;
 
@@ -65,6 +67,7 @@ router.get("/validate/:token", async (req, res) => {
 
 router.post("/accept", async (req, res) => {
   const connection = await pool.getConnection();
+  let transactionStarted = false;
   try {
     const credential = clean(req.body.token, 200);
     const fullName = clean(req.body.full_name, 255);
@@ -78,14 +81,17 @@ router.post("/accept", async (req, res) => {
     }
 
     await connection.beginTransaction();
+    transactionStarted = true;
     const invite = await findInviteByCredential(connection, credential, { forUpdate: true });
     const stateError = inviteStateError(invite);
     if (stateError) {
       await connection.rollback();
+      transactionStarted = false;
       return res.status(stateError.status).json({ status: "error", message: stateError.message });
     }
     if (invite.partnership_status !== "active") {
       await connection.rollback();
+      transactionStarted = false;
       return res.status(410).json({ status: "error", message: "Employer portal is not active" });
     }
 
@@ -95,6 +101,7 @@ router.post("/accept", async (req, res) => {
     );
     if (existingUser) {
       await connection.rollback();
+      transactionStarted = false;
       return res.status(409).json({ status: "error", message: "This email already has an account. Please sign in." });
     }
 
@@ -148,6 +155,7 @@ router.post("/accept", async (req, res) => {
       metadata: { invite_role: inviteRole },
     });
     await connection.commit();
+    transactionStarted = false;
 
     const redirectTo = inviteRole === "employee" ? "/employee-portal" : "/company/dashboard";
     const authToken = jwt.sign(
@@ -169,7 +177,7 @@ router.post("/accept", async (req, res) => {
       },
     });
   } catch (error) {
-    await connection.rollback();
+    if (transactionStarted) await connection.rollback();
     return res.status(500).json({ status: "error", message: "Failed to accept invite" });
   } finally {
     connection.release();
@@ -230,97 +238,52 @@ router.get("/", async (req, res) => {
 
 router.post("/employee", async (req, res) => {
   const connection = await pool.getConnection();
+  let transactionStarted = false;
   try {
     if (!canInvite(req.user)) {
       return res.status(403).json({ status: "error", message: "Invite access required" });
     }
 
     const partnershipId = Number(req.body.partnership_id || req.user.partnership_id);
-    const fullName = clean(req.body.full_name, 255);
-    const email = emailClean(req.body.email);
-    if (!partnershipId || !fullName || !isEmail(email)) {
-      return res.status(400).json({ status: "error", message: "Valid partnership, full name, and email are required" });
-    }
     if (!(await requirePartnershipAccess(req.user, partnershipId, connection))) {
       return res.status(404).json({ status: "error", message: "Partnership not found" });
     }
 
-    const expiresDays = Math.min(Math.max(Number(req.body.expires_days || 14), 1), 30);
-    const credentials = createInviteCredentials();
-
     await connection.beginTransaction();
-    const [[account]] = await connection.query(
-      "SELECT id FROM users WHERE email = ? LIMIT 1 FOR UPDATE",
-      [email],
-    );
-    if (account) {
-      await connection.rollback();
-      return res.status(409).json({ status: "error", message: "This email already has an account" });
-    }
+    transactionStarted = true;
+    const result = await createOrRefreshEmployeeInvite(connection, {
+      partnershipId,
+      invitedByUserId: req.user.id,
+      fullName: req.body.full_name,
+      email: req.body.email,
+      expiresDays: req.body.expires_days || 14,
+    });
 
-    const [[existingInvite]] = await connection.query(
-      `SELECT id, status FROM employee_invites
-       WHERE partnership_id = ? AND email = ?
-       LIMIT 1 FOR UPDATE`,
-      [partnershipId, email],
-    );
-    if (existingInvite?.status === "registered") {
-      await connection.rollback();
-      return res.status(409).json({ status: "error", message: "This invite has already been registered" });
-    }
-
-    await connection.query(
-      `INSERT INTO employee_invites
-       (partnership_id, invited_by_user_id, full_name, email, status, invite_role,
-        invite_token, invite_code, invite_token_hash, invite_code_hash,
-        expires_at, last_sent_at, revoked_at)
-       VALUES (?, ?, ?, ?, 'invited', 'employee', NULL, NULL, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), NOW(), NULL)
-       ON DUPLICATE KEY UPDATE
-         full_name = VALUES(full_name),
-         invited_by_user_id = VALUES(invited_by_user_id),
-         status = 'invited',
-         invite_role = 'employee',
-         invite_token = NULL,
-         invite_code = NULL,
-         invite_token_hash = VALUES(invite_token_hash),
-         invite_code_hash = VALUES(invite_code_hash),
-         expires_at = VALUES(expires_at),
-         revoked_at = NULL,
-         last_sent_at = NOW()`,
-      [partnershipId, req.user.id, fullName, email, credentials.tokenHash, credentials.codeHash, expiresDays],
-    );
-
-    const [[invite]] = await connection.query(
-      `SELECT ei.*, p.team_id, p.status AS partnership_status, p.slug AS partnership_slug,
-              e.name AS employer_name
-       FROM employee_invites ei
-       JOIN partnerships p ON p.id = ei.partnership_id
-       LEFT JOIN employers e ON e.id = p.employer_id
-       WHERE ei.partnership_id = ? AND ei.email = ?
-       LIMIT 1`,
-      [partnershipId, email],
-    );
-    await logInvite(connection, invite.id, "created", req.user.id, "Employee invite generated");
+    await logInvite(connection, result.rawInvite.id, "created", req.user.id, "Employee invite generated");
     await recordAuditEvent({
       connection,
       req,
       action: "invite.created",
       entityType: "employee_invite",
-      entityId: invite.id,
-      teamId: invite.team_id,
+      entityId: result.rawInvite.id,
+      teamId: result.rawInvite.team_id,
       partnershipId,
-      metadata: { invite_role: "employee", expires_days: expiresDays },
+      metadata: { invite_role: "employee" },
     });
     await connection.commit();
+    transactionStarted = false;
 
     return res.status(201).json({
       status: "success",
       message: "Employee invite created",
-      invite: publicInvitePayload(invite),
-      delivery: deliveryPayload(invite, credentials),
+      invite: result.invite,
+      delivery: result.delivery,
     });
   } catch (error) {
-    await connection.rollback();
+    if (transactionStarted) await connection.rollback();
+    if (error instanceof InviteLifecycleError) {
+      return res.status(error.statusCode).json({ status: "error", code: error.code, message: error.message });
+    }
     return res.status(500).json({ status: "error", message: "Failed to create invite" });
   } finally {
     connection.release();
@@ -329,12 +292,14 @@ router.post("/employee", async (req, res) => {
 
 router.post("/resend/:id", async (req, res) => {
   const connection = await pool.getConnection();
+  let transactionStarted = false;
   try {
     if (!canInvite(req.user)) {
       return res.status(403).json({ status: "error", message: "Invite access required" });
     }
 
     await connection.beginTransaction();
+    transactionStarted = true;
     const [[invite]] = await connection.query(
       `SELECT ei.*, p.team_id, p.status AS partnership_status, p.slug AS partnership_slug,
               e.name AS employer_name
@@ -347,10 +312,12 @@ router.post("/resend/:id", async (req, res) => {
     );
     if (!invite || !(await requirePartnershipAccess(req.user, invite.partnership_id, connection))) {
       await connection.rollback();
+      transactionStarted = false;
       return res.status(404).json({ status: "error", message: "Invite not found" });
     }
     if (invite.status === "registered") {
       await connection.rollback();
+      transactionStarted = false;
       return res.status(409).json({ status: "error", message: "Registered invite cannot be resent" });
     }
 
@@ -380,6 +347,7 @@ router.post("/resend/:id", async (req, res) => {
       metadata: { invite_role: invite.invite_role || "employee" },
     });
     await connection.commit();
+    transactionStarted = false;
 
     return res.json({
       status: "success",
@@ -388,7 +356,7 @@ router.post("/resend/:id", async (req, res) => {
       delivery: deliveryPayload({ ...invite, status: "invited" }, credentials),
     });
   } catch (error) {
-    await connection.rollback();
+    if (transactionStarted) await connection.rollback();
     return res.status(500).json({ status: "error", message: "Failed to resend invite" });
   } finally {
     connection.release();
@@ -397,12 +365,14 @@ router.post("/resend/:id", async (req, res) => {
 
 router.post("/revoke/:id", async (req, res) => {
   const connection = await pool.getConnection();
+  let transactionStarted = false;
   try {
     if (!canInvite(req.user)) {
       return res.status(403).json({ status: "error", message: "Invite access required" });
     }
 
     await connection.beginTransaction();
+    transactionStarted = true;
     const [[invite]] = await connection.query(
       `SELECT ei.*, p.team_id
        FROM employee_invites ei
@@ -413,10 +383,12 @@ router.post("/revoke/:id", async (req, res) => {
     );
     if (!invite || !(await requirePartnershipAccess(req.user, invite.partnership_id, connection))) {
       await connection.rollback();
+      transactionStarted = false;
       return res.status(404).json({ status: "error", message: "Invite not found" });
     }
     if (invite.status === "registered") {
       await connection.rollback();
+      transactionStarted = false;
       return res.status(409).json({ status: "error", message: "Registered invite cannot be revoked" });
     }
 
@@ -447,10 +419,11 @@ router.post("/revoke/:id", async (req, res) => {
       metadata: { invite_role: invite.invite_role || "employee" },
     });
     await connection.commit();
+    transactionStarted = false;
 
     return res.json({ status: "success", message: "Invite revoked" });
   } catch (error) {
-    await connection.rollback();
+    if (transactionStarted) await connection.rollback();
     return res.status(500).json({ status: "error", message: "Failed to revoke invite" });
   } finally {
     connection.release();

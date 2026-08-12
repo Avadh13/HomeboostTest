@@ -4,9 +4,10 @@ const protect = require("../middleware/authMiddleware");
 
 const router = express.Router();
 const adminRoles = ["admin", "super_admin"];
-const hbtRoles = ["hbt_admin", "hbt_member"];
 const isAdmin = (user) => adminRoles.includes(user?.role);
-const isHbt = (user) => hbtRoles.includes(user?.role);
+const isHbtAdmin = (user) => user?.role === "hbt_admin";
+const isHbtMember = (user) => user?.role === "hbt_member";
+const isHbt = (user) => isHbtAdmin(user) || isHbtMember(user);
 
 const ensureRecommendationTables = async (connection = pool) => {
   await connection.query(`CREATE TABLE IF NOT EXISTS employee_readiness_scores (
@@ -45,17 +46,10 @@ const ensureRecommendationTables = async (connection = pool) => {
     INDEX idx_activity_created (created_at)
   )`);
 
-  await connection.query(`CREATE TABLE IF NOT EXISTS resource_categories (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(120) NOT NULL,
-    slug VARCHAR(120) NOT NULL UNIQUE,
-    description TEXT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`);
-
   await connection.query(`CREATE TABLE IF NOT EXISTS resource_recommendation_rules (
     id INT AUTO_INCREMENT PRIMARY KEY,
     resource_id INT NOT NULL,
+    team_id INT NULL,
     readiness_level VARCHAR(60) NULL,
     priority VARCHAR(20) NULL,
     keyword VARCHAR(120) NULL,
@@ -63,6 +57,7 @@ const ensureRecommendationTables = async (connection = pool) => {
     is_active TINYINT(1) DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_resource_rule_resource (resource_id),
+    INDEX idx_resource_rule_team (team_id),
     INDEX idx_resource_rule_level (readiness_level),
     INDEX idx_resource_rule_priority (priority),
     INDEX idx_resource_rule_keyword (keyword)
@@ -91,8 +86,11 @@ const lower = (value = "") => String(value || "").toLowerCase();
 
 const getEmployeeScope = async (user) => {
   if (!user?.partnership_id) return { partnershipId: null, teamId: user?.team_id || null };
-  const [[partnership]] = await pool.query("SELECT id, team_id FROM partnerships WHERE id = ? LIMIT 1", [user.partnership_id]);
-  return { partnershipId: user.partnership_id, teamId: partnership?.team_id || user.team_id || null };
+  const [[partnership]] = await pool.query(
+    "SELECT id, team_id FROM partnerships WHERE id = ? AND status = 'active' LIMIT 1",
+    [user.partnership_id],
+  );
+  return { partnershipId: partnership?.id || null, teamId: partnership?.team_id || null };
 };
 
 const accessibleResourceSql = `
@@ -137,7 +135,7 @@ const scoreResource = (resource, readiness, rules) => {
   }
 
   const priority = lower(readiness?.priority);
-  if (priority === "hot" && /pre.?approval|checklist|appointment|buyer|buying/.test(searchText)) {
+  if (priority === "hot" && /pre.?approval|checklist|buyer|buying/.test(searchText)) {
     score += 18;
     reasons.push("Useful for active buyers");
   }
@@ -165,6 +163,58 @@ const scoreResource = (resource, readiness, rules) => {
   return { ...resource, recommendation_score: score, recommendation_reason: reasons[0] || "Recommended HomeBoost resource" };
 };
 
+const requireRuleViewer = (req, res) => {
+  if (!isAdmin(req.user) && !isHbt(req.user)) {
+    res.status(403).json({ status: "error", message: "Admin or HBT access required" });
+    return false;
+  }
+  if (isHbt(req.user) && !req.user.team_id) {
+    res.status(403).json({ status: "error", message: "HBT account is not linked to a team" });
+    return false;
+  }
+  return true;
+};
+
+const requireRuleManager = (req, res) => {
+  if (!isAdmin(req.user) && !isHbtAdmin(req.user)) {
+    res.status(403).json({ status: "error", message: "Admin or HBT Admin access required" });
+    return false;
+  }
+  if (isHbtAdmin(req.user) && !req.user.team_id) {
+    res.status(403).json({ status: "error", message: "HBT Admin account is not linked to a team" });
+    return false;
+  }
+  return true;
+};
+
+const resolveRuleTeamId = async (user, requestedTeamId, connection = pool) => {
+  if (isHbtAdmin(user)) return Number(user.team_id);
+  if (!requestedTeamId) return null;
+  const teamId = Number(requestedTeamId);
+  if (!teamId) return undefined;
+  const [[team]] = await connection.query(
+    "SELECT id FROM home_buying_teams WHERE id = ? AND is_active = 1 LIMIT 1",
+    [teamId],
+  );
+  return team ? teamId : undefined;
+};
+
+const canUseResourceForRule = async (user, resourceId, connection = pool) => {
+  const id = Number(resourceId);
+  if (!id) return false;
+  if (isAdmin(user)) {
+    const [[resource]] = await connection.query("SELECT id FROM resources WHERE id = ? AND is_active = 1 LIMIT 1", [id]);
+    return Boolean(resource);
+  }
+  const [[resource]] = await connection.query(
+    `SELECT id FROM resources
+     WHERE id = ? AND is_active = 1 AND (is_global = 1 OR team_id = ?)
+     LIMIT 1`,
+    [id, user.team_id],
+  );
+  return Boolean(resource);
+};
+
 router.get("/me", protect, async (req, res) => {
   try {
     if (req.user.role !== "employee") return res.status(403).json({ status: "error", message: "Employee access required" });
@@ -176,7 +226,7 @@ router.get("/me", protect, async (req, res) => {
        FROM employee_readiness_scores
        WHERE user_id = ?
        LIMIT 1`,
-      [req.user.id]
+      [req.user.id],
     );
 
     const readiness = readinessRow
@@ -185,25 +235,23 @@ router.get("/me", protect, async (req, res) => {
 
     const [resources] = await pool.query(
       `${accessibleResourceSql} ORDER BY r.display_order ASC, r.id DESC`,
-      [teamId, partnershipId]
+      [teamId, partnershipId],
     );
 
-    const [rules] = await pool.query("SELECT * FROM resource_recommendation_rules WHERE is_active = 1");
+    const [rules] = await pool.query(
+      `SELECT * FROM resource_recommendation_rules
+       WHERE is_active = 1 AND (team_id IS NULL OR team_id = ?)`,
+      [teamId],
+    );
 
     const scored = resources
       .map((resource) => scoreResource(resource, readiness, rules))
       .sort((a, b) => b.recommendation_score - a.recommendation_score || Number(a.display_order || 0) - Number(b.display_order || 0));
 
     const recommended = scored.filter((resource) => Number(resource.recommendation_score || 0) > 0).slice(0, 6);
-    const fallback = scored.slice(0, 6);
-
-    return res.json({
-      status: "success",
-      readiness,
-      resources: recommended.length ? recommended : fallback,
-    });
+    return res.json({ status: "success", readiness, resources: recommended.length ? recommended : scored.slice(0, 6) });
   } catch (error) {
-    return res.status(500).json({ status: "error", message: "Failed to load recommended resources", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to load recommended resources" });
   }
 });
 
@@ -214,80 +262,141 @@ router.post("/:resourceId/view", protect, async (req, res) => {
     const resourceId = Number(req.params.resourceId);
     if (!resourceId) return res.status(400).json({ status: "error", message: "Valid resource ID is required" });
 
+    const { partnershipId, teamId } = await getEmployeeScope(req.user);
+    const [[accessible]] = await pool.query(
+      `${accessibleResourceSql} AND r.id = ? LIMIT 1`,
+      [teamId, partnershipId, resourceId],
+    );
+    if (!accessible) return res.status(404).json({ status: "error", message: "Resource not found" });
+
     await pool.query(
       "INSERT INTO resource_views (resource_id, user_id, partnership_id) VALUES (?, ?, ?)",
-      [resourceId, req.user.id, req.user.partnership_id || null]
+      [resourceId, req.user.id, partnershipId],
     );
     await pool.query(
       `INSERT INTO employee_activity_logs (user_id, partnership_id, activity_type, activity_label, metadata)
        VALUES (?, ?, 'resource_view', 'Resource viewed', ?)`,
-      [req.user.id, req.user.partnership_id || null, JSON.stringify({ resource_id: resourceId })]
+      [req.user.id, partnershipId, JSON.stringify({ resource_id: resourceId })],
     );
 
     return res.json({ status: "success", message: "Resource view recorded" });
   } catch (error) {
-    return res.status(500).json({ status: "error", message: "Failed to record resource view", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to record resource view" });
   }
 });
 
 router.get("/admin/rules", protect, async (req, res) => {
   try {
-    if (!isAdmin(req.user) && !isHbt(req.user)) return res.status(403).json({ status: "error", message: "Admin or HBT access required" });
+    if (!requireRuleViewer(req, res)) return;
     await ensureRecommendationTables();
+
+    const params = [];
+    const scope = isAdmin(req.user) ? "" : "WHERE rr.team_id IS NULL OR rr.team_id = ?";
+    if (!isAdmin(req.user)) params.push(req.user.team_id);
+
     const [rules] = await pool.query(
-      `SELECT rr.*, r.title AS resource_title
+      `SELECT rr.*, r.title AS resource_title, h.name AS team_name
        FROM resource_recommendation_rules rr
        JOIN resources r ON r.id = rr.resource_id
-       ORDER BY rr.id DESC`
+       LEFT JOIN home_buying_teams h ON h.id = rr.team_id
+       ${scope}
+       ORDER BY rr.id DESC`,
+      params,
     );
     return res.json({ status: "success", rules });
   } catch (error) {
-    return res.status(500).json({ status: "error", message: "Failed to load recommendation rules", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to load recommendation rules" });
   }
 });
 
 router.post("/admin/rules", protect, async (req, res) => {
   try {
-    if (!isAdmin(req.user) && !isHbt(req.user)) return res.status(403).json({ status: "error", message: "Admin or HBT access required" });
+    if (!requireRuleManager(req, res)) return;
     await ensureRecommendationTables();
     const { resource_id, readiness_level, priority, keyword, rule_label, is_active } = req.body;
-    if (!resource_id) return res.status(400).json({ status: "error", message: "resource_id is required" });
-    await pool.query(
-      `INSERT INTO resource_recommendation_rules (resource_id, readiness_level, priority, keyword, rule_label, is_active)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [resource_id, readiness_level || null, priority || null, keyword || null, rule_label || null, is_active ?? 1]
+    if (!(await canUseResourceForRule(req.user, resource_id))) {
+      return res.status(404).json({ status: "error", message: "Resource not found for this rule scope" });
+    }
+
+    const teamId = await resolveRuleTeamId(req.user, req.body.team_id);
+    if (teamId === undefined) return res.status(400).json({ status: "error", message: "Invalid rule team" });
+
+    const [result] = await pool.query(
+      `INSERT INTO resource_recommendation_rules
+       (resource_id, team_id, readiness_level, priority, keyword, rule_label, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [resource_id, teamId, readiness_level || null, priority || null, keyword || null, rule_label || null, is_active ?? 1],
     );
-    return res.status(201).json({ status: "success", message: "Recommendation rule created" });
+    return res.status(201).json({ status: "success", message: "Recommendation rule created", rule_id: result.insertId, team_id: teamId });
   } catch (error) {
-    return res.status(500).json({ status: "error", message: "Failed to create recommendation rule", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to create recommendation rule" });
   }
 });
 
 router.put("/admin/rules/:id", protect, async (req, res) => {
   try {
-    if (!isAdmin(req.user) && !isHbt(req.user)) return res.status(403).json({ status: "error", message: "Admin or HBT access required" });
+    if (!requireRuleManager(req, res)) return;
     await ensureRecommendationTables();
-    const { resource_id, readiness_level, priority, keyword, rule_label, is_active } = req.body;
-    await pool.query(
-      `UPDATE resource_recommendation_rules
-       SET resource_id = ?, readiness_level = ?, priority = ?, keyword = ?, rule_label = ?, is_active = ?
-       WHERE id = ?`,
-      [resource_id, readiness_level || null, priority || null, keyword || null, rule_label || null, is_active ?? 1, req.params.id]
+
+    const ruleId = Number(req.params.id);
+    if (!ruleId) return res.status(400).json({ status: "error", message: "Valid rule ID is required" });
+
+    const params = [ruleId];
+    let ownerClause = "";
+    if (isHbtAdmin(req.user)) {
+      ownerClause = " AND team_id = ?";
+      params.push(req.user.team_id);
+    }
+    const [[existing]] = await pool.query(
+      `SELECT id, team_id FROM resource_recommendation_rules WHERE id = ?${ownerClause} LIMIT 1`,
+      params,
     );
-    return res.json({ status: "success", message: "Recommendation rule updated" });
+    if (!existing) return res.status(404).json({ status: "error", message: "Recommendation rule not found" });
+
+    if (!(await canUseResourceForRule(req.user, req.body.resource_id))) {
+      return res.status(404).json({ status: "error", message: "Resource not found for this rule scope" });
+    }
+
+    const teamId = isHbtAdmin(req.user)
+      ? Number(req.user.team_id)
+      : await resolveRuleTeamId(req.user, req.body.team_id);
+    if (teamId === undefined) return res.status(400).json({ status: "error", message: "Invalid rule team" });
+
+    const [result] = await pool.query(
+      `UPDATE resource_recommendation_rules
+       SET resource_id = ?, team_id = ?, readiness_level = ?, priority = ?, keyword = ?, rule_label = ?, is_active = ?
+       WHERE id = ?`,
+      [req.body.resource_id, teamId, req.body.readiness_level || null, req.body.priority || null, req.body.keyword || null, req.body.rule_label || null, req.body.is_active ?? 1, ruleId],
+    );
+    if (Number(result.affectedRows || 0) !== 1) return res.status(404).json({ status: "error", message: "Recommendation rule not found" });
+    return res.json({ status: "success", message: "Recommendation rule updated", team_id: teamId });
   } catch (error) {
-    return res.status(500).json({ status: "error", message: "Failed to update recommendation rule", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to update recommendation rule" });
   }
 });
 
 router.delete("/admin/rules/:id", protect, async (req, res) => {
   try {
-    if (!isAdmin(req.user) && !isHbt(req.user)) return res.status(403).json({ status: "error", message: "Admin or HBT access required" });
+    if (!requireRuleManager(req, res)) return;
     await ensureRecommendationTables();
-    await pool.query("DELETE FROM resource_recommendation_rules WHERE id = ?", [req.params.id]);
+
+    const ruleId = Number(req.params.id);
+    if (!ruleId) return res.status(400).json({ status: "error", message: "Valid rule ID is required" });
+
+    const params = [ruleId];
+    let ownerClause = "";
+    if (isHbtAdmin(req.user)) {
+      ownerClause = " AND team_id = ?";
+      params.push(req.user.team_id);
+    }
+    const [result] = await pool.query(
+      `DELETE FROM resource_recommendation_rules WHERE id = ?${ownerClause}`,
+      params,
+    );
+    if (Number(result.affectedRows || 0) !== 1) return res.status(404).json({ status: "error", message: "Recommendation rule not found" });
     return res.json({ status: "success", message: "Recommendation rule deleted" });
   } catch (error) {
-    return res.status(500).json({ status: "error", message: "Failed to delete recommendation rule", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to delete recommendation rule" });
   }
 });
 

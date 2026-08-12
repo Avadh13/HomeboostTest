@@ -1,10 +1,14 @@
 const fs = require("fs");
 const csv = require("csv-parser");
 const pool = require("../config/db");
-
-const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
-const normalizeName = (value) => String(value || "").trim();
-const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const {
+  InviteLifecycleError,
+  normalizeEmail,
+  normalizeName,
+  isValidEmail,
+  createOrRefreshEmployeeInvite,
+  revokePendingBatchInvites,
+} = require("../services/inviteLifecycleService");
 
 const readCsvRows = (filePath) =>
   new Promise((resolve, reject) => {
@@ -24,6 +28,7 @@ const removeUploadedFile = (filePath) => {
 
 exports.uploadEmployeesCsv = async (req, res) => {
   let connection;
+  let transactionStarted = false;
 
   try {
     const user = req.user;
@@ -39,7 +44,6 @@ exports.uploadEmployeesCsv = async (req, res) => {
     }
 
     const rows = await readCsvRows(req.file.path);
-
     if (rows.length === 0) {
       removeUploadedFile(req.file.path);
       return res.status(400).json({ status: "error", message: "CSV file is empty. Required headers: full_name,email" });
@@ -47,28 +51,29 @@ exports.uploadEmployeesCsv = async (req, res) => {
 
     connection = await pool.getConnection();
     await connection.beginTransaction();
+    transactionStarted = true;
 
     const [partnerships] = await connection.query(
       `SELECT id, team_id, slug
        FROM partnerships
        WHERE id = ? AND team_id = ? AND status = 'active'
-       LIMIT 1`,
-      [partnershipId, user.team_id]
+       LIMIT 1
+       FOR UPDATE`,
+      [partnershipId, user.team_id],
     );
 
     if (partnerships.length === 0) {
       await connection.rollback();
+      transactionStarted = false;
       removeUploadedFile(req.file.path);
       return res.status(403).json({ status: "error", message: "Partnership not found or not assigned to your team" });
     }
-
-    const partnership = partnerships[0];
 
     const [batchResult] = await connection.query(
       `INSERT INTO enrollment_batches
        (partnership_id, uploaded_by_user_id, original_filename)
        VALUES (?, ?, ?)`,
-      [partnershipId, user.id, req.file.originalname]
+      [partnershipId, user.id, req.file.originalname],
     );
 
     const batchId = batchResult.insertId;
@@ -85,83 +90,78 @@ exports.uploadEmployeesCsv = async (req, res) => {
       const rowNumber = index + 2;
 
       if (!fullName || !email) {
-        skipped++;
+        skipped += 1;
         errors.push({ row_number: rowNumber, email, reason: "Missing full_name or email" });
         continue;
       }
 
       if (!isValidEmail(email)) {
-        skipped++;
+        skipped += 1;
         errors.push({ row_number: rowNumber, email, reason: "Invalid email format" });
         continue;
       }
 
       if (seenEmails.has(email)) {
-        skipped++;
+        skipped += 1;
         errors.push({ row_number: rowNumber, email, reason: "Duplicate email inside this CSV" });
         continue;
       }
 
       seenEmails.add(email);
 
-      const [existingUser] = await connection.query("SELECT id FROM users WHERE email = ? LIMIT 1", [email]);
-
-      if (existingUser.length > 0) {
-        skipped++;
-        errors.push({ row_number: rowNumber, email, reason: "Email already has an account" });
-        continue;
+      try {
+        const result = await createOrRefreshEmployeeInvite(connection, {
+          partnershipId,
+          enrollmentBatchId: batchId,
+          invitedByUserId: user.id,
+          fullName,
+          email,
+          expiresDays: 14,
+        });
+        invited += 1;
+        invitedEmployees.push({
+          full_name: result.invite.full_name,
+          email: result.invite.email,
+          invite_link: result.delivery.invite_link,
+          invite_code: result.delivery.invite_code,
+          expires_at: result.invite.expires_at,
+        });
+      } catch (error) {
+        if (!(error instanceof InviteLifecycleError)) throw error;
+        skipped += 1;
+        errors.push({ row_number: rowNumber, email, reason: error.message });
       }
-
-      await connection.query(
-        `INSERT INTO employee_invites
-         (partnership_id, enrollment_batch_id, invited_by_user_id, full_name, email, status)
-         VALUES (?, ?, ?, ?, ?, 'invited')
-         ON DUPLICATE KEY UPDATE
-           full_name = VALUES(full_name),
-           enrollment_batch_id = VALUES(enrollment_batch_id),
-           invited_by_user_id = VALUES(invited_by_user_id),
-           status = IF(status = 'registered', 'registered', 'invited'),
-           revoked_at = NULL`,
-        [partnershipId, batchId, user.id, fullName, email]
-      );
-
-      invited++;
-      invitedEmployees.push({
-        full_name: fullName,
-        email,
-        signup_url: `/signup?partnership=${partnership.slug}`,
-      });
     }
 
     await connection.query(
       `UPDATE enrollment_batches
        SET created_count = ?, skipped_count = ?
        WHERE id = ?`,
-      [invited, skipped, batchId]
+      [invited, skipped, batchId],
     );
 
     await connection.commit();
+    transactionStarted = false;
     removeUploadedFile(req.file.path);
 
     return res.json({
       status: "success",
-      message: "CSV invite list completed",
+      message: "Secure employee invitations created",
       batch_id: batchId,
       invited,
       created: invited,
       skipped,
-      signup_rule: "Employees can register only when their email exists in the approved invite list for this partnership.",
+      signup_rule: "Employees must activate through their one-time invitation link or code.",
       invited_employees: invitedEmployees,
       errors,
     });
   } catch (error) {
-    if (connection) await connection.rollback();
+    if (connection && transactionStarted) await connection.rollback();
     if (req.file?.path) removeUploadedFile(req.file.path);
 
     return res.status(500).json({
       status: "error",
       message: "CSV invite upload failed",
-      error: error.message,
     });
   } finally {
     if (connection) connection.release();
@@ -177,7 +177,7 @@ exports.getEnrollmentBatches = async (req, res) => {
     }
 
     const [batches] = await pool.query(
-      `SELECT 
+      `SELECT
         eb.id,
         eb.partnership_id,
         eb.original_filename,
@@ -193,17 +193,18 @@ exports.getEnrollmentBatches = async (req, res) => {
        JOIN employers e ON p.employer_id = e.id
        WHERE p.team_id = ?
        ORDER BY eb.id DESC`,
-      [user.team_id]
+      [user.team_id],
     );
 
     return res.json(batches);
   } catch (error) {
-    return res.status(500).json({ status: "error", message: "Failed to load enrollment batches", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to load enrollment batches" });
   }
 };
 
 exports.revokeEnrollmentBatch = async (req, res) => {
   let connection;
+  let transactionStarted = false;
 
   try {
     const user = req.user;
@@ -215,59 +216,54 @@ exports.revokeEnrollmentBatch = async (req, res) => {
 
     connection = await pool.getConnection();
     await connection.beginTransaction();
+    transactionStarted = true;
 
     const [batches] = await connection.query(
-      `SELECT eb.id, eb.status
+      `SELECT eb.id, eb.status, eb.partnership_id
        FROM enrollment_batches eb
        JOIN partnerships p ON eb.partnership_id = p.id
        WHERE eb.id = ? AND p.team_id = ?
-       LIMIT 1`,
-      [batchId, user.team_id]
+       LIMIT 1
+       FOR UPDATE`,
+      [batchId, user.team_id],
     );
 
     if (batches.length === 0) {
       await connection.rollback();
+      transactionStarted = false;
       return res.status(404).json({ status: "error", message: "Batch not found or not assigned to your team" });
     }
 
     if (batches[0].status === "revoked") {
       await connection.rollback();
-      return res.status(400).json({ status: "error", message: "Batch is already revoked" });
+      transactionStarted = false;
+      return res.status(409).json({ status: "error", message: "Batch is already revoked" });
     }
 
-    const [revokeInvitesResult] = await connection.query(
-      `UPDATE employee_invites
-       SET status = 'revoked', revoked_at = NOW()
-       WHERE enrollment_batch_id = ?
-       AND status = 'invited'`,
-      [batchId]
-    );
-
-    const [deleteOldUsersResult] = await connection.query(
-      `DELETE FROM users
-       WHERE enrollment_batch_id = ?
-       AND role = 'employee'`,
-      [batchId]
-    );
+    const revokedInvites = await revokePendingBatchInvites(connection, {
+      batchId,
+      partnershipId: batches[0].partnership_id,
+    });
 
     await connection.query(
       `UPDATE enrollment_batches
        SET status = 'revoked', revoked_at = NOW()
        WHERE id = ?`,
-      [batchId]
+      [batchId],
     );
 
     await connection.commit();
+    transactionStarted = false;
 
     return res.json({
       status: "success",
-      message: "Enrollment batch revoked successfully",
-      revoked_invites: revokeInvitesResult.affectedRows,
-      deleted_employees: deleteOldUsersResult.affectedRows,
+      message: "Enrollment batch revoked. Registered employee accounts and history were preserved.",
+      revoked_invites: revokedInvites,
+      deleted_employees: 0,
     });
   } catch (error) {
-    if (connection) await connection.rollback();
-    return res.status(500).json({ status: "error", message: "Failed to revoke enrollment batch", error: error.message });
+    if (connection && transactionStarted) await connection.rollback();
+    return res.status(500).json({ status: "error", message: "Failed to revoke enrollment batch" });
   } finally {
     if (connection) connection.release();
   }

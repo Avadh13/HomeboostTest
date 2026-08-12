@@ -30,29 +30,17 @@ const hbtAccessOnly = (req, res, next) => {
   next();
 };
 
-/*
-  HBT Team Members
-  - Admin/Super Admin can manage all team members
-  - HBT Admin can manage only their own team members
-*/
 router.get("/", protect, hbtAdminOrAdminOnly, teamMemberController.getTeamMembers);
-
 router.post("/", protect, hbtAdminOrAdminOnly, teamMemberController.createTeamMember);
-
+router.post("/:id/resend-activation", protect, hbtAdminOrAdminOnly, teamMemberController.resendTeamMemberActivation);
 router.put("/:id", protect, hbtAdminOrAdminOnly, teamMemberController.updateTeamMember);
-
 router.delete("/:id", protect, hbtAdminOrAdminOnly, teamMemberController.deleteTeamMember);
 
-/*
-  Public/team listing should still be protected.
-  Admin can view any team.
-  HBT Admin/Member should only view their own team.
-*/
 router.get(
   "/team/:teamId",
   protect,
   hbtAccessOnly,
-  teamMemberController.getTeamMembersByTeam
+  teamMemberController.getTeamMembersByTeam,
 );
 
 module.exports = router;

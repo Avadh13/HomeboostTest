@@ -32,6 +32,14 @@ const activationStateError = (activation) => {
   return null;
 };
 
+const redirectPathForRole = (role) => {
+  if (role === "hbt_admin") return "/hbt/dashboard";
+  if (role === "hbt_member") return "/hbt/member-dashboard";
+  if (role === "employee") return "/employee-portal";
+  if (role === "admin" || role === "super_admin") return "/admin";
+  return "/company/dashboard";
+};
+
 router.get("/validate/:token", async (req, res) => {
   try {
     const activation = await getActivationByToken(pool, req.params.token);
@@ -51,6 +59,7 @@ router.get("/validate/:token", async (req, res) => {
 
 router.post("/accept", async (req, res) => {
   const connection = await pool.getConnection();
+  let transactionStarted = false;
   try {
     const token = clean(req.body.token, 200);
     const password = String(req.body.password || "");
@@ -61,10 +70,12 @@ router.post("/accept", async (req, res) => {
     if (passwordError) return res.status(400).json({ status: "error", message: passwordError });
 
     await connection.beginTransaction();
+    transactionStarted = true;
     const activation = await getActivationByToken(connection, token, { forUpdate: true });
     const stateError = activationStateError(activation);
     if (stateError) {
       await connection.rollback();
+      transactionStarted = false;
       return res.status(stateError.status).json({ status: "error", message: stateError.message });
     }
 
@@ -77,6 +88,15 @@ router.post("/accept", async (req, res) => {
     );
     if (Number(userUpdate.affectedRows || 0) !== 1) {
       throw new Error("Activation user update failed");
+    }
+
+    if (activation.target_role === "hbt_member") {
+      await connection.query(
+        `UPDATE team_members
+         SET full_name = COALESCE(NULLIF(?, ''), full_name), is_active = 1
+         WHERE user_id = ? AND team_id = ?`,
+        [fullName, activation.user_id, activation.team_id],
+      );
     }
 
     await connection.query(
@@ -105,12 +125,9 @@ router.post("/accept", async (req, res) => {
       metadata: { activation_invitation_id: activation.id },
     });
     await connection.commit();
+    transactionStarted = false;
 
-    const redirectTo = activation.target_role === "hbt_admin"
-      ? "/hbt/dashboard"
-      : activation.target_role === "employee"
-        ? "/employee-portal"
-        : "/company/dashboard";
+    const redirectTo = redirectPathForRole(activation.target_role);
     const authToken = jwt.sign(
       {
         id: activation.user_id,
@@ -137,7 +154,7 @@ router.post("/accept", async (req, res) => {
       },
     });
   } catch (error) {
-    await connection.rollback();
+    if (transactionStarted) await connection.rollback();
     return res.status(500).json({ status: "error", message: "Failed to activate account" });
   } finally {
     connection.release();
@@ -180,11 +197,13 @@ router.get("/admin/pending", async (req, res) => {
 
 router.post("/admin/users/:userId/resend", async (req, res) => {
   const connection = await pool.getConnection();
+  let transactionStarted = false;
   try {
     const userId = Number(req.params.userId);
     if (!userId) return res.status(400).json({ status: "error", message: "Invalid user ID" });
 
     await connection.beginTransaction();
+    transactionStarted = true;
     const [[user]] = await connection.query(
       `SELECT id, full_name, email, role, team_id, partnership_id, is_active
        FROM users
@@ -195,6 +214,7 @@ router.post("/admin/users/:userId/resend", async (req, res) => {
     );
     if (!user || Number(user.is_active) === 1) {
       await connection.rollback();
+      transactionStarted = false;
       return res.status(404).json({ status: "error", message: "Inactive account not found" });
     }
 
@@ -217,6 +237,7 @@ router.post("/admin/users/:userId/resend", async (req, res) => {
       metadata: { target_role: user.role },
     });
     await connection.commit();
+    transactionStarted = false;
 
     return res.status(201).json({
       status: "success",
@@ -225,7 +246,7 @@ router.post("/admin/users/:userId/resend", async (req, res) => {
       expires_in_hours: activation.expires_in_hours,
     });
   } catch (error) {
-    await connection.rollback();
+    if (transactionStarted) await connection.rollback();
     return res.status(500).json({ status: "error", message: "Failed to generate activation link" });
   } finally {
     connection.release();

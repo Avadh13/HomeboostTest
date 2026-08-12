@@ -24,16 +24,16 @@ exports.getPartnershipBySlug = async (req, res) => {
        JOIN home_buying_teams h ON p.team_id = h.id
        WHERE p.slug = ? AND p.status = 'active'
        LIMIT 1`,
-      [slug]
+      [slug],
     );
 
     if (rows.length === 0) {
       return res.status(404).json({ status: "error", message: "Partnership not found" });
     }
 
-    res.json(rows[0]);
+    return res.json(rows[0]);
   } catch (error) {
-    res.status(500).json({ status: "error", message: "Failed to load partnership", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to load partnership" });
   }
 };
 
@@ -52,12 +52,12 @@ exports.getHBTPartnerships = async (req, res) => {
        JOIN employers e ON p.employer_id = e.id
        WHERE p.team_id = ?
        ORDER BY p.id DESC`,
-      [teamId]
+      [teamId],
     );
 
-    res.json(rows);
+    return res.json(rows);
   } catch (error) {
-    res.status(500).json({ status: "error", message: "Failed to load HBT partnerships", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to load HBT partnerships" });
   }
 };
 
@@ -78,77 +78,37 @@ exports.getHBTEmployees = async (req, res) => {
        JOIN employers e ON p.employer_id = e.id
        WHERE p.team_id = ? AND u.role = 'employee'
        ORDER BY u.id DESC`,
-      [teamId]
+      [teamId],
     );
 
-    res.json(rows);
+    return res.json(rows);
   } catch (error) {
-    res.status(500).json({ status: "error", message: "Failed to load HBT employees", error: error.message });
+    return res.status(500).json({ status: "error", message: "Failed to load HBT employees" });
   }
 };
 
 exports.createPartnership = async (req, res) => {
-  const connection = await pool.getConnection();
-
-  try {
-    const teamId = req.user.team_id;
-
-    if (!teamId) {
-      connection.release();
-      return res.status(403).json({ status: "error", message: "HBT account is not linked to a team" });
-    }
-
-    const {
-      employer_name,
-      logo_url,
-      address,
-      phone,
-      website,
-      brand_primary_color,
-      brand_secondary_color,
-      slug,
-    } = req.body;
-
-    if (!employer_name || !slug) {
-      connection.release();
-      return res.status(400).json({ status: "error", message: "Employer name and slug are required" });
-    }
-
-    await connection.beginTransaction();
-
-    const [employerResult] = await connection.query(
-      `INSERT INTO employers
-       (name, logo_url, address, phone, website, brand_primary_color, brand_secondary_color, slug)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        employer_name,
-        logo_url || null,
-        address || null,
-        phone || null,
-        website || null,
-        brand_primary_color || "#000000",
-        brand_secondary_color || "#ffffff",
-        slug,
-      ]
-    );
-
-    const [partnershipResult] = await connection.query(
-      `INSERT INTO partnerships (team_id, employer_id, slug, status)
-       VALUES (?, ?, ?, 'active')`,
-      [teamId, employerResult.insertId, slug]
-    );
-
-    await connection.commit();
-    connection.release();
-
-    res.status(201).json({
-      status: "success",
-      message: "Partnership created successfully",
-      partnership_id: partnershipResult.insertId,
+  if (req.user?.role === "hbt_admin") {
+    return res.status(409).json({
+      status: "error",
+      code: "EMPLOYER_APPROVAL_REQUIRED",
+      message: "HBT Admins must submit the employer through Employer Approvals. A partnership becomes active only after Admin or Super Admin approval.",
+      approval_path: "/hbt/employer-approvals",
     });
-  } catch (error) {
-    await connection.rollback();
-    connection.release();
-    res.status(500).json({ status: "error", message: "Failed to create partnership", error: error.message });
   }
+
+  if (req.user?.role === "admin" || req.user?.role === "super_admin") {
+    return res.status(409).json({
+      status: "error",
+      code: "USE_ADMIN_PARTNERSHIP_WORKFLOW",
+      message: "Use the Admin partnership or Employer Approval workflow for direct platform administration.",
+      admin_path: "/admin/partnerships",
+    });
+  }
+
+  return res.status(403).json({
+    status: "error",
+    code: "PARTNERSHIP_CREATE_FORBIDDEN",
+    message: "Only the approved employer-onboarding workflow can create partnerships.",
+  });
 };

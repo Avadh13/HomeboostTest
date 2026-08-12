@@ -27,6 +27,14 @@ type Employee = { id: number; full_name: string; email: string; is_active: numbe
 type Invite = { id: number; full_name: string; email: string; status: string; created_at: string; registered_at?: string | null; revoked_at?: string | null };
 type Batch = { id: number; original_filename: string; created_count: number; skipped_count: number; status: string; created_at: string; revoked_at?: string | null };
 type Submission = { id: number; quiz_title: string; employee_name: string; employee_email: string; follow_up_status: string; submitted_at: string };
+type InviteDelivery = {
+  id?: number;
+  full_name: string;
+  email: string;
+  invite_link: string;
+  invite_code: string;
+  expires_at?: string | null;
+};
 
 type DashboardData = {
   partnership: Partnership;
@@ -63,6 +71,8 @@ const initials = (name: string) =>
     .map((item) => item.charAt(0).toUpperCase())
     .join("") || "E";
 
+const csvCell = (value: string) => `"${String(value || "").replace(/"/g, '""')}"`;
+
 function CompanyDashboard() {
   const toast = useToast();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -73,6 +83,8 @@ function CompanyDashboard() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [freshDeliveries, setFreshDeliveries] = useState<InviteDelivery[]>([]);
+  const [deliverySummary, setDeliverySummary] = useState("");
   const token = localStorage.getItem("token");
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
@@ -110,6 +122,41 @@ function CompanyDashboard() {
     });
   }, [data?.invites, search, statusFilter]);
 
+  const downloadFreshInvites = () => {
+    if (!freshDeliveries.length) {
+      toast.info("No fresh invitation credentials are available to download.");
+      return;
+    }
+
+    const header = "full_name,email,invite_link,invite_code,expires_at\n";
+    const rows = freshDeliveries
+      .map((delivery) => [
+        delivery.full_name,
+        delivery.email,
+        delivery.invite_link,
+        delivery.invite_code,
+        delivery.expires_at || "",
+      ].map(csvCell).join(","))
+      .join("\n");
+
+    const blob = new Blob([`${header}${rows}`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "secure_employee_invitations.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const copyInviteLink = async (delivery: InviteDelivery) => {
+    try {
+      await navigator.clipboard.writeText(delivery.invite_link);
+      toast.success(`Invitation link copied for ${delivery.email}.`);
+    } catch {
+      toast.error("Could not copy the invitation link.");
+    }
+  };
+
   const addIndividualInvite = async (event: FormEvent) => {
     event.preventDefault();
 
@@ -132,7 +179,14 @@ function CompanyDashboard() {
         return;
       }
 
-      toast.success(payload.message || "Employee invite added.");
+      if (!payload.delivery?.invite_link || !payload.delivery?.invite_code) {
+        toast.error("Invitation was not returned with one-time delivery credentials. Please resend it from Employee Invites.");
+        return;
+      }
+
+      setFreshDeliveries([payload.delivery as InviteDelivery]);
+      setDeliverySummary("One secure employee invitation created. Copy or download it now; the raw credential is not stored.");
+      toast.success(payload.message || "Employee invitation created.");
       setInviteName("");
       setInviteEmail("");
       await loadDashboard();
@@ -155,7 +209,7 @@ function CompanyDashboard() {
       return;
     }
 
-    const confirmed = confirm("Upload this approved employee list? Only these emails can sign up for your employer portal.");
+    const confirmed = confirm("Generate one-time employee invitation links and codes from this approved CSV list?");
     if (!confirmed) return;
 
     try {
@@ -176,7 +230,12 @@ function CompanyDashboard() {
         return;
       }
 
-      toast.success(`Invite list uploaded. Approved ${payload.invited || 0}, skipped ${payload.skipped || 0}.`);
+      const deliveries = Array.isArray(payload.invited_employees)
+        ? payload.invited_employees.filter((item: InviteDelivery) => item?.invite_link && item?.invite_code)
+        : [];
+      setFreshDeliveries(deliveries);
+      setDeliverySummary(`Created ${payload.invited || 0} secure invitations; skipped ${payload.skipped || 0}. Download this one-time delivery list now.`);
+      toast.success(`Secure invitations created. Approved ${payload.invited || 0}, skipped ${payload.skipped || 0}.`);
       await loadDashboard();
     } catch (error) {
       console.error("Company CSV upload failed:", error);
@@ -187,7 +246,7 @@ function CompanyDashboard() {
   };
 
   const revokeBatch = async (batchId: number) => {
-    const confirmed = confirm("Revoke this batch? Pending invites from this upload will stop working.");
+    const confirmed = confirm("Revoke this batch? Pending invitations will stop working; registered employee accounts and history will be preserved.");
     if (!confirmed) return;
 
     try {
@@ -202,7 +261,7 @@ function CompanyDashboard() {
         return;
       }
 
-      toast.success(`Batch revoked. Revoked invites: ${payload.revoked_invites || 0}.`);
+      toast.success(`Batch revoked. Pending invitations revoked: ${payload.revoked_invites || 0}. Registered accounts preserved.`);
       await loadDashboard();
     } catch {
       toast.error("Failed to revoke batch.");
@@ -253,7 +312,7 @@ function CompanyDashboard() {
   const latestBatch = data.batches[0];
 
   const statCards = [
-    { label: "Invited", value: data.stats.invited, helper: "Waiting signup", className: "bg-blue-50 text-blue-700" },
+    { label: "Invited", value: data.stats.invited, helper: "Waiting activation", className: "bg-blue-50 text-blue-700" },
     { label: "Registered", value: data.stats.registered, helper: `${registrationRate}% signup rate`, className: "bg-emerald-50 text-emerald-700" },
     { label: "Revoked", value: data.stats.revoked, helper: "Blocked invites", className: "bg-red-50 text-red-700" },
     { label: "Quiz Progress", value: data.stats.quiz_submissions, helper: "Submitted forms", className: "bg-amber-50 text-amber-700" },
@@ -293,6 +352,7 @@ function CompanyDashboard() {
 
               <div className="mt-7 flex flex-wrap gap-3">
                 <a href={`/${data.partnership.slug}`} target="_blank" rel="noreferrer" className="rounded-full bg-white px-5 py-2.5 text-sm font-black text-slate-950 shadow-lg hover:bg-white/90">View Portal</a>
+                <Link to="/company/invites" className="rounded-full border border-white/25 px-5 py-2.5 text-sm font-black text-white hover:bg-white/10">Employee Invites</Link>
                 <Link to="/notifications" className="rounded-full border border-white/25 px-5 py-2.5 text-sm font-black text-white hover:bg-white/10">Notifications</Link>
                 <button onClick={logout} className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-black text-white hover:bg-red-700">Logout</button>
               </div>
@@ -332,40 +392,69 @@ function CompanyDashboard() {
           ))}
         </section>
 
+        {freshDeliveries.length > 0 && (
+          <section className="rounded-[2rem] border border-emerald-200 bg-emerald-50 p-5 shadow-sm md:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">One-time delivery</p>
+                <h2 className="mt-1 text-2xl font-black text-emerald-950">Secure invitation credentials</h2>
+                <p className="mt-2 max-w-3xl text-sm font-semibold leading-relaxed text-emerald-800">{deliverySummary}</p>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <button type="button" onClick={downloadFreshInvites} className="rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-black text-white hover:bg-emerald-800">Download Secure CSV</button>
+                <button type="button" onClick={() => setFreshDeliveries([])} className="rounded-full border border-emerald-300 px-5 py-2.5 text-sm font-black text-emerald-800 hover:bg-emerald-100">Hide</button>
+              </div>
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {freshDeliveries.map((delivery) => (
+                <article key={`${delivery.email}-${delivery.invite_code}`} className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
+                  <h3 className="font-black text-slate-950">{delivery.full_name}</h3>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">{delivery.email}</p>
+                  <p className="mt-3 break-all rounded-2xl bg-slate-50 p-3 font-mono text-xs text-slate-700">{delivery.invite_link}</p>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                    <span className="rounded-full bg-violet-50 px-3 py-2 text-sm font-black text-violet-700">Code: {delivery.invite_code}</span>
+                    <button type="button" onClick={() => copyInviteLink(delivery)} className="rounded-full bg-slate-950 px-4 py-2 text-xs font-black text-white hover:bg-emerald-700">Copy Link</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section className="grid gap-5 xl:grid-cols-[0.78fr_1.22fr]">
           <div className="grid gap-5">
             <form onSubmit={addIndividualInvite} className="premium-card">
               <div className="flex items-start justify-between gap-4">
-                <div><p className="eyebrow">Single employee</p><h2 className="mt-1 text-2xl font-black text-slate-950">Add individual invite</h2></div>
-                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">Fast add</span>
+                <div><p className="eyebrow">Single employee</p><h2 className="mt-1 text-2xl font-black text-slate-950">Create individual invite</h2></div>
+                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">One-time</span>
               </div>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600">Add one approved employee without uploading a CSV.</p>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">Create one approved Employee invitation. The raw link/code is shown only immediately after creation.</p>
               <div className="mt-5 grid gap-3">
                 <input className="form-field" placeholder="Employee full name" value={inviteName} onChange={(event) => setInviteName(event.target.value)} />
                 <input className="form-field" type="email" placeholder="employee@company.com" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} />
-                <button type="submit" disabled={addingInvite} className="btn-primary w-full disabled:opacity-60">{addingInvite ? "Adding..." : "Add Employee Invite"}</button>
+                <button type="submit" disabled={addingInvite} className="btn-primary w-full disabled:opacity-60">{addingInvite ? "Creating..." : "Create Secure Invite"}</button>
               </div>
             </form>
 
             <div className="premium-card">
               <div className="flex items-start justify-between gap-4">
                 <div><p className="eyebrow">Bulk upload</p><h2 className="mt-1 text-2xl font-black text-slate-950">Upload employee CSV</h2></div>
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">Protected</span>
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">Hash-at-rest</span>
               </div>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600">Upload a CSV with <strong>full_name,email</strong>. Only approved emails can sign up under your employer portal.</p>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">Upload <strong>full_name,email</strong>. A fresh link/code is returned once for each accepted row and can be downloaded immediately.</p>
               <label className="mt-5 block rounded-[1.5rem] border-2 border-dashed border-violet-200 bg-violet-50/50 p-5 text-center transition hover:border-violet-300 hover:bg-violet-50">
                 <input type="file" accept=".csv" disabled={uploading} onChange={(event) => uploadCsv(event.target.files ? event.target.files[0] : null)} className="hidden" />
                 <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">⬆</span>
-                <span className="mt-3 block text-sm font-black text-slate-900">{uploading ? "Uploading..." : "Choose employee CSV"}</span>
+                <span className="mt-3 block text-sm font-black text-slate-900">{uploading ? "Creating invitations..." : "Choose employee CSV"}</span>
                 <span className="mt-1 block text-xs font-semibold text-slate-500">Required columns: full_name,email</span>
               </label>
-              <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-800">Unknown emails are blocked even if they know the partnership slug.</div>
+              <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-800">Email + partnership slug is not enough to register. Employees must use their one-time invitation credential.</div>
             </div>
           </div>
 
           <div className="premium-card">
             <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
-              <div><p className="eyebrow">Employee access list</p><h2 className="mt-1 text-2xl font-black text-slate-950">Approved employees</h2><p className="mt-1 text-sm text-slate-500">Card view for invited, registered, and revoked access.</p></div>
+              <div><p className="eyebrow">Employee access list</p><h2 className="mt-1 text-2xl font-black text-slate-950">Approved employees</h2><p className="mt-1 text-sm text-slate-500">Safe status view; raw invitation credentials are never loaded from the database.</p></div>
               <div className="grid gap-2 sm:grid-cols-[1fr_160px]">
                 <input className="form-field" placeholder="Search name or email..." value={search} onChange={(event) => setSearch(event.target.value)} />
                 <select className="form-field" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
