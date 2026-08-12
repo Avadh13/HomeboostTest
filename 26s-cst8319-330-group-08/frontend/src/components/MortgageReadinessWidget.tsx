@@ -49,7 +49,7 @@ function MortgageReadinessWidget() {
         if (!response.ok) throw new Error(payload.message || "Failed to load readiness");
         setReadiness(payload.readiness || null);
         setRecommendations(Array.isArray(payload.recommendations) ? payload.recommendations : []);
-      } catch (error) {
+      } catch {
         if (controller.signal.aborted) return;
         setReadiness(null);
         setRecommendations([]);

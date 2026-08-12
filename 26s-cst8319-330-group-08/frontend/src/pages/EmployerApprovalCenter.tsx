@@ -158,12 +158,11 @@ function EmployerApprovalCenter({ embedded = false, adminMode = false }: Employe
     if (!canReview) return;
     if (approvalStatus === "approved" && !window.confirm(`Approve ${request.requested_company_name} and prepare Company Manager access?`)) return;
 
-    let reviewNote = "";
+    const reviewNote = approvalStatus === "needs_info" || approvalStatus === "rejected"
+      ? window.prompt(approvalStatus === "needs_info" ? "What information is required?" : "Reason for rejection")?.trim() || ""
+      : window.prompt("Approval note (optional)")?.trim() || "";
     if (approvalStatus === "needs_info" || approvalStatus === "rejected") {
-      reviewNote = window.prompt(approvalStatus === "needs_info" ? "What information is required?" : "Reason for rejection")?.trim() || "";
       if (!reviewNote) return setNotice("A review note is required for this decision.");
-    } else {
-      reviewNote = window.prompt("Approval note (optional)")?.trim() || "";
     }
 
     setNotice("");
