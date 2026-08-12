@@ -6,6 +6,7 @@ const {
   createOrRefreshEmployeeInvite,
   revokePendingBatchInvites,
 } = require("../src/services/inviteLifecycleService");
+const { createActivationInvitation } = require("../src/services/accountActivationService");
 const { hashOpaqueToken } = require("../src/services/paymentSecurityService");
 const emergencyMigration = require("../src/migrations/20260812_emergency_security");
 
@@ -86,6 +87,26 @@ const createSchema = async () => {
     UNIQUE KEY uq_invite_code_hash (invite_code_hash)
   ) ENGINE=InnoDB`);
 
+  await connection.query(`CREATE TABLE account_activation_invitations (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    email VARCHAR(180) NOT NULL,
+    target_role VARCHAR(40) NOT NULL,
+    team_id INT NULL,
+    partnership_id INT NULL,
+    token_hash CHAR(64) NOT NULL,
+    status VARCHAR(40) NOT NULL DEFAULT 'pending',
+    expires_at DATETIME NOT NULL,
+    accepted_at DATETIME NULL,
+    revoked_at DATETIME NULL,
+    created_by_user_id INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_activation_token_hash (token_hash),
+    INDEX idx_activation_user (user_id),
+    INDEX idx_activation_status (status)
+  ) ENGINE=InnoDB`);
+
   // Intentionally use the pre-hardening schema so the migration must add team_id.
   await connection.query(`CREATE TABLE resource_recommendation_rules (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -98,7 +119,7 @@ const createSchema = async () => {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB`);
 
-  await connection.query("INSERT INTO home_buying_teams (id, name, is_active) VALUES (1, 'Integration HBT', 1)");
+  await connection.query("INSERT INTO home_buying_teams (id, name, is_active) VALUES (1, 'Integration HBT A', 1), (2, 'Integration HBT B', 1)");
   await connection.query("INSERT INTO employers (id, name) VALUES (1, 'Integration Employer')");
   await connection.query("INSERT INTO partnerships (id, team_id, employer_id, slug, status) VALUES (1, 1, 1, 'integration-employer', 'active')");
 };
@@ -153,6 +174,27 @@ test("emergency migration hashes legacy invite credentials and fails legacy glob
   assert.equal(Number(legacyRule.is_active), 0);
 });
 
+test("recommendation ownership query excludes another HBT team's rules", async () => {
+  await connection.query(
+    `INSERT INTO resource_recommendation_rules
+     (resource_id, team_id, rule_label, is_active)
+     VALUES
+       (100, NULL, 'Admin global rule', 1),
+       (101, 1, 'Team A rule', 1),
+       (102, 2, 'Team B rule', 1)`,
+  );
+
+  const [visibleToTeamA] = await connection.query(
+    `SELECT rule_label
+     FROM resource_recommendation_rules
+     WHERE is_active = 1 AND (team_id IS NULL OR team_id = ?)
+     ORDER BY id`,
+    [1],
+  );
+
+  assert.deepEqual(visibleToTeamA.map((row) => row.rule_label), ["Admin global rule", "Team A rule"]);
+});
+
 test("shared invitation lifecycle stores hashes only and returns credentials once", async () => {
   await connection.beginTransaction();
   const created = await createOrRefreshEmployeeInvite(connection, {
@@ -180,6 +222,40 @@ test("shared invitation lifecycle stores hashes only and returns credentials onc
   const rawToken = decodeURIComponent(encodedToken);
   assert.equal(stored.invite_token_hash, hashOpaqueToken(rawToken));
   assert.equal(stored.invite_code_hash, hashOpaqueToken(created.delivery.invite_code));
+});
+
+test("HBT Member activation stores only a token hash", async () => {
+  const [member] = await connection.query(
+    `INSERT INTO users
+     (full_name, email, password, role, team_id, is_active)
+     VALUES ('Pending HBT Member', 'member@example.com', 'unusable-test-hash', 'hbt_member', 1, 0)`,
+  );
+
+  await connection.beginTransaction();
+  const delivery = await createActivationInvitation(connection, {
+    userId: member.insertId,
+    email: "member@example.com",
+    targetRole: "hbt_member",
+    teamId: 1,
+    createdByUserId: null,
+    ttlHours: 24,
+  });
+  await connection.commit();
+
+  const [[stored]] = await connection.query(
+    `SELECT token_hash, status, target_role, team_id
+     FROM account_activation_invitations
+     WHERE user_id = ?`,
+    [member.insertId],
+  );
+  const encodedToken = delivery.activation_url.split("/activate/").pop();
+  const rawToken = decodeURIComponent(encodedToken);
+
+  assert.equal(stored.token_hash, hashOpaqueToken(rawToken));
+  assert.equal(stored.status, "pending");
+  assert.equal(stored.target_role, "hbt_member");
+  assert.equal(Number(stored.team_id), 1);
+  assert.equal(Object.hasOwn(stored, "token"), false);
 });
 
 test("batch revocation revokes only pending invitations and preserves registered users", async () => {
