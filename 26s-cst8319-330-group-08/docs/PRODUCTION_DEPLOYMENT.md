@@ -9,6 +9,7 @@ A successful build is necessary but not sufficient. Production release requires 
 - Frontend: Vercel
 - Backend: Railway
 - Database: MySQL
+- Payment provider: Stripe
 - Backend startup: `npm run migrate && node src/server.js`
 
 ## Required pre-release checks
@@ -19,16 +20,15 @@ A successful build is necessary but not sufficient. Production release requires 
 4. QA Reimplementation Checks pass.
 5. Frontend typecheck, lint, tests, and production build pass.
 6. Backend unit/integration tests and syntax checks pass.
-7. Migrations pass against:
-   - Fresh disposable database
-   - Production-like schema copy
+7. Migrations pass against a fresh disposable database and a production-like schema copy.
 8. Pre-migration backup is complete and verified.
 9. Stripe test-mode signed webhook suite passes.
 10. Tenant-isolation negative tests pass.
 11. Production environment variables are present without exposing values.
-12. Demo and diagnostic flags are disabled.
-13. Client-approved content, branding, legal pages, and domain routing are ready.
-14. Rollback owner and communication channel are identified.
+12. No demo payment endpoint or fallback provider exists in the deployed code.
+13. Diagnostic routes are disabled.
+14. Client-approved content, branding, legal pages, and domain routing are ready.
+15. Rollback owner and communication channel are identified.
 
 ## Railway backend variables
 
@@ -54,7 +54,6 @@ STRIPE_WEBHOOK_SECRET=<secret>
 HBT_PROGRAM_PRICE_CENTS=<approved amount>
 HBT_PROGRAM_CURRENCY=cad
 AUDIT_IP_HASH_SECRET=<separate secret>
-ALLOW_DEMO_PAYMENT_COMPLETION=false
 ENABLE_DIAGNOSTIC_ROUTES=false
 ALLOW_LOCAL_ORIGINS=false
 ALLOW_VERCEL_PREVIEWS=false unless deliberately enabled for a controlled preview
@@ -67,14 +66,6 @@ Future requirements:
 - Object/private storage secrets
 - Redis/shared rate-limit connection
 
-## Vercel frontend variables
-
-```text
-VITE_API_BASE_URL=<approved Railway backend URL>/api
-```
-
-No server secret may use a `VITE_` prefix.
-
 ## Stripe webhook configuration
 
 1. Create a production webhook endpoint:
@@ -86,13 +77,10 @@ POST <backend>/api/payments/stripe-webhook
 2. Subscribe only to required event types, currently `checkout.session.completed`.
 3. Store the signing secret in Railway.
 4. Send a signed test event.
-5. Confirm:
-   - Invalid signature returns 400
-   - Missing signature returns 400
-   - Incorrect amount/currency/session/email returns 422
-   - First valid event provisions once
-   - Replayed event is acknowledged without duplicate provisioning
+5. Confirm invalid or missing signatures fail, payment metadata is validated, the first valid event provisions once, and replayed events do not duplicate provisioning.
 6. Reconcile the resulting registration/payment/user/team records.
+
+HBT enrollment must fail closed with a service-unavailable response when Stripe is not configured. The application must never create a synthetic checkout session or provide a manual public payment-completion endpoint.
 
 ## Deployment sequence
 
@@ -112,7 +100,7 @@ POST <backend>/api/payments/stripe-webhook
 
 ## Non-destructive production smoke tests
 
-- Public Home/Pricing/Contact render.
+- Public Home/Pricing/Contact render without placeholder/demo media.
 - Invalid login fails without account disclosure.
 - Admin login and dashboard load.
 - HBT Admin login and own-team data load.
@@ -125,6 +113,7 @@ POST <backend>/api/payments/stripe-webhook
 - Anonymous upload fails.
 - Public numeric payment status URL fails.
 - Opaque status token shows no PII.
+- HBT signup uses Stripe checkout only.
 - Invalid/replayed Stripe events do not provision.
 - Activation link is single-use.
 - Invite link is single-use and previous resend link is invalid.
@@ -144,12 +133,4 @@ Rollback must consider both code and schema.
 
 ## Current release blockers
 
-The remediation branch must remain draft until:
-
-- Fresh-database migration test runs against MySQL
-- Railway branch/staging backend deployment is successful
-- Stripe signed integration tests pass
-- Remaining High-priority audit findings are resolved
-- Email and persistent storage are configured
-- Backup restoration is demonstrated
-- End-to-end role workflows and accessibility checks pass
+Do not call the application production-ready until Railway/Vercel deployment, signed Stripe integration, email delivery, persistent storage, backup restoration, role-based E2E flows, and accessibility checks have all been demonstrated.
