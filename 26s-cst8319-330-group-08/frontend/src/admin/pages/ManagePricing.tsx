@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import API_BASE_URL from "../../api/api";
 import AdminLayout from "../components/AdminLayout";
 import { useToast } from "../../components/ToastProvider";
+import { buildAuthHeaders, handleUnauthorizedResponse } from "../../utils/auth";
 
 type PricingPlan = {
   id: number;
@@ -116,7 +117,7 @@ function ManagePricing() {
     try {
       const response = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: buildAuthHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           title,
           price,
@@ -130,6 +131,7 @@ function ManagePricing() {
       });
 
       const data = await response.json().catch(() => ({}));
+      if (handleUnauthorizedResponse(response)) return;
 
       if (!response.ok) {
         toast.error(data.message || "Pricing plan save failed.");
@@ -150,8 +152,9 @@ function ManagePricing() {
     if (!confirmDelete) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/pricing/${plan.id}`, { method: "DELETE" });
+      const response = await fetch(`${API_BASE_URL}/pricing/${plan.id}`, { method: "DELETE", headers: buildAuthHeaders() });
       const data = await response.json().catch(() => ({}));
+      if (handleUnauthorizedResponse(response)) return;
 
       if (!response.ok) {
         toast.error(data.message || "Delete failed.");

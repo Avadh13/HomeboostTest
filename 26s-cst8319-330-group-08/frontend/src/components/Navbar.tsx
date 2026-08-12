@@ -210,6 +210,11 @@ function NavbarContent() {
   }, [portalMenuOpen]);
 
   useEffect(() => {
+    document.body.classList.toggle("hb-portal-menu-open", Boolean(portalMenuOpen));
+    return () => document.body.classList.remove("hb-portal-menu-open");
+  }, [portalMenuOpen]);
+
+  useEffect(() => {
     if (!portalMode || !token) {
       setUnreadAlerts(0);
       setUnreadMessages(0);

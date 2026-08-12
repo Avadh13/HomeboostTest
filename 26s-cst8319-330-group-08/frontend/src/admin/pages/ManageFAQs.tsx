@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import API_BASE_URL from "../../api/api";
 import AdminLayout from "../components/AdminLayout";
 import { useToast } from "../../components/ToastProvider";
+import { buildAuthHeaders, handleUnauthorizedResponse } from "../../utils/auth";
 
 type FAQ = {
   id: number;
@@ -102,7 +103,7 @@ function ManageFAQs() {
     try {
       const response = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: buildAuthHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           question,
           answer,
@@ -113,6 +114,7 @@ function ManageFAQs() {
       });
 
       const data = await response.json().catch(() => ({}));
+      if (handleUnauthorizedResponse(response)) return;
 
       if (!response.ok) {
         toast.error(data.message || "FAQ save failed.");
@@ -133,8 +135,9 @@ function ManageFAQs() {
     if (!confirmDelete) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/faqs/${faq.id}`, { method: "DELETE" });
+      const response = await fetch(`${API_BASE_URL}/faqs/${faq.id}`, { method: "DELETE", headers: buildAuthHeaders() });
       const data = await response.json().catch(() => ({}));
+      if (handleUnauthorizedResponse(response)) return;
 
       if (!response.ok) {
         toast.error(data.message || "Delete failed.");

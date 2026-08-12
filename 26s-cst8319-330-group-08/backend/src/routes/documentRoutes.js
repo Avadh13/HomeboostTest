@@ -238,6 +238,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     const originalName = text(req.file?.originalname || req.body.original_filename || `${title}.pdf`, 255);
     const storedFilename = req.file?.filename || null;
     const hash = savedPath ? fileHash(savedPath) : null;
+    const fileWasSaved = Boolean(savedPath);
     const [result] = await pool.query(
       `INSERT INTO employee_documents
        (user_id, partnership_id, template_id, document_title, original_filename, stored_filename, stored_path, mime_type, file_size_bytes, storage_provider, file_sha256, uploaded_by_ip, status)
@@ -246,7 +247,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     );
     await logDocumentAccess(req, result.insertId, savedPath ? "uploaded_file" : "submitted_metadata");
     savedPath = null;
-    return res.status(201).json({ status: "success", message: savedPath ? "Document uploaded" : "Document submitted", document_id: result.insertId });
+    return res.status(201).json({ status: "success", message: fileWasSaved ? "Document uploaded" : "Document submitted", document_id: result.insertId });
   } catch (error) {
     if (savedPath && fs.existsSync(savedPath)) fs.unlinkSync(savedPath);
     return res.status(500).json({ status: "error", message: "Failed to upload document", error: error.message });

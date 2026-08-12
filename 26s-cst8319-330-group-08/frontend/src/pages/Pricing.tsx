@@ -123,7 +123,7 @@ function Pricing() {
 
                     <ul className="my-8 flex-1 space-y-3 text-left">
                       {features.length === 0 ? (
-                        <li className="text-sm font-semibold text-slate-500">Feature details coming soon.</li>
+                        <li className="text-sm font-semibold text-slate-500">Plan includes portal access, onboarding support, and role-based reporting.</li>
                       ) : (
                         features.map((feature, featureIndex) => (
                           <li key={featureIndex} className="flex gap-3 text-sm font-semibold text-slate-700">

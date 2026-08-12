@@ -1,6 +1,30 @@
 import type { ReactNode } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import {
+  Bell,
+  BookOpen,
+  Building2,
+  CheckSquare,
+  ClipboardCheck,
+  CreditCard,
+  FileQuestion,
+  FileText,
+  FolderKanban,
+  Home,
+  LayoutDashboard,
+  Layers3,
+  LogOut,
+  Mail,
+  MessageSquare,
+  PanelTop,
+  ReceiptText,
+  ShieldCheck,
+  Sparkles,
+  Users,
+  WalletCards,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import API_BASE_URL from "../../api/api";
 import BrandLogo from "../../components/BrandLogo";
 
@@ -8,10 +32,37 @@ type AdminLayoutProps = { title?: string; children: ReactNode };
 type NavItem = {
   path: string;
   label: string;
-  icon: string;
+  icon: LucideIcon;
   group: "Core" | "Operations" | "Content" | "Communication";
 };
 type EmployerApprovalSummary = { approval_status?: string };
+
+const navLinks: NavItem[] = [
+  { path: "/admin", label: "Dashboard", icon: LayoutDashboard, group: "Core" },
+  { path: "/admin/profile", label: "My Profile", icon: Users, group: "Core" },
+  { path: "/admin/notifications", label: "Notifications", icon: Bell, group: "Core" },
+  { path: "/admin/reports", label: "Reports", icon: ReceiptText, group: "Core" },
+  { path: "/admin/qa", label: "QA Readiness", icon: ShieldCheck, group: "Core" },
+  { path: "/admin/builder", label: "Builder Mode", icon: FolderKanban, group: "Core" },
+  { path: "/admin/payments", label: "Payments", icon: CreditCard, group: "Operations" },
+  { path: "/admin/hbts", label: "Home Buying Teams", icon: Home, group: "Operations" },
+  { path: "/admin/partnerships", label: "Partnerships", icon: Building2, group: "Operations" },
+  { path: "/admin/employer-approvals", label: "Employer Approvals", icon: ClipboardCheck, group: "Operations" },
+  { path: "/admin/users", label: "Users", icon: Users, group: "Operations" },
+  { path: "/admin/service-requests", label: "Mortgage Requests", icon: WalletCards, group: "Operations" },
+  { path: "/admin/resources", label: "Resources", icon: BookOpen, group: "Content" },
+  { path: "/admin/mortgage-services", label: "Mortgage Services", icon: Layers3, group: "Content" },
+  { path: "/admin/pages", label: "Pages", icon: FileText, group: "Content" },
+  { path: "/admin/sections", label: "Sections", icon: PanelTop, group: "Content" },
+  { path: "/admin/cards", label: "Cards", icon: WalletCards, group: "Content" },
+  { path: "/admin/pricing", label: "Pricing", icon: CreditCard, group: "Content" },
+  { path: "/admin/footer", label: "Footer Builder", icon: PanelTop, group: "Content" },
+  { path: "/admin/faqs", label: "FAQs", icon: FileQuestion, group: "Content" },
+  { path: "/admin/quizzes", label: "Quizzes", icon: Sparkles, group: "Content" },
+  { path: "/admin/quiz-submissions", label: "Quiz Submissions", icon: CheckSquare, group: "Communication" },
+  { path: "/admin/messages", label: "Communication Center", icon: MessageSquare, group: "Communication" },
+  { path: "/admin/contact-messages", label: "Contact Forms", icon: Mail, group: "Communication" },
+];
 
 function AdminLayout({ title, children }: AdminLayoutProps) {
   const navigate = useNavigate();
@@ -71,33 +122,6 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
     navigate("/login");
   };
 
-  const navLinks: NavItem[] = [
-    { path: "/admin", label: "Dashboard", icon: "⌂", group: "Core" },
-    { path: "/admin/profile", label: "My Profile", icon: "○", group: "Core" },
-    { path: "/admin/notifications", label: "Notifications", icon: "◉", group: "Core" },
-    { path: "/admin/reports", label: "Reports", icon: "▥", group: "Core" },
-    { path: "/admin/qa", label: "QA Readiness", icon: "✓", group: "Core" },
-    { path: "/admin/builder", label: "Builder Mode", icon: "▣", group: "Core" },
-    { path: "/admin/payments", label: "Payments", icon: "$", group: "Operations" },
-    { path: "/admin/hbts", label: "Home Buying Teams", icon: "◈", group: "Operations" },
-    { path: "/admin/partnerships", label: "Partnerships", icon: "◇", group: "Operations" },
-    { path: "/admin/employer-approvals", label: "Employer Approvals", icon: "◆", group: "Operations" },
-    { path: "/admin/users", label: "Users", icon: "♙", group: "Operations" },
-    { path: "/admin/service-requests", label: "Mortgage Requests", icon: "◍", group: "Operations" },
-    { path: "/admin/resources", label: "Resources", icon: "▤", group: "Content" },
-    { path: "/admin/mortgage-services", label: "Mortgage Services", icon: "⌁", group: "Content" },
-    { path: "/admin/pages", label: "Pages", icon: "◫", group: "Content" },
-    { path: "/admin/sections", label: "Sections", icon: "▥", group: "Content" },
-    { path: "/admin/cards", label: "Cards", icon: "▦", group: "Content" },
-    { path: "/admin/pricing", label: "Pricing", icon: "$", group: "Content" },
-    { path: "/admin/footer", label: "Footer Builder", icon: "▧", group: "Content" },
-    { path: "/admin/faqs", label: "FAQs", icon: "?", group: "Content" },
-    { path: "/admin/quizzes", label: "Quizzes", icon: "✦", group: "Content" },
-    { path: "/admin/quiz-submissions", label: "Quiz Submissions", icon: "✓", group: "Communication" },
-    { path: "/admin/messages", label: "Communication Center", icon: "✉", group: "Communication" },
-    { path: "/admin/contact-messages", label: "Contact Forms", icon: "☏", group: "Communication" },
-  ];
-
   const groupedLinks = useMemo(
     () =>
       navLinks.reduce<Record<NavItem["group"], NavItem[]>>(
@@ -149,35 +173,40 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
               <div key={group}>
                 <p className="mb-2 px-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">{group}</p>
                 <div className="space-y-1">
-                  {groupedLinks[group].map((item) => (
-                    <NavLink
-                      key={item.path}
-                      to={item.path}
-                      end={item.path === "/admin"}
-                      onClick={() => setSidebarOpen(false)}
-                      className={({ isActive }) =>
-                        `flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-black transition ${
-                          isActive
-                            ? "bg-blue-600 text-white shadow-sm"
-                            : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
-                        }`
-                      }
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-sm text-slate-600">{item.icon}</span>
-                        {item.label}
-                      </span>
-                      {item.path === "/admin/contact-messages" && unreadCount > 0 ? (
-                        <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">{unreadCount}</span>
-                      ) : null}
-                      {item.path === "/admin/notifications" && unreadNotifications > 0 ? (
-                        <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">{unreadNotifications}</span>
-                      ) : null}
-                      {item.path === "/admin/employer-approvals" && pendingApprovals > 0 ? (
-                        <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] text-white">{pendingApprovals}</span>
-                      ) : null}
-                    </NavLink>
-                  ))}
+                  {groupedLinks[group].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <NavLink
+                        key={item.path}
+                        to={item.path}
+                        end={item.path === "/admin"}
+                        onClick={() => setSidebarOpen(false)}
+                        className={({ isActive }) =>
+                          `flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-black transition ${
+                            isActive
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
+                          }`
+                        }
+                      >
+                        <span className="flex items-center gap-3">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                            <Icon size={17} strokeWidth={2.4} aria-hidden="true" />
+                          </span>
+                          {item.label}
+                        </span>
+                        {item.path === "/admin/contact-messages" && unreadCount > 0 ? (
+                          <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">{unreadCount}</span>
+                        ) : null}
+                        {item.path === "/admin/notifications" && unreadNotifications > 0 ? (
+                          <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">{unreadNotifications}</span>
+                        ) : null}
+                        {item.path === "/admin/employer-approvals" && pendingApprovals > 0 ? (
+                          <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] text-white">{pendingApprovals}</span>
+                        ) : null}
+                      </NavLink>
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -189,7 +218,9 @@ function AdminLayout({ title, children }: AdminLayoutProps) {
               onClick={handleLogout}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-black text-red-600 transition hover:bg-red-50"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-base text-red-600">⏻</span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600">
+                <LogOut size={18} strokeWidth={2.4} aria-hidden="true" />
+              </span>
               <span>Logout</span>
             </button>
           </div>

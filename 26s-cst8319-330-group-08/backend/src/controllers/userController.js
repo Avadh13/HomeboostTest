@@ -1,5 +1,17 @@
 const pool = require("../config/db");
 
+const getUserById = async (id) => {
+  const [[user]] = await pool.query("SELECT id, role, is_active FROM users WHERE id = ? LIMIT 1", [id]);
+  return user || null;
+};
+
+const getActiveSuperAdminCount = async () => {
+  const [[row]] = await pool.query(
+    "SELECT COUNT(*) AS count FROM users WHERE role = 'super_admin' AND is_active = 1"
+  );
+  return Number(row?.count || 0);
+};
+
 exports.getUsers = async (req, res) => {
   try {
     const [users] = await pool.query(
@@ -69,6 +81,28 @@ exports.updateUserRole = async (req, res) => {
       });
     }
 
+    const targetUser = await getUserById(id);
+    if (!targetUser) {
+      return res.status(404).json({ status: "error", message: "User not found" });
+    }
+
+    if (Number(req.user?.id) === Number(id) && targetUser.role === "super_admin" && role !== "super_admin") {
+      return res.status(403).json({
+        status: "error",
+        message: "Super Admins cannot demote their own account.",
+      });
+    }
+
+    if (targetUser.role === "super_admin" && role !== "super_admin" && Number(targetUser.is_active) === 1) {
+      const activeSuperAdmins = await getActiveSuperAdminCount();
+      if (activeSuperAdmins <= 1) {
+        return res.status(403).json({
+          status: "error",
+          message: "At least one active Super Admin must remain.",
+        });
+      }
+    }
+
     await pool.query("UPDATE users SET role = ? WHERE id = ?", [role, id]);
 
     res.json({
@@ -91,6 +125,28 @@ exports.updateUserStatus = async (req, res) => {
 
     const statusValue = Number(is_active) === 1 ? 1 : 0;
 
+    const targetUser = await getUserById(id);
+    if (!targetUser) {
+      return res.status(404).json({ status: "error", message: "User not found" });
+    }
+
+    if (Number(req.user?.id) === Number(id) && statusValue === 0) {
+      return res.status(403).json({
+        status: "error",
+        message: "You cannot disable your own account.",
+      });
+    }
+
+    if (targetUser.role === "super_admin" && Number(targetUser.is_active) === 1 && statusValue === 0) {
+      const activeSuperAdmins = await getActiveSuperAdminCount();
+      if (activeSuperAdmins <= 1) {
+        return res.status(403).json({
+          status: "error",
+          message: "At least one active Super Admin must remain.",
+        });
+      }
+    }
+
     await pool.query("UPDATE users SET is_active = ? WHERE id = ?", [
       statusValue,
       id,
@@ -108,3 +164,5 @@ exports.updateUserStatus = async (req, res) => {
     });
   }
 };
+
+exports._private = { getUserById, getActiveSuperAdminCount };
