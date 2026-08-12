@@ -80,7 +80,7 @@ const createOrRefreshEmployeeInvite = async (
   }
 
   const [[existingInvite]] = await connection.query(
-    `SELECT id, status
+    `SELECT id, status, invite_role
      FROM employee_invites
      WHERE partnership_id = ? AND email = ?
      LIMIT 1 FOR UPDATE`,
@@ -91,6 +91,13 @@ const createOrRefreshEmployeeInvite = async (
       "This invite has already been registered",
       409,
       "INVITE_ALREADY_REGISTERED",
+    );
+  }
+  if (existingInvite?.invite_role && existingInvite.invite_role !== "employee") {
+    throw new InviteLifecycleError(
+      "This email already has a non-employee invitation. Resolve or revoke that invitation before creating an employee invite.",
+      409,
+      "INVITE_ROLE_CONFLICT",
     );
   }
 
@@ -196,7 +203,8 @@ const revokePendingBatchInvites = async (connection, { batchId, partnershipId = 
          invite_code_hash = NULL
      WHERE enrollment_batch_id = ?
        ${partnershipClause}
-       AND status = 'invited'`,
+       AND status = 'invited'
+       AND invite_role = 'employee'`,
     params,
   );
 
