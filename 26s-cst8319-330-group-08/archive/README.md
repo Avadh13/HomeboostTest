@@ -10,11 +10,11 @@ Archived files are retained for history and recovery, but they are not required 
 
 ### `legacy/frontend/`
 
-Contains unused or superseded frontend files confirmed to have no live imports/routes, including Vite starter assets, the generic Vite template README, old route guards, unused Admin UI primitives, and two obsolete ChatWidget implementations. The active application uses `RoleProtectedRoute`, `AdminProtectedRoute`, and `MessageCenter` instead.
+Contains confirmed unused or superseded frontend files: Vite starter assets, the generic Vite template README, unused `App.css`, obsolete route guards, unused Admin UI primitives, and the old page-level `ChatWidget` implementation. The active application keeps `components/ChatWidget.tsx`, `MessageCenter`, `RoleProtectedRoute`, and `AdminProtectedRoute` in the normal source tree.
 
 ### `legacy/docs/`
 
-Contains historical analysis, temporary handoff/status material, obsolete demo/testing notes, and superseded implementation notes. Current operational documentation remains under `docs/`.
+Contains historical analysis, temporary handoff/status material, obsolete demo/testing notes, and superseded implementation notes. Current operational and requirements documentation remains under `docs/`.
 
 ### `legacy/sql/`
 
